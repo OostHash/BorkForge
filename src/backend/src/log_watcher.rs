@@ -249,7 +249,13 @@ pub(crate) fn handle_riven_events(
 
     let cooldown_ok = last_riven_fire.is_none_or(|t| t.elapsed().as_secs() >= 4);
 
-    if riven_trigger && cooldown_ok {
+    if riven_trigger
+        && cooldown_ok
+        && app
+            .state::<AppState>()
+            .overlays_enabled
+            .load(Ordering::SeqCst)
+    {
         *last_riven_fire = Some(std::time::Instant::now());
         let _ = app.emit(events::RIVEN_SCREEN_OPEN, ());
         let _ = app.emit(events::FF_STATUS, "🎲 Riven screen detected");
@@ -317,10 +323,9 @@ pub(crate) fn handle_relic_pick_events(
     if lower.contains("themedprojectionmanager.lua: populateinventorygrid") {
         info!("relic-pick: PopulateInventoryGrid detected — spawning OCR thread");
         let now = std::time::Instant::now();
-        let relic_pick_on = app
-            .state::<AppState>()
-            .relic_pick_overlay_enabled
-            .load(Ordering::SeqCst);
+        let state = app.state::<AppState>();
+        let relic_pick_on = state.overlays_enabled.load(Ordering::SeqCst)
+            && state.relic_pick_overlay_enabled.load(Ordering::SeqCst);
         let should_trigger = relic_pick_on
             && last_relic_pick_trigger.is_none_or(|t| now.duration_since(t).as_secs() >= 5);
         if should_trigger {
@@ -329,10 +334,22 @@ pub(crate) fn handle_relic_pick_events(
             std::thread::spawn(move || {
                 // Brief delay for the screen to finish rendering before capture.
                 std::thread::sleep(std::time::Duration::from_millis(400));
+                let state = app_clone.state::<AppState>();
+                if !state.overlays_enabled.load(Ordering::SeqCst)
+                    || !state.relic_pick_overlay_enabled.load(Ordering::SeqCst)
+                {
+                    return;
+                }
                 let era = crate::ocr::detect_fissure_era();
                 info!("relic-pick: OCR result = {:?}", era);
                 if let Some(era) = era {
                     let payload = build_relic_pick_payload(&era, &app_clone);
+                    let state = app_clone.state::<AppState>();
+                    if !state.overlays_enabled.load(Ordering::SeqCst)
+                        || !state.relic_pick_overlay_enabled.load(Ordering::SeqCst)
+                    {
+                        return;
+                    }
                     let relic_count = payload["relics"].as_array().map_or(0, |a| a.len());
                     info!(
                         "relic-pick: emitting relic-pick-open era={} relics={}",
@@ -341,6 +358,14 @@ pub(crate) fn handle_relic_pick_events(
                     // Show the overlay window from Rust — more reliable than
                     // calling win.show() from the WebView (avoids timing races).
                     relic_pick_show(&app_clone);
+                    let state = app_clone.state::<AppState>();
+                    if !state.overlays_enabled.load(Ordering::SeqCst)
+                        || !state.relic_pick_overlay_enabled.load(Ordering::SeqCst)
+                    {
+                        relic_pick_hide(&app_clone);
+                        let _ = app_clone.emit(events::RELIC_PICK_CLOSE, ());
+                        return;
+                    }
                     let _ = app_clone.emit(events::RELIC_PICK_OPEN, payload);
                 }
             });
@@ -542,12 +567,61 @@ pub(crate) fn collect_session_relics(text: &str, session_relics: &mut Vec<String
     }
 }
 
+/// Catch up `session_relics` from EE.log history at thread startup, for when
+/// FrameForge is launched mid-mission — the live tailer only reads forward from
+/// the file's current end, so any relic loads that already happened this mission
+/// (before FrameForge attached) would otherwise never enter the OCR prefilter.
+///
+/// Reads the last `BACKFILL_BYTES` of EE.log and only considers text after the
+/// most recent dismiss marker in that window (mirroring the live clear-on-dismiss
+/// behavior), so relics from an already-closed earlier cycle aren't seeded in.
+pub(crate) fn seed_session_relics(log_path: &std::path::Path, session_relics: &mut Vec<String>) {
+    use std::io::{Read, Seek, SeekFrom};
+    const BACKFILL_BYTES: u64 = 4 * 1024 * 1024;
+
+    let Ok(mut f) = std::fs::File::open(log_path) else {
+        return;
+    };
+    let file_len = f.seek(SeekFrom::End(0)).unwrap_or(0);
+    let read_from = file_len.saturating_sub(BACKFILL_BYTES);
+    if f.seek(SeekFrom::Start(read_from)).is_err() {
+        return;
+    }
+    let mut buf = Vec::with_capacity((file_len - read_from) as usize);
+    if f.read_to_end(&mut buf).is_err() {
+        return;
+    }
+    let Ok(text) = std::str::from_utf8(&buf) else {
+        return;
+    };
+
+    // ASCII-only lowercasing keeps byte offsets aligned with `text` so the slice
+    // below can't land mid-character (unlike `to_lowercase()`, which can change
+    // byte length for some non-ASCII input such as accented player names).
+    let lower = text.to_ascii_lowercase();
+    let last_dismiss_pos = [
+        "relic reward screen shut down",
+        "closevoidprojectionrewardscreen",
+        "matchingservice::endsession",
+    ]
+    .iter()
+    .filter_map(|marker| lower.rfind(marker))
+    .max();
+    let scan_from = last_dismiss_pos.unwrap_or(0);
+    collect_session_relics(&text[scan_from..], session_relics);
+}
+
 #[derive(Default)]
 pub(crate) struct VoidProjectionState {
     in_sequence: bool,
     sequence_completed: bool,
     other_ids: std::collections::HashSet<String>,
     own_item: String,
+    // Squad members who cracked nothing this round ("<id> gets reward NULL").
+    // No reward card is shown for them, so the EE hint (expected card count)
+    // must subtract them from squad size or OCR retries past the point where
+    // every real card has already been found.
+    null_reward_ids: std::collections::HashSet<String>,
 }
 
 impl VoidProjectionState {
@@ -576,6 +650,7 @@ pub(crate) fn collect_void_projection_state(
         if lower.contains("voidprojections: getvoidprojectionreward") {
             state.in_sequence = true;
             state.other_ids.clear();
+            state.null_reward_ids.clear();
             state.own_item.clear();
             if let Ok(mut size) = squad_size.lock() {
                 *size = None;
@@ -591,8 +666,15 @@ pub(crate) fn collect_void_projection_state(
                 if let Some(id) = lower.split_whitespace().last() {
                     state.other_ids.insert(id.to_string());
                 }
+            } else if lower.contains("gets reward null") {
+                if let Some(id) = lower.split_whitespace().next() {
+                    state.null_reward_ids.insert(id.to_string());
+                }
             } else if lower.contains("has reward info for all players now") {
-                let squad = (1 + state.other_ids.len()).clamp(1, 4);
+                let squad_total = (1 + state.other_ids.len()).clamp(1, 4);
+                let squad = squad_total
+                    .saturating_sub(state.null_reward_ids.len())
+                    .max(1);
                 if let Ok(mut size) = squad_size.lock() {
                     *size = Some(squad);
                 }
@@ -604,13 +686,16 @@ pub(crate) fn collect_void_projection_state(
                         "[EE.log] VoidProjections squad\n\\
                          ├─ Local item : {}\n\\
                          ├─ Other players (unique IDs) : {}\n\\
-                         └─ Squad size : {} total\n\n",
+                         ├─ Null rewards (no card) : {}\n\\
+                         └─ Squad size : {} total ({} expected card(s))\n\n",
                         if state.own_item.is_empty() {
                             "(not found)"
                         } else {
                             &state.own_item
                         },
                         state.other_ids.len(),
+                        state.null_reward_ids.len(),
+                        squad_total,
                         squad,
                     ),
                 );
@@ -675,6 +760,7 @@ pub(crate) fn dismiss_relic_rewards(
     diag_dir: &std::sync::Arc<std::sync::Mutex<Option<std::path::PathBuf>>>,
     reward_screen_active: &std::sync::Arc<std::sync::atomic::AtomicBool>,
     rewards_emitted_ms: &std::sync::Arc<std::sync::atomic::AtomicU64>,
+    best_reward_payload: &std::sync::Arc<std::sync::Mutex<Option<serde_json::Value>>>,
     state: DismissState<'_>,
 ) -> bool {
     let DismissState {
@@ -724,6 +810,13 @@ pub(crate) fn dismiss_relic_rewards(
     reward_screen_active.store(false, Ordering::SeqCst);
     *active_since = None;
     *last_dismiss_at = Some(std::time::Instant::now());
+    // Only clear on a true mission/session boundary. Endless missions (Survival,
+    // Excavation, etc.) pick relics once and reuse them across every reward
+    // rotation — the game never re-logs "Resource load completed" for a relic
+    // already in memory, so clearing on every rotation's dismiss (as opposed to
+    // just the final one) would empty session_relics for every rotation after
+    // the first, forcing OCR to fall back to the full ~700-item catalog instead
+    // of the narrowed one. That's what made 4.5.9 feel slow on infinite missions.
     if lower.contains("matchingservice::endsession") {
         session_relics.clear();
     }
@@ -737,7 +830,27 @@ pub(crate) fn dismiss_relic_rewards(
         .duration_since(std::time::UNIX_EPOCH)
         .map(|duration| duration.as_millis() as u64)
         .unwrap_or(0);
-    let delay_ms = if emitted_at > 0 {
+
+    // Nothing was ever shown this session (OCR never reached complete/soft-complete)
+    // but a confirmed partial match may be sitting ready — publish it now instead of
+    // discarding it, so the user sees something rather than nothing. The full grace
+    // period applies from this moment since the overlay hasn't been visible yet.
+    let late_payload = if emitted_at == 0 {
+        best_reward_payload
+            .lock()
+            .ok()
+            .and_then(|mut guard| guard.take())
+    } else {
+        None
+    };
+    let delay_ms = if let Some(payload) = &late_payload {
+        publish_relic_rewards(app, Some(payload));
+        append_to_diag(
+            session_log_path,
+            "[STEP 3] OVERLAY OPENED (published on dismiss — partial result)\n\n",
+        );
+        MIN_DISPLAY_MS
+    } else if emitted_at > 0 {
         MIN_DISPLAY_MS.saturating_sub(now_ms.saturating_sub(emitted_at))
     } else {
         0
@@ -771,19 +884,47 @@ pub(crate) fn auto_dismiss_relic_rewards(
     reward_screen_active: &std::sync::Arc<std::sync::atomic::AtomicBool>,
     active_since: &mut Option<std::time::Instant>,
     last_dismiss_at: &mut Option<std::time::Instant>,
+    rewards_emitted_ms: &std::sync::Arc<std::sync::atomic::AtomicU64>,
 ) {
     let Some(since) = *active_since else { return };
     if since.elapsed().as_secs() < 20 {
         return;
     }
+    close_reward_overlay(
+        app,
+        session_log_path,
+        diag_dir,
+        reward_screen_active,
+        active_since,
+        last_dismiss_at,
+        rewards_emitted_ms,
+        "AUTO-DISMISS (20s timeout)",
+    );
+}
+
+/// Hide the reward overlay now and clear its state. Used by the 20 s timeout and
+/// when the relic-pick grid opens (the reward screen has closed by then, even if
+/// its "shut down" line hasn't reached EE.log yet). Skips the 5 s minimum display.
+pub(crate) fn close_reward_overlay(
+    app: &tauri::AppHandle,
+    session_log_path: &std::path::Path,
+    diag_dir: &std::sync::Arc<std::sync::Mutex<Option<std::path::PathBuf>>>,
+    reward_screen_active: &std::sync::Arc<std::sync::atomic::AtomicBool>,
+    active_since: &mut Option<std::time::Instant>,
+    last_dismiss_at: &mut Option<std::time::Instant>,
+    rewards_emitted_ms: &std::sync::Arc<std::sync::atomic::AtomicU64>,
+    reason: &str,
+) {
+    let open_for = active_since.map(|since| since.elapsed().as_secs_f64());
     append_to_diag(
         session_log_path,
         &format!(
-            "[STEP 4] AUTO-DISMISS (20s timeout)\n\\
-             ├─ Time     : {}\n\\
-             └─ Open for : {:.1}s\n\n",
+            "[STEP 4] {}\n├─ Time     : {}\n└─ Open for : {}\n\n",
+            reason,
             chrono::Local::now().format("%H:%M:%S%.3f"),
-            since.elapsed().as_secs_f64(),
+            open_for
+                .map(|seconds| format!("{seconds:.1}s"))
+                .unwrap_or_else(|| "(unknown)".to_string()),
         ),
     );
     if let Ok(mut guard) = diag_dir.lock() {
@@ -794,6 +935,7 @@ pub(crate) fn auto_dismiss_relic_rewards(
     reward_screen_active.store(false, Ordering::SeqCst);
     *active_since = None;
     *last_dismiss_at = Some(std::time::Instant::now());
+    rewards_emitted_ms.store(0, Ordering::SeqCst);
     if let Some(window) = app.get_webview_window("relic-overlay") {
         let _ = window.set_position(tauri::Position::Physical(tauri::PhysicalPosition {
             x: 0,
@@ -909,12 +1051,14 @@ pub(crate) fn build_fallback_reward_catalog(
     (!catalog.is_empty()).then(|| std::sync::Arc::new(catalog))
 }
 
-/// Start the diagnostic files for a relic-reward OCR session.
+/// Start the diagnostic files for a relic-reward OCR session. `auto_capture_dir`
+/// is `Some` only when the user switched captures on (setting `autoDiagEnabled`):
+/// without a folder the screenshot and log copies below are skipped.
 pub(crate) fn prepare_reward_session(
     session_log_path: &std::path::Path,
     squad_names: &std::sync::Arc<std::sync::Mutex<Vec<String>>>,
     trigger: RewardTrigger<'_>,
-    auto_capture_dir: &std::path::Path,
+    auto_capture_dir: Option<&std::path::Path>,
     diag_dir: &std::sync::Arc<std::sync::Mutex<Option<std::path::PathBuf>>>,
     last_found_path: &std::path::Path,
 ) {
@@ -962,11 +1106,13 @@ pub(crate) fn prepare_reward_session(
     ) {
         warn!(error = %error, "session log write failed");
     }
-    let run_dir =
-        auto_capture_dir.join(chrono::Local::now().format("%Y-%m-%d_%H-%M-%S").to_string());
-    let _ = std::fs::create_dir_all(&run_dir);
+    let run_dir = auto_capture_dir
+        .map(|dir| dir.join(chrono::Local::now().format("%Y-%m-%d_%H-%M-%S").to_string()));
+    if let Some(dir) = &run_dir {
+        let _ = std::fs::create_dir_all(dir);
+    }
     if let Ok(mut guard) = diag_dir.lock() {
-        *guard = Some(run_dir);
+        *guard = run_dir;
     }
     let _ = std::fs::write(
         last_found_path,
@@ -1052,6 +1198,31 @@ pub(crate) async fn capture_reward_items(
     .flatten()
 }
 
+/// Save a desktop screenshot the instant the EE.log trigger fires, before any
+/// OCR capture/matching work begins. Call only after `prepare_reward_session`
+/// has populated `diag_dir` with this trigger's folder.
+///
+/// This is the ground-truth anchor for "was the trigger seen on time": the
+/// reward screen (and any on-screen match/mission timer) is already visible
+/// in-game by the time EE.log writes the trigger line, so this BMP shows
+/// exactly what the player saw at the moment FrameForge detected it — letting
+/// a late-looking overlay be diagnosed as a late *detection* (compare this
+/// screenshot's timer against when the trigger fired) vs. slow *OCR
+/// processing* (compare this screenshot against the later `screenshot.bmp`
+/// and the per-attempt timestamps in the session log).
+pub(crate) fn schedule_trigger_moment_capture(
+    diag_dir: std::sync::Arc<std::sync::Mutex<Option<std::path::PathBuf>>>,
+) {
+    let folder = diag_dir.lock().ok().and_then(|guard| guard.clone());
+    if let Some(folder) = folder {
+        tauri::async_runtime::spawn_blocking(move || {
+            if let Some((pixels, width, height)) = crate::ocr::capture_desktop_for_diag() {
+                let _ = write_bmp(&folder.join("trigger_moment.bmp"), &pixels, width, height);
+            }
+        });
+    }
+}
+
 /// Save a delayed desktop screenshot after the relic overlay has animated in.
 pub(crate) fn schedule_reward_diagnostic_capture(
     diag_dir: std::sync::Arc<std::sync::Mutex<Option<std::path::PathBuf>>>,
@@ -1111,6 +1282,14 @@ pub(crate) fn schedule_reward_safety_cleanup(
 
 /// Store the payload for a late overlay mount, then notify the frontend.
 pub(crate) fn publish_relic_rewards(app: &tauri::AppHandle, payload: Option<&serde_json::Value>) {
+    if payload.is_some_and(|payload| !payload.is_null())
+        && !app
+            .state::<AppState>()
+            .overlays_enabled
+            .load(Ordering::SeqCst)
+    {
+        return;
+    }
     if let Some(payload) = payload.filter(|payload| !payload.is_null()) {
         if let Ok(mut pending) = app.state::<AppState>().pending_relic_rewards.lock() {
             *pending = Some(payload.clone());
@@ -1349,6 +1528,25 @@ pub(crate) fn log_reward_best_result(
     let _ = std::fs::write(
         last_path,
         format!("=== {} ===\nItems: {:?}\n{}\n", ts, items, dbg),
+    );
+}
+
+pub(crate) fn log_reward_partial_no_improvement(
+    attempt: u32,
+    ts: &str,
+    items: &[String],
+    dbg: &str,
+    session_log_path: &std::path::Path,
+) {
+    let _ = crate::append_to_file(
+        session_log_path,
+        &format!(
+            "[STEP 2] OCR ATTEMPT #{}\n\
+             \u{251c}\u{2500} Time     : {}\n\
+             {}\n\
+             \u{2514}\u{2500} RESULT   : {} items found (no improvement over best) \u{2192} retrying in 400ms\n\n",
+            attempt, ts, dbg, items.len()
+        ),
     );
 }
 

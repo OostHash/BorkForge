@@ -634,6 +634,26 @@ fn hardcoded_card_centers(n: usize) -> Vec<f32> {
     }
 }
 
+/// Groups x-positions into clusters: a value joins the running cluster while it
+/// stays within `gap` of that cluster's mean. Returns each cluster's mean, left to right.
+fn cluster_x_centers(mut xs: Vec<f32>, gap: f32) -> Vec<f32> {
+    xs.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    let mut clusters: Vec<(f32, usize)> = Vec::new(); // (sum, count)
+    for x in xs {
+        match clusters.last_mut() {
+            Some((sum, n)) if x - *sum / *n as f32 <= gap => {
+                *sum += x;
+                *n += 1;
+            }
+            _ => clusters.push((x, 1)),
+        }
+    }
+    clusters
+        .into_iter()
+        .map(|(sum, n)| sum / n as f32)
+        .collect()
+}
+
 fn build_word_set(texts: &[String]) -> std::collections::HashSet<String> {
     let corrected = texts
         .join(" ")
@@ -667,11 +687,18 @@ fn score_item(display_name: &str, words: &std::collections::HashSet<String>) -> 
         .filter(|&&w| word_found_in_set(w, words))
         .count();
 
-    let base = (matched as f32 / n_catalog).max(if n_ocr > 0.0 {
-        matched as f32 / n_ocr
+    // A full catalog match scores 1.0. A partial match is capped at 0.9, so an
+    // extra unmatched catalog word (e.g. "Chassis" on "Lavos Prime Chassis
+    // Blueprint") can't beat the exact name via the length bonus below.
+    let base = if matched == item_words.len() {
+        1.0
     } else {
-        0.0
-    });
+        (matched as f32 / n_catalog).max(if n_ocr > 0.0 {
+            matched as f32 / n_ocr
+        } else {
+            0.0
+        }) * 0.9
+    };
 
     let len_bonus: f32 = item_words
         .iter()
@@ -758,7 +785,6 @@ pub fn match_reward_items(params: MatchParams<'_>) -> (bool, bool, Vec<String>, 
                 .all(|w| BADGE_WORDS.contains(&w.to_lowercase().as_str()))
     };
 
-    let raw_norm = normalise(raw_full);
     let is_prime_like = |w: &str| -> bool {
         if w.starts_with("prim") && w.len() >= 4 {
             return true;
@@ -780,6 +806,37 @@ pub fn match_reward_items(params: MatchParams<'_>) -> (bool, bool, Vec<String>, 
         }
         false
     };
+
+    // Title lines that survive the y/badge/player-name filters, by x-position.
+    let title_lines: Vec<&str> = ocr_lines
+        .iter()
+        .filter(|(t, _, y)| {
+            t.trim().len() >= 3
+                && *y >= 0.10
+                && *y < ocr_y_max
+                && !is_player_name(t)
+                && !is_ui_badge(t)
+        })
+        .map(|(t, _, _)| t.as_str())
+        .collect();
+    let title_xs: Vec<f32> = ocr_lines
+        .iter()
+        .filter(|(t, _, y)| {
+            t.trim().len() >= 3
+                && *y >= 0.10
+                && *y < ocr_y_max
+                && !is_player_name(t)
+                && !is_ui_badge(t)
+        })
+        .map(|(_, x, _)| *x)
+        .collect();
+    // Count prime/forma keywords only in title-row text, not the full OCR blob.
+    // Hover-tooltip descriptions and duplicate badge-style lines below the bar
+    // (y >= ocr_y_max) also say "Prime"/"Forma" and previously inflated this
+    // count above the true number of cards, making the estimated card count
+    // (and therefore is_complete) unreachable — the retry loop would then spin
+    // for the full timeout without ever handing off to the overlay.
+    let raw_norm = normalise(&title_lines.join(" "));
     let prime_count = raw_norm
         .split_whitespace()
         .filter(|&w| is_prime_like(w))
@@ -788,40 +845,8 @@ pub fn match_reward_items(params: MatchParams<'_>) -> (bool, bool, Vec<String>, 
         .split_whitespace()
         .filter(|&w| is_forma_like(w))
         .count();
-
-    let ocr_cluster_count: usize = {
-        let mut xs: Vec<f32> = ocr_lines
-            .iter()
-            .filter(|(t, _, y)| {
-                t.trim().len() >= 3
-                    && *y >= 0.10
-                    && *y < ocr_y_max
-                    && !is_player_name(t)
-                    && !is_ui_badge(t)
-            })
-            .map(|(_, x, _)| *x)
-            .collect();
-        xs.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
-        if xs.is_empty() {
-            0
-        } else {
-            let mut count = 1usize;
-            let mut cluster_sum = xs[0];
-            let mut cluster_n = 1usize;
-            for &x in &xs[1..] {
-                let center = cluster_sum / cluster_n as f32;
-                if x - center > 0.10 {
-                    count += 1;
-                    cluster_sum = x;
-                    cluster_n = 1;
-                } else {
-                    cluster_sum += x;
-                    cluster_n += 1;
-                }
-            }
-            count.min(4)
-        }
-    };
+    let title_cluster_centers = cluster_x_centers(title_xs, 0.10);
+    let ocr_cluster_count: usize = title_cluster_centers.len().min(4);
     let word_card_count = (prime_count + forma_count)
         .max(ocr_cluster_count)
         .max(hint_squad_size.unwrap_or(0))
@@ -830,8 +855,13 @@ pub fn match_reward_items(params: MatchParams<'_>) -> (bool, bool, Vec<String>, 
     let bars_trusted = !card_centers.is_empty()
         && card_centers.len() == word_card_count
         && bar_centers_are_valid(&card_centers);
+    // Fallback columns come from the title x-clusters, not a fixed 4-slot grid.
+    // A wrapped title ("Dethcube Prime" / "Carapace") shares one cluster, so it
+    // stays on one card. The fixed grid split it across two columns.
     let active_centers: Vec<f32> = if bars_trusted {
         card_centers.clone()
+    } else if !title_cluster_centers.is_empty() && title_cluster_centers.len() <= 4 {
+        title_cluster_centers.clone()
     } else {
         hardcoded_card_centers(word_card_count)
     };
@@ -1342,7 +1372,15 @@ pub fn extract_reward_items_twophase(
     {
         let lower = raw_full.to_lowercase();
         const QUALITY: &[&str] = &["intact", "exceptional", "flawless", "radiant"];
-        if lower.contains(" relic") && QUALITY.iter().any(|q| lower.contains(q)) {
+        // The reward card screen's own header names the cracked relic (e.g. "Axi D6
+        // Intact"), which previously tripped this same check and caused the real
+        // reward screen to be skipped for its entire lifetime. The pre-mission/
+        // inter-rotation relic PICKER screen is the thing this check is meant to
+        // catch, and it lists several of the player's relics at once — so require
+        // at least two quality-word hits (one single mention is just the reward
+        // screen's own header) before treating it as the picker and skipping.
+        let quality_hits: usize = QUALITY.iter().map(|q| lower.matches(q).count()).sum();
+        if lower.contains(" relic") && quality_hits >= 2 {
             return (
                 false,
                 true,

@@ -1,0 +1,119 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { clearMocks, mockIPC, mockWindows } from "@tauri-apps/api/mocks";
+import { afterEach, expect, it, vi } from "vitest";
+import { page } from "vitest/browser";
+import { cleanup, render } from "vitest-browser-react";
+import { appKeys } from "../api/app";
+import { Header } from "./Header";
+
+afterEach(async () => {
+  await cleanup();
+  clearMocks();
+});
+
+type Backend = { settings?: Record<string, unknown>; session?: [string, string] | null; monitoring?: boolean };
+
+function setup(backend: Backend = {}) {
+  const calls: string[] = [];
+  mockWindows("main");
+  mockIPC((cmd) => {
+    calls.push(cmd);
+    switch (cmd) {
+      case "load_settings":
+        return JSON.stringify(backend.settings ?? {});
+      case "wfm_get_session":
+        return backend.session ?? null;
+      case "get_monitor_status":
+        return backend.monitoring ?? false;
+      case "get_player_name":
+        return "Tenno";
+      case "get_cache_statuses":
+        return {
+          worldstate: { source: "fresh", last_updated: null, warning: null },
+          "drop-data": { source: "stale", last_updated: null, warning: null },
+        };
+      default:
+        return null;
+    }
+  });
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const onOpenScreen = vi.fn();
+  const onOpenSettings = vi.fn();
+  return { calls, client, onOpenScreen, onOpenSettings };
+}
+
+const mount = ({ client, onOpenScreen, onOpenSettings }: { client: QueryClient; onOpenScreen: (id: string) => void; onOpenSettings: () => void }) =>
+  render(
+    <QueryClientProvider client={client}>
+      <Header onOpenScreen={onOpenScreen} onOpenSettings={onOpenSettings} />
+    </QueryClientProvider>,
+  );
+
+it("shows the account, and the memory scanner as OFF by default", async () => {
+  const ctx = setup();
+  ctx.client.setQueryData(appKeys.player, { name: null, masteryRank: 27 });
+  await mount(ctx);
+  await expect.element(page.getByText("MR 27")).toBeVisible();
+  await expect.element(page.getByText("Memory")).toBeVisible();
+  await expect.element(page.getByText("OFF")).toBeVisible();
+  await page.getByRole("button", { name: "Settings" }).click();
+  expect(ctx.onOpenSettings).toHaveBeenCalledOnce();
+  ctx.onOpenSettings.mockClear();
+  // OFF opens Settings.
+  await page.getByRole("button", { name: /^Memory ?: OFF$/ }).click();
+  expect(ctx.onOpenSettings).toHaveBeenCalledOnce();
+});
+
+it("pokes the scanner when the game is not found", async () => {
+  const ctx = setup({ settings: { memoryScannerEnabled: true }, monitoring: true });
+  await mount(ctx);
+  const chip = page.getByRole("button", { name: /^Memory ?: No Game$/ });
+  await chip.click();
+  await expect.element(page.getByText("Checking…")).toBeVisible();
+  expect(ctx.calls).toContain("poke_scan");
+});
+
+it("opens Market from the WFM chip when logged out", async () => {
+  const ctx = setup();
+  await mount(ctx);
+  await page.getByRole("button", { name: /^WFM ?: Not logged in$/ }).click();
+  expect(ctx.onOpenScreen).toHaveBeenCalledWith("market");
+});
+
+it("shows WFM online without an action", async () => {
+  const ctx = setup({ session: ["tenno", "online"] });
+  await mount(ctx);
+  await expect.element(page.getByText("Online")).toBeVisible();
+  expect(page.getByRole("button", { name: /WFM/ }).query()).toBeNull();
+});
+
+it("lists the data caches and refreshes them all", async () => {
+  const ctx = setup();
+  await mount(ctx);
+  await page.getByRole("button", { name: /^Data ?: stale$/ }).click();
+  const panel = page.getByRole("dialog", { name: "Data caches" });
+  await expect.element(panel.getByText("Worldstate")).toBeVisible();
+  await expect.element(panel.getByText("stale · never")).toBeVisible();
+  await panel.getByRole("button", { name: "Refresh all data" }).click();
+  await expect.element(panel.getByRole("button", { name: /Refreshing…/ })).toHaveAttribute("aria-busy", "true");
+  expect(ctx.calls).toContain("refresh_all_caches");
+});
+
+it("offers a pending update, and hides it when dismissed", async () => {
+  const ctx = setup();
+  ctx.client.setQueryData(appKeys.update, "2.4.0");
+  await mount(ctx);
+  await expect.element(page.getByRole("button", { name: "Update to v2.4.0" })).toBeVisible();
+  await page.getByRole("button", { name: "Dismiss update" }).click();
+  expect(page.getByRole("button", { name: "Update to v2.4.0" }).query()).toBeNull();
+});
+
+it("installs the update and shows progress", async () => {
+  const ctx = setup();
+  ctx.client.setQueryData(appKeys.update, "2.4.0");
+  mockIPC((cmd) => (cmd === "install_update" ? new Promise(() => undefined) : null));
+  await mount(ctx);
+  await page.getByRole("button", { name: "Update to v2.4.0" }).click();
+  await expect.element(page.getByRole("button", { name: /Installing…/ })).toHaveAttribute("aria-busy", "true");
+  expect(page.getByRole("button", { name: "Dismiss update" }).query()).toBeNull();
+});

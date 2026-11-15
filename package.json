@@ -6,15 +6,21 @@
     "node": ">=24"
   },
   "scripts": {
-    "build": "pnpm --filter @borkforge/desktop build",
-    "check": "pnpm typecheck && pnpm test && cargo fmt --all -- --check && cargo check --workspace --all-targets",
-    "dev": "pnpm --filter @borkforge/desktop dev",
+    "build": "pnpm --filter @borkforge/frontend build",
+    "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && cargo fmt --all -- --check && cargo check --workspace --all-targets",
+    "dev": "pnpm --filter @borkforge/frontend dev",
     "desktop": "pnpm --filter @borkforge/backend tauri",
     "desktop:build": "pnpm --filter @borkforge/backend tauri:build",
     "desktop:dev": "pnpm --filter @borkforge/backend tauri:dev",
+    "format": "pnpm --filter @borkforge/frontend format && cargo fmt --all",
+    "format:check": "pnpm --filter @borkforge/frontend format:check",
+    "lint": "pnpm --filter @borkforge/frontend lint",
     "test": "pnpm test:frontend && pnpm test:backend",
+    "test:a11y": "pnpm --filter @borkforge/frontend test:a11y",
     "test:backend": "cargo test --workspace",
-    "test:frontend": "pnpm --filter @borkforge/desktop test",
-    "typecheck": "pnpm --filter @borkforge/desktop typecheck"
+    "test:e2e": "pnpm --filter @borkforge/frontend test:e2e",
+    "test:frontend": "pnpm --filter @borkforge/frontend test",
+    "test:visual": "pnpm --filter @borkforge/frontend test:visual",
+    "typecheck": "pnpm --filter @borkforge/frontend typecheck"
   }
 }

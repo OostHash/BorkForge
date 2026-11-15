@@ -14,7 +14,6 @@ pub(crate) fn wfm_load_credentials() -> Result<Option<(String, String)>, String>
     Platform::load_credentials(WFM_TARGET)
 }
 
-#[tauri::command]
 pub(crate) async fn wfm_delete_credentials() -> Result<(), String> {
     Platform::delete_credentials(WFM_TARGET)
 }

@@ -1,5 +1,5 @@
 //! Centralized Tauri event name constants — every `.emit()` call site in
-//! `src/backend/src` should reference one of these instead of a string literal.
+//! `src-tauri/src` should reference one of these instead of a string literal.
 //! Mirrors `src/constants/tauri.ts`'s `TAURI_EVENTS` object; keep both in sync
 //! when adding, renaming, or retiring an event.
 //!
@@ -31,6 +31,7 @@ pub const RIVEN_UNVEILED: &str = "riven-unveiled";
 pub const INVENTORY_UPDATE: &str = "inventory-update";
 pub const INVENTORY_REWARD: &str = "inventory-reward";
 pub const CATALOGUE_UPDATED: &str = "catalogue-updated";
+pub const BULK_PRICES_UPDATED: &str = "bulk-prices-updated";
 pub const TRADE_COMPLETED: &str = "trade-completed";
 
 pub const BLOB_STATUS: &str = "blob-status";

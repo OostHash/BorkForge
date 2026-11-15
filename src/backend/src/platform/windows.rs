@@ -243,11 +243,6 @@ impl Iterator for RegionIter<'_> {
                         || protect & 0x20 != 0
                         || protect & 0x40 != 0
                         || protect & 0x80 != 0),
-                is_writable: mbi.State == MEM_COMMIT
-                    && (protect & 0x04 != 0
-                        || protect & 0x08 != 0
-                        || protect & 0x40 != 0
-                        || protect & 0x80 != 0),
                 is_executable: protect & 0x10 != 0 || protect & 0x20 != 0 || protect & 0x40 != 0,
                 backing: if mbi.Type == 0x1000000 {
                     RegionBacking::File
@@ -335,26 +330,4 @@ pub fn get_warframe_window_rect() -> Result<[i32; 4], String> {
     unsafe { ClientToScreen(hwnd, &mut origin) };
 
     Ok([origin.x, origin.y, r.right - r.left, r.bottom - r.top])
-}
-
-pub fn set_overlay_topmost() {
-    use windows_sys::Win32::UI::WindowsAndMessaging::{
-        FindWindowW, SetWindowPos, HWND_TOPMOST, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE,
-    };
-
-    let title: Vec<u16> = "FrameForge Overlay\0".encode_utf16().collect();
-    let hwnd = unsafe { FindWindowW(std::ptr::null(), title.as_ptr()) };
-    if hwnd != 0 {
-        unsafe {
-            SetWindowPos(
-                hwnd,
-                HWND_TOPMOST,
-                0,
-                0,
-                0,
-                0,
-                SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE,
-            );
-        }
-    }
 }

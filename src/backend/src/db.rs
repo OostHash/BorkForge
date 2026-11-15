@@ -341,11 +341,6 @@ pub fn get_trades(conn: &Connection) -> Result<Vec<Trade>> {
     Ok(rows)
 }
 
-pub fn delete_trade(conn: &Connection, id: i64) -> Result<()> {
-    conn.execute("DELETE FROM trades WHERE id = ?1", params![id])?;
-    Ok(())
-}
-
 pub fn add_quantity_change(
     conn: &Connection,
     unique_name: &str,

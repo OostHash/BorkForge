@@ -5,7 +5,7 @@ use std::io::Write;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
-use tauri::{Manager, State};
+use tauri::{Emitter, Manager, State};
 use tracing::info;
 
 use app_state::{load_corrections, AppState};
@@ -37,6 +37,8 @@ mod mem_regions;
 mod memory_scanner;
 mod monitor;
 mod ocr;
+#[cfg(test)]
+mod ocr_bench;
 mod ocr_fallback;
 mod paths;
 mod platform;
@@ -295,7 +297,7 @@ fn load_initial_state(paths: InitialCachePaths<'_>) -> InitialState {
 fn setup_app(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     use tauri::Manager;
 
-    logging::init(app.handle());
+    logging::init();
 
     match paths::root() {
         Some(root) => info!("app root: {} (dev)", root.display()),
@@ -400,6 +402,7 @@ fn setup_app(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
                     state.wfm.cache_price(slug, Some(price));
                 }
             }
+            let _ = app_handle.emit(events::BULK_PRICES_UPDATED, ());
         });
     }
 
@@ -461,7 +464,6 @@ async fn start_monitor(app: tauri::AppHandle, state: State<'_, AppState>) -> Res
     // the memory scanner's on/off state.
     let debug_path = std::env::temp_dir().join("frameforge_reward_debug.txt");
     let last_found_path = std::env::temp_dir().join("frameforge_last_reward.txt");
-    monitor::start_memory_trigger(app.clone());
     monitor::start_legacy_reward_worker(flag, debug_path, last_found_path);
 
     Ok(())
@@ -647,8 +649,8 @@ pub fn run() {
             unmatched_paths_dir,
             corrections: initial.corrections,
             force_pid_check: Arc::new(AtomicBool::new(false)),
-            relic_pick_overlay_enabled: Arc::new(AtomicBool::new(true)),
-            mem_trigger_enabled: Arc::new(AtomicBool::new(false)),
+            relic_pick_overlay_enabled: Arc::new(AtomicBool::new(false)),
+            overlays_enabled: Arc::new(AtomicBool::new(false)),
         })
         .setup(setup_app)
         .invoke_handler(tauri::generate_handler![
@@ -665,18 +667,14 @@ pub fn run() {
             stats::get_item_snapshots,
             trade_log::get_trades,
             trade_log::add_trade,
-            trade_log::delete_trade,
             diagnostics::clear_cache,
             settings::load_settings,
             settings::save_settings,
-            diagnostics::read_scan_log,
             companion_api::log_api_changes,
             diagnostics::dump_memory_probe,
             diagnostics::toggle_raw_scan,
             diagnostics::set_blob_log,
             diagnostics::set_api_log,
-            diagnostics::get_app_version,
-            diagnostics::set_app_version,
             settings::force_quit,
             catalogue::get_weapon_catalog,
             catalogue::get_craftable_items,
@@ -684,9 +682,7 @@ pub fn run() {
             catalogue::get_recipe,
             catalogue::get_recipes_bulk,
             catalogue::get_relic_drops,
-            catalogue::get_relic_rewards,
             wfm_commands::fetch_wfm_items,
-            wfm_commands::fetch_wfm_price,
             wfm_queue::start_wfm_queue,
             wfm_queue::wfm_queue_prices,
             wfm_queue::wfm_queue_price_priority,
@@ -694,13 +690,12 @@ pub fn run() {
             wfm_top::get_wfm_top_items,
             wfm_commands::get_item_price,
             pricing::refresh_bulk_prices,
+            pricing::get_bulk_prices,
             updater::check_for_update,
             updater::install_update,
             settings::factory_reset,
             wfm_commands::wfm_set_status,
             rivens::ocr_riven_log_error,
-            rivens::riven_screen_visible,
-            rivens::riven_screen_status,
             rivens::save_riven_roll,
             rivens::get_saved_riven_rolls,
             rivens::delete_saved_riven_roll,
@@ -714,16 +709,11 @@ pub fn run() {
             wfm_commands::wfm_get_riven_attributes,
             wfm_commands::wfm_get_item_orders,
             wfm_commands::wfm_get_item_statistics,
-            wfm_commands::wfm_open_login_window,
-            wfm_commands::wfm_close_login_window,
-            wfm_commands::wfm_receive_jwt,
-            wfm_commands::wfm_receive_tokens,
             wfm_commands::wfm_refresh_token,
             wfm_commands::wfm_set_jwt,
             wfm_commands::wfm_get_jwt,
             credentials::wfm_save_credentials,
             credentials::wfm_load_credentials,
-            credentials::wfm_delete_credentials,
             wfm_commands::wfm_login,
             wfm_commands::wfm_logout,
             wfm_commands::wfm_get_session,
@@ -756,16 +746,10 @@ pub fn run() {
             diagnostics::get_overlay_session_log,
             relic_pick::get_pending_relic_rewards,
             diagnostics::log_relic_fe,
-            diagnostics::set_overlay_topmost,
-            diagnostics::inject_overlay_diagnostic,
-            diagnostics::debug_create_window,
             relic_pick::show_overlay_window,
             relic_pick::move_overlay_offscreen,
-            relic_pick::show_test_overlay_window,
-            relic_pick::hide_test_overlay_window,
             diagnostics::get_diag_folder_size,
             diagnostics::clear_diag_folder,
-            diagnostics::save_auto_diag_capture,
             diagnostics::capture_diagnostics,
             image_cache::get_img_cache_dir,
             image_cache::prewarm_image_cache,
@@ -776,13 +760,14 @@ pub fn run() {
             monitor::stop_monitor,
             monitor::poke_scan,
             monitor::set_relic_pick_enabled,
-            monitor::set_mem_trigger_enabled,
+            monitor::set_overlays_enabled,
             monitor::get_monitor_status,
-            catalogue::get_blueprint_names,
             platform::get_system_locale,
             catalogue::get_current_crafting,
             relic_pick::debug_detect_fissure_era,
             relic_pick::test_relic_pick_overlay,
+            relic_pick::hide_relic_pick_overlay,
+            relic_pick::show_relic_pick_window,
             relic_pick::debug_ee_log_tail,
             console_login::open_console_login,
             wfcd::get_drop_data,

@@ -8,80 +8,6 @@ use crate::append_to_file;
 type MemoryPattern = (&'static str, &'static [u8], usize, usize, u64, u64);
 
 #[tauri::command]
-pub(crate) fn get_app_version(app: tauri::AppHandle) -> String {
-    // Use the Tauri runtime version — same source the updater plugin uses for comparison.
-    // Falls back to CARGO_PKG_VERSION in dev mode where package_info may not be set.
-    let runtime = app.package_info().version.to_string();
-    if !runtime.is_empty() {
-        return runtime;
-    }
-    env!("CARGO_PKG_VERSION").to_string()
-}
-
-#[tauri::command]
-pub(crate) fn set_app_version(version: String) -> Result<(), String> {
-    let backend_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
-    let source_dir = backend_dir
-        .parent()
-        .ok_or_else(|| "Backend directory has no parent".to_string())?;
-    let tauri_conf = backend_dir.join("tauri.conf.json");
-    let package_json = source_dir.join("frontend/package.json");
-    let cargo_toml = backend_dir.join("Cargo.toml");
-    if tauri_conf.exists() {
-        update_version_in_file(&tauri_conf, &version)?;
-    }
-    if package_json.exists() {
-        update_version_in_file(&package_json, &version)?;
-    }
-    if cargo_toml.exists() {
-        update_cargo_toml_version(&cargo_toml, &version)?;
-    }
-    Ok(())
-}
-
-fn update_version_in_file(path: &std::path::Path, version: &str) -> Result<(), String> {
-    let content = std::fs::read_to_string(path).map_err(|e| e.to_string())?;
-    // Replace first occurrence of "version": "x.y.z"
-    let marker = "\"version\": \"";
-    if let Some(start) = content.find(marker) {
-        let after = start + marker.len();
-        if let Some(end) = content[after..].find('"') {
-            let mut updated = content.clone();
-            updated.replace_range(after..after + end, version);
-            std::fs::write(path, updated).map_err(|e| e.to_string())?;
-            return Ok(());
-        }
-    }
-    Err(format!("Version field not found in {}", path.display()))
-}
-
-fn update_cargo_toml_version(path: &std::path::Path, version: &str) -> Result<(), String> {
-    let content = std::fs::read_to_string(path).map_err(|e| e.to_string())?;
-    // Find [package] section then replace the first `version = "..."` line after it.
-    // The newline prefix avoids matching version keys inside dependency inline tables.
-    let pkg_marker = "[package]";
-    let ver_marker = "\nversion = \"";
-    if let Some(pkg_start) = content.find(pkg_marker) {
-        let after_pkg = pkg_start + pkg_marker.len();
-        if let Some(rel_start) = content[after_pkg..].find(ver_marker) {
-            let abs_start = after_pkg + rel_start + ver_marker.len();
-            if let Some(end) = content[abs_start..].find('"') {
-                let mut updated = content.clone();
-                updated.replace_range(abs_start..abs_start + end, version);
-                std::fs::write(path, updated).map_err(|e| e.to_string())?;
-                return Ok(());
-            }
-        }
-    }
-    Err(format!("Version field not found in {}", path.display()))
-}
-
-#[tauri::command]
-pub(crate) fn read_scan_log(state: State<AppState>) -> Result<String, String> {
-    std::fs::read_to_string(&state.log_path).map_err(|e| e.to_string())
-}
-
-#[tauri::command]
 pub(crate) async fn dump_memory_probe(state: State<'_, AppState>) -> Result<String, String> {
     let log_path = state.memory_probe_path.clone();
     let lines = tokio::task::spawn_blocking(|| crate::memory_scanner::dump_inventory_regions(40))
@@ -259,96 +185,6 @@ pub(crate) fn log_relic_fe(msg: String) {
     let _ = append_to_file(&path, &format!("[FE] {}\n", msg));
 }
 
-/// Force-set the relic-overlay window to HWND_TOPMOST via SetWindowPos.
-/// Called from JS on a 150 ms interval while the overlay is visible, to beat
-/// Warframe's continuous HWND_TOPMOST reassertion.
-#[tauri::command]
-pub(crate) fn set_overlay_topmost() {
-    use crate::platform::{Platform, WindowManager};
-    Platform::set_overlay_topmost();
-}
-
-/// Diagnostic: position a test window ON TOP OF WARFRAME (finds Warframe's HWND
-/// to guarantee the correct monitor) and inject a full-screen coloured div via
-/// evaluate_script — bypasses IPC and React entirely (Rust → WebView2 direct).
-/// Creates the window from Rust if the pre-declared one doesn't exist.
-/// Red = WebView renders, IPC broken. Green = WebView renders, IPC ok.
-/// Nothing at all = window creation failed or WebView not rendering.
-#[tauri::command]
-pub(crate) fn inject_overlay_diagnostic(app: tauri::AppHandle) -> String {
-    use tauri::{Manager, PhysicalPosition, PhysicalSize, WebviewUrl, WebviewWindowBuilder};
-
-    // Find Warframe's client area to anchor the diagnostic window to the right monitor.
-    use crate::platform::{Platform, WindowManager};
-    let rect = Platform::get_warframe_window_rect().unwrap_or([0, 0, 1920, 1080]);
-    let (wf_x, wf_y, wf_w, wf_h) = (rect[0], rect[1], rect[2], rect[3]);
-
-    // Place diagnostic at the vertical centre of the Warframe client area, full width.
-    let diag_x = wf_x;
-    let diag_y = wf_y + wf_h / 2 - 150;
-    let diag_w = wf_w.max(400) as u32;
-    let diag_h = 300u32;
-
-    let win = match app.get_webview_window("relic-overlay") {
-        Some(w) => w,
-        None => {
-            // Pre-declared window missing — create a fresh one from Rust.
-            match WebviewWindowBuilder::new(
-                &app,
-                "relic-overlay",
-                WebviewUrl::App("index.html#overlay".into()),
-            )
-            .title("FrameForge Overlay")
-            .position(diag_x as f64, diag_y as f64)
-            .inner_size(diag_w as f64, diag_h as f64)
-            .transparent(true)
-            .decorations(false)
-            .always_on_top(true)
-            .skip_taskbar(true)
-            .resizable(false)
-            .focused(false)
-            .build()
-            {
-                Ok(w) => w,
-                Err(e) => return format!("create-err:{e}"),
-            }
-        }
-    };
-
-    let _ = win.set_position(tauri::Position::Physical(PhysicalPosition {
-        x: diag_x,
-        y: diag_y,
-    }));
-    let _ = win.set_size(tauri::Size::Physical(PhysicalSize {
-        width: diag_w,
-        height: diag_h,
-    }));
-    let _ = win.set_always_on_top(true);
-    let _ = win.show();
-
-    // Give WebView2 a moment to paint before we also eval.
-    std::thread::sleep(std::time::Duration::from_millis(200));
-
-    let script = r#"
-        (function() {
-            document.documentElement.style.cssText = 'margin:0;padding:0;width:100%;height:100%;';
-            document.body.style.cssText = 'margin:0;padding:0;background:rgba(200,0,0,0.95);color:#fff;font-family:sans-serif;font-size:26px;font-weight:bold;display:flex;align-items:center;justify-content:center;height:100vh;box-sizing:border-box;';
-            document.body.innerHTML = '<span>FF WEBVIEW ALIVE — IPC test pending...</span>';
-            try {
-                window.__TAURI_INTERNALS__.invoke('log_relic_fe', {msg:'[OV] inject_diagnostic IPC ok'});
-                document.body.style.background = 'rgba(0,160,0,0.95)';
-                document.body.innerHTML = '<span>FF WEBVIEW — IPC OK (you should see this in green)</span>';
-            } catch(e) {
-                document.body.innerHTML = '<span>FF WEBVIEW — NO IPC: ' + String(e).slice(0,100) + '</span>';
-            }
-        })();
-    "#;
-    match win.eval(script) {
-        Ok(_) => format!("eval-ok wf=({wf_x},{wf_y},{wf_w},{wf_h}) diag=({diag_x},{diag_y})"),
-        Err(e) => format!("eval-err:{e}"),
-    }
-}
-
 /// Debug helper: create a test window from Rust side to verify whether JS-side
 /// WebviewWindow creation is broken. Returns Ok("created") or Err(reason).
 /// Uses a URL hash (#modular) so the Tauri asset protocol serves clean index.html
@@ -359,33 +195,6 @@ pub(crate) fn toggle_debug_categorization(state: State<AppState>) -> bool {
     let enabled = !prev;
     info!(debug_cat = enabled, "debug categorization toggled");
     enabled
-}
-
-/// and the Tauri init script is injected properly — query strings prevent this.
-#[tauri::command]
-pub(crate) fn debug_create_window(app: tauri::AppHandle) -> Result<String, String> {
-    use tauri::{Manager, WebviewUrl, WebviewWindowBuilder};
-    if let Some(existing) = app.get_webview_window("relic-overlay-solid") {
-        let _ = existing.close();
-        std::thread::sleep(std::time::Duration::from_millis(150));
-    }
-    WebviewWindowBuilder::new(
-        &app,
-        "relic-overlay-solid",
-        WebviewUrl::App("index.html#modular".into()),
-    )
-    .title("FF Debug Window — look in taskbar!")
-    .inner_size(800.0, 500.0)
-    .position(200.0, 200.0)
-    .transparent(false)
-    .decorations(true)
-    .always_on_top(false)
-    .skip_taskbar(false)
-    .resizable(true)
-    .focused(true)
-    .build()
-    .map(|_| "created".to_string())
-    .map_err(|e| format!("build() failed: {e}"))
 }
 
 fn dir_size_bytes(dir: &std::path::Path) -> u64 {
@@ -556,45 +365,6 @@ pub(crate) fn write_bmp(
         }
     }
     Ok(())
-}
-
-/// Capture a diagnostic bundle: scan log + screenshot of the full Warframe window
-/// (including any overlay on top via GDI desktop BitBlt / DXGI fallback).
-/// Saves everything to %TEMP%\frameforge\diagnostics\<timestamp>\ and
-/// returns the folder path so the frontend can show it.
-#[tauri::command]
-pub(crate) async fn save_auto_diag_capture(state: State<'_, AppState>) -> Result<String, String> {
-    // Reuse the frame already captured by the OCR pipeline — no second GPU readback,
-    // so no GetDIBits stall that used to freeze the whole PC during fissure VFX.
-    let frame = state.last_ocr_frame.lock().ok().and_then(|g| g.clone());
-    let auto_capture_dir = state.auto_capture_dir.clone();
-
-    tauri::async_runtime::spawn_blocking(move || {
-        let ts = chrono::Local::now().format("%Y-%m-%d_%H-%M-%S").to_string();
-        let folder = auto_capture_dir.join(&ts);
-        std::fs::create_dir_all(&folder).map_err(|e| e.to_string())?;
-
-        let session_log = std::env::temp_dir().join("frameforge_overlay_session.txt");
-        if session_log.exists() {
-            let _ = std::fs::copy(&session_log, folder.join("ocr_session_log.txt"));
-        }
-
-        match frame {
-            Some((pixels, w, h)) => {
-                let _ = write_bmp(&folder.join("screenshot.bmp"), &pixels, w, h);
-            }
-            None => {
-                let _ = std::fs::write(
-                    folder.join("screenshot_note.txt"),
-                    "No OCR frame captured yet — trigger a Void Fissure first.",
-                );
-            }
-        }
-
-        Ok(folder.to_string_lossy().into_owned())
-    })
-    .await
-    .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]

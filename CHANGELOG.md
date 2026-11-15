@@ -14,6 +14,10 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 - A pnpm workspace for the frontend and repository tooling.
 - A Cargo workspace for the native backend.
+- New frontend, including its design system, reusable primitives, application shell,
+  screens, overlays, and mock development environment.
+- Frontend quality tooling with ESLint, Prettier, Vitest browser tests,
+  Playwright accessibility and visual suites, and generated design tokens.
 - Central `dev`, `build`, `check`, test, and Tauri commands at the repository
   root.
 - A Windows-aware CI workflow for frontend builds and Rust checks.
@@ -23,6 +27,11 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 ### Changed
 
 - Reorganized the application into `src/frontend` and `src/backend`.
+- Replaced the inherited frontend with the component-based React Aria,
+  Tailwind CSS, and TanStack implementation.
+- Backend change so the production Tauri commands,
+  window lifecycle, overlays, diagnostics, and application state use the same
+  contract as the new frontend.
 - Moved frontend source code into `src/frontend/src` and Rust source code into
   `src/backend/src`.
 - Renamed internal workspace packages and the native executable for BorkForge.

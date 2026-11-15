@@ -85,7 +85,6 @@ pub struct MemoryRegionInfo {
     pub region_size: usize,
     pub is_committed: bool,
     pub is_readable: bool,
-    pub is_writable: bool,
     pub is_executable: bool,
     pub backing: RegionBacking,
 }
@@ -111,9 +110,6 @@ pub trait ComInit {
 pub trait WindowManager {
     /// Find the Warframe window and return its client rect as [x, y, w, h].
     fn get_warframe_window_rect() -> Result<[i32; 4], String>;
-
-    /// Force-set the overlay window to topmost position.
-    fn set_overlay_topmost();
 }
 
 // ─── Platform selector ────────────────────────────────────────────────────────
@@ -164,9 +160,6 @@ impl WindowManager for Platform {
     fn get_warframe_window_rect() -> Result<[i32; 4], String> {
         windows::get_warframe_window_rect()
     }
-    fn set_overlay_topmost() {
-        windows::set_overlay_topmost()
-    }
 }
 
 // ─── Linux stubs ──────────────────────────────────────────────────────────────
@@ -214,7 +207,6 @@ impl WindowManager for Platform {
     fn get_warframe_window_rect() -> Result<[i32; 4], String> {
         Err("Window management not supported on Linux yet".into())
     }
-    fn set_overlay_topmost() {}
 }
 
 // ─── Tauri command wrapper ────────────────────────────────────────────────────

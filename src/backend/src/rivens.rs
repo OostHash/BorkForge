@@ -3,7 +3,7 @@ use tauri::State;
 use tracing::warn;
 
 use crate::app_state::AppState;
-use crate::{append_to_file, ocr, truncate_chars};
+use crate::{append_to_file, ocr};
 
 // ─── Riven database ───────────────────────────────────────────────────────────
 
@@ -995,120 +995,6 @@ pub(crate) async fn ocr_riven_screen() -> Result<serde_json::Value, String> {
         "original_rolled_stats": parse_original_stats(original_parse_text),
         "raw": text,
     }))
-}
-
-/// 3-state riven screen status:
-///  "open"    = inventory header visible + "FITS IN" on right panel
-///  "closed"  = inventory header visible + "FITS IN" gone (user exited riven screen)
-///  "unknown" = inventory header not visible (alt-tabbed, or left inventory entirely)
-#[tauri::command]
-pub(crate) fn riven_screen_status() -> String {
-    let riven_log = std::env::temp_dir().join("frameforge_riven_session.txt");
-    let ts = chrono::Local::now().format("%H:%M:%S%.3f").to_string();
-
-    let Ok((pixels, w, h)) = ocr::capture_warframe_pixels() else {
-        let _ = append_to_file(
-            &riven_log,
-            &format!("[POLL {}] capture failed → unknown\n", ts),
-        );
-        return "unknown".into();
-    };
-
-    let header = ocr::ocr_pixels_rect_raw(&pixels, w, h, 0.0, 0.55, 0.0, 0.10).unwrap_or_default();
-    let in_inventory = header.to_lowercase().contains("inventory");
-
-    if !in_inventory {
-        let _ = append_to_file(
-            &riven_log,
-            &format!("[POLL {}] no inventory header → unknown\n", ts),
-        );
-        return "unknown".into();
-    }
-
-    let right = ocr::ocr_pixels_rect_raw(&pixels, w, h, 0.73, 1.0, 0.30, 0.80).unwrap_or_default();
-    let rl = right.to_lowercase();
-    // In comparison mode "FITS IN" may be partially cut off, reading as "SIN", "IN", "TS IN" etc.
-    // Accept any fragment that is a suffix of "FITS IN".
-    let fits_in = rl.contains("fits in")
-        || rl.contains("fits")
-        || rl.contains("ts in")
-        || rl.contains("its in")
-        || (rl.trim() == "in")
-        || (rl.trim() == "sin");
-    let preview = right
-        .lines()
-        .filter(|l| !l.trim().is_empty())
-        .collect::<Vec<_>>()
-        .join(" | ");
-
-    let status = if fits_in { "open" } else { "closed" };
-    let _ = append_to_file(
-        &riven_log,
-        &format!(
-            "[POLL {}] inventory=true fits_in={} ocr=\"{}\" → {}\n",
-            ts,
-            fits_in,
-            truncate_chars(&preview, 80),
-            status
-        ),
-    );
-    status.into()
-}
-
-/// Is the riven reroll screen still open?
-/// Checks for "FITS IN" text on the right panel using RAW OCR (no preprocessing).
-/// "FITS IN" is white text on dark — readable without grayscale conversion.
-/// Only closes the overlay when Warframe is still focused (INVENTORY/MODS header present)
-/// AND "FITS IN" is gone — so alt-tabbing away doesn't trigger a false close.
-#[tauri::command]
-pub(crate) fn riven_screen_visible() -> bool {
-    let riven_log = std::env::temp_dir().join("frameforge_riven_session.txt");
-    let ts = chrono::Local::now().format("%H:%M:%S%.3f").to_string();
-
-    let Ok((pixels, w, h)) = ocr::capture_warframe_pixels() else {
-        let _ = append_to_file(
-            &riven_log,
-            &format!("[POLL {}] capture failed → true (assume open)\n", ts),
-        );
-        return true; // can't capture = can't confirm closed
-    };
-
-    // Check header (x 0–55%, y 0–10%) for "INVENTORY" — confirms Warframe is focused
-    // and we're in the mods screen. If header is absent, user alt-tabbed; keep overlay.
-    let header = ocr::ocr_pixels_rect_raw(&pixels, w, h, 0.0, 0.55, 0.0, 0.10).unwrap_or_default();
-    let in_inventory = header.to_lowercase().contains("inventory");
-
-    if !in_inventory {
-        let _ = append_to_file(
-            &riven_log,
-            &format!(
-                "[POLL {}] no inventory header → true (alt-tabbed or different screen)\n",
-                ts
-            ),
-        );
-        return true; // Warframe not in focus or wrong screen — don't close
-    }
-
-    // Check right panel (x 73–100%, y 30–80%) for "FITS IN"
-    let right = ocr::ocr_pixels_rect_raw(&pixels, w, h, 0.73, 1.0, 0.30, 0.80).unwrap_or_default();
-    let fits_in_visible = right.to_lowercase().contains("fits");
-    let right_preview = right
-        .lines()
-        .filter(|l| !l.trim().is_empty())
-        .collect::<Vec<_>>()
-        .join(" | ");
-
-    let _ = append_to_file(
-        &riven_log,
-        &format!(
-            "[POLL {}] inventory=true fits_in={} ocr=\"{}\"\n",
-            ts,
-            fits_in_visible,
-            truncate_chars(&right_preview, 120)
-        ),
-    );
-
-    fits_in_visible
 }
 
 /// Write an error into the riven session log (called from TypeScript when OCR command fails).

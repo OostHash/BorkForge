@@ -56,9 +56,3 @@ pub(crate) fn add_trade(state: State<AppState>, params: AddTradeParams) -> Resul
     );
     Ok(trade_id)
 }
-
-#[tauri::command]
-pub(crate) fn delete_trade(state: State<AppState>, id: i64) -> Result<(), String> {
-    let conn = state.conn.lock().map_err(|e| e.to_string())?;
-    db::delete_trade(&conn, id).map_err(|e| e.to_string())
-}

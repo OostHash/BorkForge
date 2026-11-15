@@ -311,7 +311,6 @@ dependencies = [
 name = "borkforge-backend"
 version = "1.0.0"
 dependencies = [
- "aho-corasick",
  "chrono",
  "dirs 5.0.1",
  "lzma-rs",

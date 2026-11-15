@@ -1,0 +1,138 @@
+@import "tailwindcss";
+
+/* Token layers, generated from src/theme/*.ts (pnpm tokens). */
+@import "./generated/semantic.css";
+@import "./generated/density.css";
+@import "./generated/domain.css";
+
+/*
+ * Tailwind's default colour palette is off (plan 6.5): bg-white/6,
+ * text-gray-400 and bg-black/60 simply do not exist here. Spacing, radius,
+ * typography and motion stay on Tailwind's standard scales.
+ */
+@theme {
+  --color-*: initial;
+}
+
+/*
+ * Semantic roles as Tailwind colours. `inline` makes utilities reference
+ * var(--ff-*) directly, so data-theme / data-density switch them at runtime.
+ * Domain colours are deliberately not exposed here (plan 6.7).
+ */
+@theme inline {
+  --color-bg: var(--ff-bg);
+  --color-surface: var(--ff-surface);
+  --color-surface-raised: var(--ff-surface-raised);
+  --color-surface-sunken: var(--ff-surface-sunken);
+  --color-border: var(--ff-border);
+  --color-border-strong: var(--ff-border-strong);
+  --color-text: var(--ff-text);
+  --color-muted: var(--ff-text-muted);
+  --color-faint: var(--ff-text-faint);
+  --color-accent: var(--ff-accent);
+  --color-accent-soft: var(--ff-accent-soft);
+  --color-on-accent: var(--ff-on-accent);
+  --color-on-danger: var(--ff-on-danger);
+  --color-success: var(--ff-success);
+  --color-danger: var(--ff-danger);
+  --color-warning: var(--ff-warning);
+  --color-info: var(--ff-info);
+  --color-hover: var(--ff-hover);
+  --color-active: var(--ff-active);
+  --color-selected: var(--ff-selected);
+  --color-backdrop: var(--ff-backdrop);
+  --color-focus: var(--ff-focus-ring);
+  /* Domain colours are tuned for dark pages; as text they mix towards the text colour per theme (--ff-tone-ink). */
+  --color-tone: color-mix(in oklab, var(--ff-tone, var(--ff-text)) var(--ff-tone-ink), var(--ff-text));
+
+  --shadow-1: var(--ff-shadow-1);
+  --shadow-2: var(--ff-shadow-2);
+  --shadow-3: var(--ff-shadow-3);
+
+  /* Density-sensitive exceptions (plan 6.8): h-control-md, px-cell-x, text-list. */
+  --spacing-control-sm: var(--ff-control-sm);
+  --spacing-control-md: var(--ff-control-md);
+  --spacing-control-lg: var(--ff-control-lg);
+  --spacing-cell-x: var(--ff-cell-x);
+  --spacing-cell-y: var(--ff-cell-y);
+  --text-list: var(--ff-font-size-list);
+}
+
+@layer base {
+  html {
+    background: var(--ff-bg);
+    color: var(--ff-text);
+  }
+
+  body {
+    background: transparent;
+  }
+
+  /*
+   * App shell, not a document: the window never scrolls, panels do. Heights
+   * chain through html/body/#root instead of 100dvh, which does not track
+   * native webview zoom reliably in WebView2.
+   */
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  html {
+    overflow: hidden;
+  }
+
+  /* Scroll lock while a modal <dialog> is open (plan 7.8). */
+  html:has(dialog:modal) {
+    overflow: hidden;
+  }
+
+  /* Overlay windows stay transparent; only the main window paints --ff-bg. */
+  html[data-window="overlay"],
+  html[data-window="riven-overlay"],
+  html[data-window="relic-pick-overlay"] {
+    background: transparent;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--ff-focus-ring);
+    outline-offset: 2px;
+  }
+
+  /*
+   * Windows High Contrast (vault theming-7a.md): Windows picks the colours and
+   * drops backgrounds, so states that only had a background get system colours.
+   */
+  @media (forced-colors: active) {
+    :focus-visible {
+      outline-color: Highlight;
+    }
+    /* Selected tab, pressed toggle (chips, icon buttons, previews), current page, chosen segment. */
+    [role="tab"][aria-selected="true"],
+    [aria-pressed="true"],
+    [aria-current="page"],
+    [role="option"][aria-selected="true"],
+    label:has(> input[type="radio"].sr-only:checked) {
+      /* !important: the utilities layer would otherwise win over this base layer. */
+      background-color: SelectedItem !important;
+      color: SelectedItemText !important;
+      border-color: SelectedItem !important;
+      forced-color-adjust: none;
+    }
+    [role="tab"][aria-selected="true"] *,
+    [aria-pressed="true"] *,
+    [aria-current="page"] *,
+    label:has(> input[type="radio"].sr-only:checked) * {
+      color: inherit !important;
+    }
+    /* A progress bar is only its fill. */
+    progress::-webkit-progress-value {
+      background-color: Highlight !important;
+    }
+    progress::-webkit-progress-bar {
+      background-color: Canvas !important;
+      border: 1px solid CanvasText;
+    }
+  }
+}

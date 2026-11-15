@@ -17,7 +17,7 @@ use std::collections::VecDeque;
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
-use tracing::{debug, info, warn};
+use tracing::{debug, warn};
 
 const API_BASE: &str = "https://api.warframe.market";
 const USER_AGENT: &str = "FrameForge/3.2.0";
@@ -82,13 +82,6 @@ pub struct WfmTopItem {
     pub unit_price: u32,     // median sell price (plat)
     pub daily_volume: f64,   // average trades/day over last 7 days
     pub total_value_7d: u64, // unit_price × total volume over 7 days
-}
-
-#[derive(serde::Serialize)]
-pub struct WfmPrice {
-    pub url_name: String,
-    pub sell_median: Option<f64>,
-    pub buy_median: Option<f64>,
 }
 
 // ==============================================================================
@@ -355,51 +348,6 @@ impl Wfm {
             .map_err(|e| format!("Parse: {}", e))
     }
 
-    /// Validate a token bundle against /v2/me and store it. Fetches the CSRF
-    /// token from the site when the bundle carries a v1 JWT but no CSRF token.
-    /// Returns (username, status).
-    pub fn adopt_tokens(
-        &self,
-        access_token: String,
-        refresh_token: String,
-        client_id: String,
-        device_id: String,
-        v1_jwt: String,
-        csrf_token: Option<String>,
-    ) -> Result<(String, String), String> {
-        let json = self.me(&access_token, "Profile")?;
-        let username = json["data"]["ingameName"]
-            .as_str()
-            .unwrap_or("Tenno")
-            .to_string();
-        let status = json["data"]["status"]
-            .as_str()
-            .unwrap_or("offline")
-            .to_string();
-
-        // The injected script captures the CSRF token from the meta tag as a
-        // best-effort fallback; if that failed (SPA timing) fetch it directly.
-        let csrf = csrf_token.unwrap_or_default();
-        let csrf = if !csrf.is_empty() {
-            csrf
-        } else {
-            self.fetch_csrf(&v1_jwt).unwrap_or_default()
-        };
-        info!(len = csrf.len(), "csrf_token captured");
-
-        self.set_session(WfmSession {
-            access_token,
-            refresh_token,
-            client_id,
-            device_id,
-            username: username.clone(),
-            status: status.clone(),
-            v1_jwt,
-            csrf_token: csrf,
-        });
-        Ok((username, status))
-    }
-
     /// Restore a session from a saved token JSON string, validating via /v2/me.
     /// Returns (username, status).
     pub fn restore_from_json(&self, jwt: &str) -> Result<(String, String), String> {
@@ -603,9 +551,15 @@ impl Wfm {
         tcp.set_read_timeout(Some(RW_TIMEOUT)).ok();
         tcp.set_write_timeout(Some(RW_TIMEOUT)).ok();
 
-        let req = "wss://ws.warframe.market/socket"
+        let mut req = "wss://ws.warframe.market/socket"
             .into_client_request()
             .map_err(|e| format!("WS request: {}", e))?;
+        // ws.warframe.market rejects the upgrade with 403 when there is no
+        // User-Agent, and tungstenite sends none by default.
+        req.headers_mut().insert(
+            "User-Agent",
+            tungstenite::http::HeaderValue::from_static(USER_AGENT),
+        );
         let (mut ws, _) =
             tungstenite::client_tls(req, tcp).map_err(|e| format!("WS connect: {}", e))?;
 

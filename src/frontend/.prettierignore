@@ -1,0 +1,8 @@
+dist
+node_modules
+test-results
+playwright-report
+tests/__screenshots__
+pnpm-lock.yaml
+# Written by `pnpm tokens`; tokens:check compares them byte for byte.
+src/theme/generated

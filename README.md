@@ -16,7 +16,7 @@ existing installations remain compatible while the fork is reorganized.
 
 ```text
 src/
-├── frontend/   # React, TypeScript, and Vite
+├── frontend/   # React, TypeScript, Tailwind CSS, and Vite
 │   └── src/    # UI source code
 └── backend/    # Tauri and Rust
     └── src/    # Native backend source code
@@ -171,7 +171,9 @@ rustup default stable-x86_64-pc-windows-msvc
 git clone https://github.com/OostHash/BorkForge.git
 cd BorkForge
 pnpm install
-pnpm check          # type checks plus frontend and backend tests
+pnpm check          # formatting, linting, types, and frontend/backend tests
+pnpm test:a11y      # browser accessibility checks
+pnpm test:visual    # Playwright screenshot regression suite
 pnpm desktop:dev    # dev mode with hot reload
 pnpm desktop:build  # installer → target/release/bundle/
 ```
@@ -182,7 +184,8 @@ pnpm desktop:build  # installer → target/release/bundle/
 
 | Layer | Technology |
 |---|---|
-| Frontend | React 19, TypeScript 5.8, Vite 7 |
+| Frontend | React 19, TypeScript 5.8, Vite 7, Tailwind CSS 4 |
+| UI and data | React Aria Components, TanStack Query/Table/Virtual |
 | Desktop shell | Tauri 2 |
 | Backend | Rust 2021 edition |
 | Database | SQLite (local only) |
@@ -209,7 +212,7 @@ Sikewyrm/WyrmStudios; the original copyright and license notices are retained.
 
 ## Contributing
 
-Bug reports, feature requests, and PRs welcome via [GitHub Issues](../../issues). Use the issue templates. For large changes, open an issue first to align on approach.
+Bug reports, feature requests, and PRs are welcome via [GitHub Issues](../../issues). For large changes, open an issue first to align on approach.
 
 ---
 
