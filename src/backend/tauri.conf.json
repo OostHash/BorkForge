@@ -1,0 +1,101 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "FrameForge",
+  "version": "1.0.0",
+  "identifier": "com.jochem.frameforge",
+  "build": {
+    "beforeDevCommand": {
+      "cwd": "../frontend",
+      "script": "pnpm dev"
+    },
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": {
+      "cwd": "../frontend",
+      "script": "pnpm build"
+    },
+    "frontendDist": "../frontend/dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "FrameForge",
+        "width": 800,
+        "height": 600,
+        "minWidth": 640,
+        "minHeight": 480,
+        "visible": false,
+        "backgroundColor": "#161b22"
+      },
+      {
+        "label": "relic-overlay",
+        "url": "index.html?overlay",
+        "title": "FrameForge Overlay",
+        "width": 1920,
+        "height": 400,
+        "x": 0,
+        "y": -3000,
+        "transparent": true,
+        "decorations": false,
+        "shadow": false,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "resizable": false,
+        "focus": false
+      },
+      {
+        "label": "relic-pick-overlay",
+        "url": "index.html#relicpickoverlay",
+        "title": "FrameForge Relic Picker",
+        "width": 340,
+        "height": 80,
+        "x": 0,
+        "y": -3000,
+        "visible": false,
+        "transparent": true,
+        "decorations": false,
+        "shadow": false,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "resizable": false,
+        "focus": false
+      },
+      {
+        "label": "overlay-test",
+        "url": "index.html?overlaytest",
+        "title": "FF Overlay Test",
+        "width": 480,
+        "height": 220,
+        "x": 0,
+        "y": -3000,
+        "visible": false,
+        "decorations": true,
+        "resizable": true,
+        "skipTaskbar": false
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEM4MURFOTcyNDY0REI4MEIKUldRTHVFMUdjdWtkeU5EU2Z2c0FNSWNGUmRIdG53b3BETVYxaFBIeG9ENFVHYnV1MVQ5MHJHY3oK",
+      "endpoints": [
+        "https://github.com/OostHash/BorkForge/releases/latest/download/latest.json"
+      ]
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "createUpdaterArtifacts": "v1Compatible",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ]
+  }
+}

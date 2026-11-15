@@ -1,0 +1,40 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules/
+dist/
+dist-ssr/
+*.local
+
+# Local AI-assistant state
+.claude/
+CLAUDE.md
+
+# Personal release scripts
+build-and-release.bat
+backup-memory.bat
+
+# Stray backup copies of source files
+src/frontend/src/_backup/
+
+# Tauri build output
+/target/
+
+# Editor directories and files
+.vscode/
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Dev build data root (pnpm tauri dev) - separate from the installed app's files
+/.frameforge-dev/

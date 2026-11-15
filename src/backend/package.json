@@ -1,0 +1,12 @@
+{
+  "name": "@borkforge/backend",
+  "private": true,
+  "scripts": {
+    "tauri": "tauri",
+    "tauri:build": "tauri build",
+    "tauri:dev": "tauri dev"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2"
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "name": "borkforge",
+  "private": true,
+  "packageManager": "pnpm@11.25.0",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "build": "pnpm --filter @borkforge/desktop build",
+    "check": "pnpm typecheck && pnpm test && cargo fmt --all -- --check && cargo check --workspace --all-targets",
+    "dev": "pnpm --filter @borkforge/desktop dev",
+    "desktop": "pnpm --filter @borkforge/backend tauri",
+    "desktop:build": "pnpm --filter @borkforge/backend tauri:build",
+    "desktop:dev": "pnpm --filter @borkforge/backend tauri:dev",
+    "test": "pnpm test:frontend && pnpm test:backend",
+    "test:backend": "cargo test --workspace",
+    "test:frontend": "pnpm --filter @borkforge/desktop test",
+    "typecheck": "pnpm --filter @borkforge/desktop typecheck"
+  }
+}
