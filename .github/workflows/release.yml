@@ -47,6 +47,7 @@ jobs:
           }
 
       - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @borkforge/frontend exec playwright install chromium
       - run: pnpm check
 
       - name: Build signed updater and draft release
