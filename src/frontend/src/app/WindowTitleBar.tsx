@@ -7,17 +7,16 @@ const buttonClass =
 /** Empty draggable title bar with native-window controls and no duplicate branding. */
 export function WindowTitleBar() {
   return (
-    <div
-      data-tauri-drag-region
-      className="flex h-8 shrink-0 select-none justify-end border-b border-border bg-surface"
-    >
+    <div data-tauri-drag-region className="flex h-8 shrink-0 select-none justify-end border-b border-border bg-surface">
       <button
         type="button"
         className={buttonClass}
         aria-label="Minimize window"
         title="Minimize"
         onClick={() => {
-          void getCurrentWindow().minimize().catch(() => undefined);
+          void getCurrentWindow()
+            .minimize()
+            .catch(() => undefined);
         }}
       >
         <Minus aria-hidden="true" className="size-3.5" strokeWidth={1.5} />
@@ -29,7 +28,9 @@ export function WindowTitleBar() {
         aria-label="Maximize or restore window"
         title="Maximize or restore"
         onClick={() => {
-          void getCurrentWindow().toggleMaximize().catch(() => undefined);
+          void getCurrentWindow()
+            .toggleMaximize()
+            .catch(() => undefined);
         }}
       >
         <Square aria-hidden="true" className="size-3" strokeWidth={1.5} />
@@ -40,7 +41,9 @@ export function WindowTitleBar() {
         aria-label="Close window"
         title="Close"
         onClick={() => {
-          void getCurrentWindow().close().catch(() => undefined);
+          void getCurrentWindow()
+            .close()
+            .catch(() => undefined);
         }}
       >
         <X aria-hidden="true" className="size-4" strokeWidth={1.5} />
