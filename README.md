@@ -60,35 +60,6 @@ pnpm check
 pnpm desktop:dev
 ```
 
-Create an unsigned local Windows installer with:
-
-```powershell
-pnpm desktop:build:unsigned
-```
-
-Official release builds use `pnpm desktop:build`. They require the private
-BorkForge updater key so installed copies can verify updates. The Windows
-installer itself is currently unsigned and may trigger a SmartScreen warning.
-
-### Publishing a Release
-
-The release workflow builds the Windows installer and signed updater artifacts,
-then creates a draft GitHub release. The protected `release` environment must
-contain the Actions secrets `TAURI_SIGNING_PRIVATE_KEY` and
-`TAURI_SIGNING_PRIVATE_KEY_PASSWORD`. A required reviewer must approve the job
-before GitHub makes those secrets available to its Windows runner.
-
-1. Set the version in `src/backend/tauri.conf.json` and update `CHANGELOG.md`.
-2. Commit and push the release changes to `master` and wait for CI to pass.
-3. Create and push a matching tag, for example `v1.0.0`.
-4. Review and approve the `release` environment deployment on GitHub.
-5. Inspect the draft release and its installer, updater archive, signature, and
-   `latest.json` assets.
-6. Publish the draft. Installed copies will only see the update after this step.
-
-The React/TypeScript frontend lives in `src/frontend`; the Rust/Tauri backend
-lives in `src/backend`.
-
 ## Project Status
 
 BorkForge is an independent opinionated version of
