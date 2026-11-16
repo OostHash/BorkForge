@@ -16,13 +16,13 @@ export const debugFixtures = {
   get_overlay_session_log: {
     default: () => "[12:00:01] relic-trigger seen\n[12:00:02] OCR: 4 rewards\n[12:00:02] rewards emitted",
   } satisfies Fixture<string>,
-  capture_diagnostics: { alwaysDefault: true, default: () => "C:/FrameForge/Debug/Manual-Capture/2026-11-13_12-00-00" } satisfies Fixture<string>,
+  capture_diagnostics: { alwaysDefault: true, default: () => "C:/BorkForge/Debug/Manual-Capture/2026-11-13_12-00-00" } satisfies Fixture<string>,
   dump_memory_probe: {
     alwaysDefault: true,
     default: () => "/Lotus/Types/Items/MiscItems/OrokinCell\n/Lotus/Powersuits/Mag/MagPrime\n",
   } satisfies Fixture<string>,
   toggle_raw_scan: { alwaysDefault: true, default: () => "started" } satisfies Fixture<string>,
-  start_memory_relic_debug: { alwaysDefault: true, default: () => "C:/Temp/frameforge_mem_relic_debug.log" } satisfies Fixture<string>,
+  start_memory_relic_debug: { alwaysDefault: true, default: () => "C:/Temp/borkforge_mem_relic_debug.log" } satisfies Fixture<string>,
   stop_memory_relic_debug: noResult(),
   debug_detect_fissure_era: { default: () => "No era detected (mock: no game window)." } satisfies Fixture<string>,
   test_relic_pick_overlay: {

@@ -1,0 +1,67 @@
+name: Feature request
+description: Suggest an improvement or new capability for BorkForge
+title: "[Feature]: "
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for suggesting an improvement. Describe the problem first so the best solution remains open for discussion.
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Inventory scanning
+        - Relics or OCR
+        - Foundry
+        - Market or warframe.market
+        - Rivens
+        - Timers or world state
+        - Installer or updater
+        - Window or interface
+        - New area
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or limitation
+      description: What is difficult, missing, or unnecessarily time-consuming today?
+      placeholder: Describe the user problem rather than only the desired button or setting.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: How would you like BorkForge to address the problem?
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Are there existing workarounds or other possible approaches?
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context or examples
+      description: Add mock-ups, screenshots, links, or examples from your workflow if helpful.
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Checklist
+      options:
+        - label: I searched the existing issues for a similar request.
+          required: true
+        - label: This request is about BorkForge rather than a general Warframe support question.
+          required: true

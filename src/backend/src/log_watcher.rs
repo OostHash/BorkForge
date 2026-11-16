@@ -273,7 +273,7 @@ pub(crate) fn handle_riven_events(
         });
         if riven_active {
             *last_riven_fire = None;
-            let riven_log = std::env::temp_dir().join("frameforge_riven_session.txt");
+            let riven_log = std::env::temp_dir().join("borkforge_riven_session.txt");
             let ts = chrono::Local::now().format("%H:%M:%S%.3f").to_string();
             let _ = append_to_file(
                 &riven_log,
@@ -297,7 +297,7 @@ pub(crate) fn handle_riven_events(
         });
         if riven_active {
             *last_riven_fire = None;
-            let riven_log = std::env::temp_dir().join("frameforge_riven_session.txt");
+            let riven_log = std::env::temp_dir().join("borkforge_riven_session.txt");
             let ts = chrono::Local::now().format("%H:%M:%S%.3f").to_string();
             let _ = append_to_file(
                 &riven_log,
@@ -568,9 +568,9 @@ pub(crate) fn collect_session_relics(text: &str, session_relics: &mut Vec<String
 }
 
 /// Catch up `session_relics` from EE.log history at thread startup, for when
-/// FrameForge is launched mid-mission — the live tailer only reads forward from
+/// BorkForge is launched mid-mission — the live tailer only reads forward from
 /// the file's current end, so any relic loads that already happened this mission
-/// (before FrameForge attached) would otherwise never enter the OCR prefilter.
+/// (before BorkForge attached) would otherwise never enter the OCR prefilter.
 ///
 /// Reads the last `BACKFILL_BYTES` of EE.log and only considers text after the
 /// most recent dismiss marker in that window (mirroring the live clear-on-dismiss
@@ -957,7 +957,7 @@ pub(crate) fn build_relic_reward_catalog(
     if session_relics.is_empty() {
         return (
             std::sync::Arc::clone(full_catalog),
-            "  No relics collected — using full catalog (FrameForge started mid-mission?)"
+            "  No relics collected — using full catalog (BorkForge started mid-mission?)"
                 .to_string(),
         );
     }
@@ -1205,7 +1205,7 @@ pub(crate) async fn capture_reward_items(
 /// This is the ground-truth anchor for "was the trigger seen on time": the
 /// reward screen (and any on-screen match/mission timer) is already visible
 /// in-game by the time EE.log writes the trigger line, so this BMP shows
-/// exactly what the player saw at the moment FrameForge detected it — letting
+/// exactly what the player saw at the moment BorkForge detected it — letting
 /// a late-looking overlay be diagnosed as a late *detection* (compare this
 /// screenshot's timer against when the trigger fired) vs. slow *OCR
 /// processing* (compare this screenshot against the later `screenshot.bmp`
@@ -1353,7 +1353,7 @@ pub(crate) fn log_reward_dark_frame(
         "[STEP 2] OCR ATTEMPT #{}\n\
          ├─ Time     : {}\n\
          └─ RESULT   : {} → PrintWindow returned dark image\n\
-            Check %TEMP%\\frameforge_capture_debug.bmp\n\
+            Check %TEMP%\\borkforge_capture_debug.bmp\n\
             Fix: switch Warframe to Borderless Windowed mode\n\
             Retrying in 100ms…\n\n",
         attempt, ts, dbg
@@ -1376,7 +1376,7 @@ pub(crate) fn log_reward_ocr_empty(
         "[STEP 2] OCR ATTEMPT #{}\n\
          ├─ Time     : {}\n\
          └─ RESULT   : {} → image has content but OCR found no text\n\
-            Check %TEMP%\\frameforge_capture_debug.bmp\n\
+            Check %TEMP%\\borkforge_capture_debug.bmp\n\
             Retrying in 300ms…\n\n",
         attempt, ts, dbg
     );

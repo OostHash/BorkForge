@@ -40,6 +40,7 @@ tracing-log = "0.2"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 tauri-plugin-notification = "2"
 tauri-plugin-updater = "2"
+tauri-plugin-snap-layout = "1"
 # ── BEGIN ocrs fallback ─────────────────────────────────────────────────────
 # Pure-Rust neural-net OCR; used when Windows.Media.Ocr has no language packs.
 # To remove: delete ocr_fallback.rs, remove `mod ocr_fallback` from lib.rs,

@@ -4,6 +4,7 @@
   "scripts": {
     "tauri": "tauri",
     "tauri:build": "tauri build",
+    "tauri:build:unsigned": "tauri build --no-sign",
     "tauri:dev": "tauri dev"
   },
   "devDependencies": {

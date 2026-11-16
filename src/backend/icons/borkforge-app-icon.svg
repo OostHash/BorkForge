@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <title>BorkForge app icon</title>
+  <defs>
+    <linearGradient id="background" x1="84" y1="58" x2="428" y2="454" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#1B2A3A" />
+      <stop offset="1" stop-color="#0B1118" />
+    </linearGradient>
+    <radialGradient id="glow" cx="0" cy="0" r="1" gradientTransform="translate(256 250) rotate(90) scale(218)" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#248BFF" stop-opacity="0.26" />
+      <stop offset="1" stop-color="#248BFF" stop-opacity="0" />
+    </radialGradient>
+  </defs>
+
+  <rect width="512" height="512" rx="96" fill="url(#background)" />
+  <rect width="512" height="512" rx="96" fill="url(#glow)" />
+
+  <!-- The same monochrome BorkForge mark used inside the application. -->
+  <g transform="translate(51 56) scale(1.32)" fill="#FFFFFF">
+    <path d="M76 30L123 64H187L234 30L222 86L205 103H105L88 86L76 30Z" />
+    <path d="M4 130H306C294 145 276 154 251 163C224 172 211 182 210 199C209 219 219 236 240 246H250V264H205C205 236 183 216 155 216C127 216 105 236 105 264H60V246H70C91 236 101 219 100 199C99 182 86 172 59 163C34 154 16 145 4 130Z" />
+  </g>
+</svg>

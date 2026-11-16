@@ -96,7 +96,7 @@ export function MarketTab() {
         )}
         <SwitchRow
           label="Go invisible on start"
-          description="When FrameForge opens, set your warframe.market status to Invisible."
+          description="When BorkForge opens, set your warframe.market status to Invisible."
           checked={settings.wfmInvisibleOnStart === true}
           disabled={!loggedIn}
           onCheckedChange={(on) => {
@@ -105,7 +105,7 @@ export function MarketTab() {
         />
         <SwitchRow
           label="Go invisible on close"
-          description="Before FrameForge exits, set your warframe.market status to Invisible."
+          description="Before BorkForge exits, set your warframe.market status to Invisible."
           checked={settings.wfmInvisibleOnClose === true}
           disabled={!loggedIn}
           onCheckedChange={(on) => {
@@ -134,7 +134,7 @@ export function MarketTab() {
       <SettingsGroup title="Sale automation">
         <SwitchRow
           label="Record automatic sales"
-          description="Record detected sales in your warframe.market statistics. When off, FrameForge only reduces or removes the listing. Recorded sales cannot be undone from FrameForge."
+          description="Record detected sales in your warframe.market statistics. When off, BorkForge only reduces or removes the listing. Recorded sales cannot be undone from BorkForge."
           checked={settings.wfmRecordSales === true}
           disabled={!loggedIn}
           onCheckedChange={(on) => {

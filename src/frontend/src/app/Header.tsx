@@ -1,5 +1,5 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { Bug, Coffee, MessageCircle, Settings, X } from "lucide-react";
+import { X } from "lucide-react";
 import { useEffect, useState } from "react";
 import {
   dismissUpdate,
@@ -13,7 +13,6 @@ import {
   usePendingUpdate,
   usePlayer,
 } from "../api/app";
-import { openExternal } from "../api/links";
 import { useOverlayStatus } from "../api/overlays";
 import { useSettings } from "../api/settings";
 import { useSession } from "../api/trading";
@@ -25,23 +24,17 @@ import { Button, IconButton } from "../primitives/actions";
 import { Badge } from "../primitives/display";
 import { Popover } from "../primitives/overlay";
 
-const LINKS = [
-  { label: "Join our Discord", icon: MessageCircle, url: "https://discord.gg/7NMsN9J8vy" },
-  { label: "Support on Ko-fi", icon: Coffee, url: "https://ko-fi.com/sikewyrm" },
-  { label: "Report a bug or suggest a feature", icon: Bug, url: "https://github.com/OostHash/BorkForge/issues/new/choose" },
-] as const;
-
 /** Stays a little after "Refresh all data", like the current app. */
 const REFRESH_FEEDBACK_MS = 2000;
 
 type Props = {
   /** Opens a screen of the shell (WFM chip → Market, which opens on Trading). */
   onOpenScreen: (id: string) => void;
-  /** Opens Settings (the Settings button, Memory "OFF"). */
+  /** Opens Settings when the Memory status is disabled. */
   onOpenSettings: () => void;
 };
 
-/** Top bar of the main window: account, update, status chips and links (vault header.md). */
+/** Top bar of the main window: account, update and status chips (vault header.md). */
 export function Header({ onOpenScreen, onOpenSettings }: Props) {
   return (
     <header className="flex shrink-0 flex-wrap items-center gap-2 border-b border-border bg-surface px-4 py-2">
@@ -51,21 +44,6 @@ export function Header({ onOpenScreen, onOpenSettings }: Props) {
         <MemoryChip onOpenSettings={onOpenSettings} />
         <WfmChip onOpenScreen={onOpenScreen} />
         <DataChip />
-        <ul aria-label="Links" className="flex items-center gap-0.5">
-          {LINKS.map((link) => (
-            <li key={link.url}>
-              <IconButton
-                icon={link.icon}
-                label={link.label}
-                size="sm"
-                onClick={() => {
-                  void openExternal(link.url).catch(() => undefined);
-                }}
-              />
-            </li>
-          ))}
-        </ul>
-        <IconButton icon={Settings} label="Settings" size="sm" onClick={onOpenSettings} />
       </div>
     </header>
   );

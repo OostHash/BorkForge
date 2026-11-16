@@ -56,9 +56,6 @@ it("shows the account, and the memory scanner as OFF by default", async () => {
   await expect.element(page.getByText("MR 27")).toBeVisible();
   await expect.element(page.getByText("Memory")).toBeVisible();
   await expect.element(page.getByText("OFF")).toBeVisible();
-  await page.getByRole("button", { name: "Settings" }).click();
-  expect(ctx.onOpenSettings).toHaveBeenCalledOnce();
-  ctx.onOpenSettings.mockClear();
   // OFF opens Settings.
   await page.getByRole("button", { name: /^Memory ?: OFF$/ }).click();
   expect(ctx.onOpenSettings).toHaveBeenCalledOnce();

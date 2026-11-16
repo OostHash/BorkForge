@@ -124,8 +124,8 @@ function FactoryReset() {
         onClose={() => {
           setConfirming(false);
         }}
-        title="Reset FrameForge?"
-        description="All app data is deleted and FrameForge restarts. This cannot be undone."
+        title="Reset BorkForge?"
+        description="All app data is deleted and BorkForge restarts. This cannot be undone."
         confirmLabel="Reset everything"
         destructive
         busy={busy}

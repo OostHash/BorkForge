@@ -1,0 +1,120 @@
+name: Bug report
+description: Report a reproducible problem with BorkForge
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping improve BorkForge.
+
+        Please search existing issues before continuing. Never attach passwords, authentication tokens, or other credentials. Logs can contain account or player names, so review them before uploading.
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Affected area
+      description: Where did the problem occur?
+      options:
+        - Inventory scanning
+        - Relic reward overlay or OCR
+        - Relic pick overlay
+        - Foundry
+        - Market or warframe.market
+        - Rivens
+        - Timers or world state
+        - Installer or updater
+        - Window or interface
+        - Other
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: BorkForge version
+      description: The version is shown at the bottom of Settings.
+      placeholder: "For example: 1.0.0"
+    validations:
+      required: true
+
+  - type: input
+    id: windows-version
+    attributes:
+      label: Windows version
+      description: Include whether you use Windows 10 or 11 and, if known, the build number.
+      placeholder: "For example: Windows 11 24H2, build 26100"
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened?
+      description: Describe the problem and what you were doing when it occurred.
+      placeholder: Tell us what went wrong.
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Give the shortest sequence that reliably causes the problem.
+      placeholder: |
+        1. Open …
+        2. Select …
+        3. Observe …
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behaviour
+      placeholder: What should BorkForge have done instead?
+    validations:
+      required: true
+
+  - type: dropdown
+    id: frequency
+    attributes:
+      label: How often does this happen?
+      options:
+        - Every time
+        - Often
+        - Sometimes
+        - Once
+        - Unknown
+    validations:
+      required: true
+
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Logs or diagnostics
+      description: Use Settings → Debugging for relevant logs or captures. Drag files into this box after reviewing them for private information.
+      placeholder: Paste relevant text or attach files here. Leave empty if none are available.
+
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: Screenshots or video
+      description: Drag in anything that makes the problem easier to understand.
+
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: Additional context
+      description: Include anything else that may matter, such as display scaling, multiple monitors, or whether Warframe was running.
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Checklist
+      options:
+        - label: I searched the existing issues for this problem.
+          required: true
+        - label: I removed passwords, tokens, credentials, and other private information from attachments.
+          required: true

@@ -20,7 +20,7 @@ use std::time::{Duration, Instant};
 use tracing::{debug, warn};
 
 const API_BASE: &str = "https://api.warframe.market";
-const USER_AGENT: &str = "FrameForge/3.2.0";
+const USER_AGENT: &str = concat!("BorkForge/", env!("CARGO_PKG_VERSION"));
 
 // ==============================================================================
 // Wire types
@@ -1038,7 +1038,7 @@ impl Wfm {
 
     /// The current user's riven auctions. Phase 1 hits the profile endpoint
     /// (visible auctions); phase 2 fetches each stored id not already returned
-    /// (hidden auctions FrameForge created), skipping closed ones.
+    /// (hidden auctions BorkForge created), skipping closed ones.
     pub fn my_riven_auctions(&self, stored_ids: &[String]) -> Result<serde_json::Value, String> {
         let (v1_auth, username) = {
             let lock = self.session.lock().unwrap_or_else(|e| e.into_inner());

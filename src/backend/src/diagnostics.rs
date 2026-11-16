@@ -141,10 +141,10 @@ pub(crate) fn clear_cache(state: State<AppState>) -> Result<(), String> {
 
 /// Append text to both the global overlay session log and the per-session diagnostic file.
 /// The diagnostic target is found by picking the most recently modified folder under
-/// %TEMP%\frameforge\diagnostics\ that contains an ocr_session_log.txt.
+/// %TEMP%\borkforge\diagnostics\ that contains an ocr_session_log.txt.
 pub(crate) fn append_to_diag(global_log: &std::path::Path, text: &str) {
     let _ = append_to_file(global_log, text);
-    let diag_base = std::env::temp_dir().join("frameforge").join("diagnostics");
+    let diag_base = std::env::temp_dir().join("borkforge").join("diagnostics");
     if let Ok(entries) = std::fs::read_dir(&diag_base) {
         let mut folders: Vec<std::path::PathBuf> = entries
             .filter_map(|e| e.ok().map(|d| d.path()))
@@ -163,7 +163,7 @@ pub(crate) fn append_to_diag(global_log: &std::path::Path, text: &str) {
 /// Read the riven overlay session log.
 #[tauri::command]
 pub(crate) fn get_riven_session_log() -> String {
-    let path = std::env::temp_dir().join("frameforge_riven_session.txt");
+    let path = std::env::temp_dir().join("borkforge_riven_session.txt");
     std::fs::read_to_string(&path).unwrap_or_else(|_| {
         "(no riven session log yet — open the riven reroll screen first)".into()
     })
@@ -172,7 +172,7 @@ pub(crate) fn get_riven_session_log() -> String {
 /// Read the current overlay session log.
 #[tauri::command]
 pub(crate) fn get_overlay_session_log() -> String {
-    let path = std::env::temp_dir().join("frameforge_overlay_session.txt");
+    let path = std::env::temp_dir().join("borkforge_overlay_session.txt");
     std::fs::read_to_string(&path)
         .unwrap_or_else(|_| "(no session log yet — trigger a Void Fissure first)".into())
 }
@@ -181,7 +181,7 @@ pub(crate) fn get_overlay_session_log() -> String {
 /// lines into the same session log that gets copied to the diagnostics folder.
 #[tauri::command]
 pub(crate) fn log_relic_fe(msg: String) {
-    let path = std::env::temp_dir().join("frameforge_overlay_session.txt");
+    let path = std::env::temp_dir().join("borkforge_overlay_session.txt");
     let _ = append_to_file(&path, &format!("[FE] {}\n", msg));
 }
 
@@ -214,7 +214,7 @@ fn dir_size_bytes(dir: &std::path::Path) -> u64 {
         .sum()
 }
 
-/// Return the total size of %TEMP%\frameforge\diagnostics\ in bytes.
+/// Return the total size of %TEMP%\borkforge\diagnostics\ in bytes.
 #[tauri::command]
 pub(crate) fn get_diag_folder_size(state: State<AppState>) -> u64 {
     dir_size_bytes(&state.auto_capture_dir)
@@ -424,7 +424,7 @@ pub(crate) fn start_memory_relic_debug() -> Result<String, String> {
     if MEM_RELIC_DEBUG_RUNNING.swap(true, Ordering::SeqCst) {
         return Err("Memory relic debug already running".to_string());
     }
-    let log_path = std::env::temp_dir().join("frameforge_mem_relic_debug.log");
+    let log_path = std::env::temp_dir().join("borkforge_mem_relic_debug.log");
     let log_str = log_path.to_string_lossy().to_string();
     let header = format!(
         "══════════════════════════════════════════════════\n\

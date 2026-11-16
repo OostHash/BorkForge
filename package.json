@@ -11,6 +11,7 @@
     "dev": "pnpm --filter @borkforge/frontend dev",
     "desktop": "pnpm --filter @borkforge/backend tauri",
     "desktop:build": "pnpm --filter @borkforge/backend tauri:build",
+    "desktop:build:unsigned": "pnpm --filter @borkforge/backend tauri:build:unsigned",
     "desktop:dev": "pnpm --filter @borkforge/backend tauri:dev",
     "format": "pnpm --filter @borkforge/frontend format && cargo fmt --all",
     "format:check": "pnpm --filter @borkforge/frontend format:check",

@@ -188,3 +188,10 @@ it("shows the overlay log in a dialog and opens the batch preview", async () => 
   await row("Incoming batch").getByRole("button", { name: "Preview" }).click();
   await expect.element(page.getByRole("status", { name: "Batch preview" })).toHaveTextContent("open");
 });
+
+it("keeps the developer pages under Debugging", async () => {
+  const { client } = setup();
+  await mount(client);
+  await expect.element(row("Kitchen sink").getByRole("button", { name: "Open" })).toBeVisible();
+  await expect.element(row("Tokens").getByRole("button", { name: "Open" })).toBeVisible();
+});

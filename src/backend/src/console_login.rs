@@ -109,9 +109,9 @@ pub async fn open_console_login(app: tauri::AppHandle) -> Result<(), String> {
     // warframe.com browser session. Without this, already-logged-in users get
     // redirected to the homepage and login.php is never called, so our
     // credential interceptor never fires.
-    let data_dir = std::env::temp_dir().join("frameforge-console-login");
+    let data_dir = std::env::temp_dir().join("borkforge-console-login");
     tauri::WebviewWindowBuilder::new(&app, "console-login", tauri::WebviewUrl::External(url))
-        .title("FrameForge — Warframe Login")
+        .title("BorkForge — Warframe Login")
         .inner_size(500.0, 720.0)
         .resizable(true)
         .data_directory(data_dir)

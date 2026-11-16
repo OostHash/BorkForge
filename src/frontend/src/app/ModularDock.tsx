@@ -1,9 +1,11 @@
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { PanelRightOpen } from "lucide-react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { isTauri } from "../api/env";
 import { closeModularPopout, openModularPopout, useModularPrefs } from "../api/modular";
 import { useSettings } from "../api/settings";
 import { clampModularWidth, MODULAR_WIDTH } from "../domain/modular";
 import { ResizeHandle } from "../primitives/behavior/ResizeHandle";
+import { IconButton } from "../primitives/actions";
 import { toast } from "../primitives/overlay";
 import { ModularWindow } from "../screens/modular/ModularWindow";
 
@@ -21,11 +23,12 @@ const useWindowWidth = () => useSyncExternalStore(subscribeResize, () => window.
  * (current app: useModularWindow).
  */
 export function ModularDock() {
-  const { prefs, loaded, setWidth, setPopout } = useModularPrefs();
+  const { prefs, loaded, setWidth, setCollapsed, setPopout } = useModularPrefs();
   const { data: settings } = useSettings();
   const windowWidth = useWindowWidth();
   // Live width while dragging; saved once on release.
   const [dragWidth, setDragWidth] = useState<number | null>(null);
+  const widthCommit = useRef(0);
   const width = clampModularWidth(dragWidth ?? prefs.width, windowWidth);
 
   const popout = prefs.popout;
@@ -47,6 +50,20 @@ export function ModularDock() {
   }, [popout, loaded]);
 
   if (popout) return null;
+  if (prefs.collapsed) {
+    return (
+      <aside aria-label="Collapsed modular window" className="flex w-10 shrink-0 justify-center border-s border-border bg-surface py-1.5">
+        <IconButton
+          size="sm"
+          icon={PanelRightOpen}
+          label="Expand modular window"
+          onClick={() => {
+            setCollapsed(false);
+          }}
+        />
+      </aside>
+    );
+  }
   return (
     <div className="relative flex shrink-0 border-s border-border" style={{ width }}>
       <ResizeHandle
@@ -58,13 +75,22 @@ export function ModularDock() {
         max={clampModularWidth(MODULAR_WIDTH.max, windowWidth)}
         onValueChange={setDragWidth}
         onValueCommit={(value) => {
-          setDragWidth(null);
-          setWidth(value);
+          const commit = ++widthCommit.current;
+          // Keep the committed width visible until the asynchronous settings
+          // save finishes. Clearing it immediately briefly restored the old
+          // width before the optimistic settings cache caught up.
+          setDragWidth(value);
+          void setWidth(value).finally(() => {
+            if (widthCommit.current === commit) setDragWidth(null);
+          });
         }}
         className="absolute inset-y-0 start-0 z-(--ff-z-sticky) w-1.5"
       />
       <ModularWindow
         className="flex-1"
+        onCollapse={() => {
+          setCollapsed(true);
+        }}
         onPopout={() => {
           setPopout(true);
         }}

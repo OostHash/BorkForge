@@ -1,5 +1,5 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { Copy, Eye, FolderOpen } from "lucide-react";
+import { Copy, Eye, FlaskConical, FolderOpen, Palette } from "lucide-react";
 import { useId, useState, type ReactNode } from "react";
 import { clearDebugFolder, openDebugFolder, reloadSizes, useDebugSizes, useRunning, useSetRunning } from "../../api/debug";
 import { invoke } from "../../api/invoke";
@@ -382,6 +382,33 @@ export function DebuggingTab() {
           <ClearButton which="unmatched_paths" bytes={sizes.unmatched_paths} />
         </DebugRow>
       </SettingsGroup>
+
+      {import.meta.env.DEV && (
+        <SettingsGroup title="Developer pages">
+          <DebugRow title="Kitchen sink" description="Inspect the app's reusable interface components and interaction states.">
+            <Button
+              size="sm"
+              leadingIcon={FlaskConical}
+              onClick={() => {
+                window.location.assign("?view=kitchen-sink");
+              }}
+            >
+              Open
+            </Button>
+          </DebugRow>
+          <DebugRow title="Tokens" description="Inspect the generated theme colours, spacing and density tokens.">
+            <Button
+              size="sm"
+              leadingIcon={Palette}
+              onClick={() => {
+                window.location.assign("?view=tokens");
+              }}
+            >
+              Open
+            </Button>
+          </DebugRow>
+        </SettingsGroup>
+      )}
     </>
   );
 }

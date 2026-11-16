@@ -10,7 +10,7 @@ afterEach(async () => {
   clearMocks();
 });
 
-function setup(initial: Record<string, unknown>) {
+function setup(initial: Record<string, unknown>, saveGate?: Promise<void>) {
   let settings: Record<string, unknown> = { ...initial };
   const calls: Array<{ cmd: string; args: unknown }> = [];
   mockWindows("main");
@@ -20,7 +20,7 @@ function setup(initial: Record<string, unknown>) {
     if (cmd === "plugin:window|get_all_windows") return ["main"];
     if (cmd === "save_settings") {
       settings = { ...settings, ...(JSON.parse((args as { json: string }).json) as Record<string, unknown>) };
-      return null;
+      return saveGate ?? null;
     }
     return null;
   });
@@ -48,6 +48,39 @@ it("saves the docked width when resizing ends", async () => {
   await userEvent.keyboard("{ArrowLeft}");
   await vi.waitFor(() => {
     expect(saved().modularWidth).toBe(248);
+  });
+});
+
+it("keeps the committed width while its setting is still being saved", async () => {
+  await page.viewport(1280, 800);
+  let finishSave!: () => void;
+  const saveGate = new Promise<void>((resolve) => {
+    finishSave = () => {
+      resolve();
+    };
+  });
+  const { client } = setup({ modularWidth: 240 }, saveGate);
+  await mount(client);
+  const handle = page.getByRole("separator", { name: "Modular window width" });
+  (handle.element() as HTMLElement).focus();
+  await userEvent.keyboard("{ArrowLeft}");
+  await expect.element(handle).toHaveAttribute("aria-valuenow", "248");
+  finishSave();
+  await expect.element(handle).toHaveAttribute("aria-valuenow", "248");
+});
+
+it("collapses to a rail and remembers the choice", async () => {
+  const { client, saved } = setup({});
+  await mount(client);
+  await page.getByRole("button", { name: "Collapse modular window" }).click();
+  await expect.element(page.getByRole("button", { name: "Expand modular window" })).toBeVisible();
+  await vi.waitFor(() => {
+    expect(saved().modularCollapsed).toBe(true);
+  });
+  await page.getByRole("button", { name: "Expand modular window" }).click();
+  await expect.element(page.getByRole("button", { name: "Collapse modular window" })).toBeVisible();
+  await vi.waitFor(() => {
+    expect(saved().modularCollapsed).toBe(false);
   });
 });
 

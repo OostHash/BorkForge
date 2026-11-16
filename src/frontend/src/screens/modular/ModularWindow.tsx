@@ -1,4 +1,4 @@
-import { ArrowDown, ArrowUp, ChevronDown, ChevronRight, ExternalLink, Star, X } from "lucide-react";
+import { ArrowDown, ArrowUp, ChevronDown, ChevronRight, ExternalLink, PanelRightClose, Star, X } from "lucide-react";
 import { useId, useMemo, useState, type ReactNode } from "react";
 import { useCraftableItems, useRecipes } from "../../api/foundry";
 import { useOwnership } from "../../api/inventory";
@@ -308,16 +308,19 @@ function Section({ id, index, count }: { id: SectionId; index: number; count: nu
 type Props = {
   /** Docked in the main window: shows a pop-out button. */
   onPopout?: () => void;
+  /** Docked in the main window: collapses the panel to a narrow rail. */
+  onCollapse?: () => void;
   className?: string;
 };
 
 /** Tracked items, favourites, pinned timers and watched fissures (vault modular-window.md). */
-export function ModularWindow({ onPopout, className }: Props) {
+export function ModularWindow({ onPopout, onCollapse, className }: Props) {
   const { prefs } = useModularPrefs();
   return (
     <aside aria-label="Modular window" className={cn("flex min-h-0 min-w-0 flex-col overflow-x-hidden overflow-y-auto bg-surface", className)}>
       <div className="flex shrink-0 items-center gap-1 border-b border-border py-1.5 ps-3 pe-1">
         <span className="flex-1 text-xs font-semibold tracking-wide text-muted uppercase">Modular window</span>
+        {onCollapse && <IconButton size="sm" icon={PanelRightClose} label="Collapse modular window" onClick={onCollapse} />}
         {onPopout && <IconButton size="sm" icon={ExternalLink} label="Open in its own window" onClick={onPopout} />}
       </div>
       {prefs.sectionOrder.map((id, index) => (

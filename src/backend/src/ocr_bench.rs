@@ -26,7 +26,7 @@ fn compare_winrt_vs_ocrs_on_real_screenshots() {
     assert!(root.exists(), "benchmark folder not found: {root:?}");
 
     // ocrs downloads its two model files here on first use (~10 MB, one-time).
-    let data_dir = std::env::temp_dir().join("frameforge_ocr_bench_models");
+    let data_dir = std::env::temp_dir().join("borkforge_ocr_bench_models");
     crate::ocr_fallback::set_data_dir(data_dir);
 
     let mut entries: Vec<_> = std::fs::read_dir(root)
@@ -128,7 +128,7 @@ fn compare_winrt_vs_ocrs_on_real_screenshots() {
         avg(&ocrs_times),
     ));
 
-    let out_path = std::env::temp_dir().join("frameforge_ocr_bench_report.txt");
+    let out_path = std::env::temp_dir().join("borkforge_ocr_bench_report.txt");
     std::fs::write(&out_path, &report).unwrap();
     println!("{report}");
     println!("\nFull report written to {}", out_path.display());

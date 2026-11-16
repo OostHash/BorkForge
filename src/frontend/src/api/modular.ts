@@ -17,6 +17,7 @@ export type ModularPrefs = {
   watches: FissureWatch[];
   sectionOrder: SectionId[];
   width: number;
+  collapsed: boolean;
   popout: boolean;
 };
 
@@ -29,6 +30,7 @@ export function modularPrefsFrom(settings: SettingsFile | undefined): ModularPre
     watches: watchesFrom(s.fissureWatches),
     sectionOrder: sectionOrderFrom(s.modularSectionOrder),
     width: modularWidthFrom(s.modularWidth),
+    collapsed: s.modularCollapsed === true,
     popout: s.modularPopout === true,
   };
 }
@@ -36,7 +38,7 @@ export function modularPrefsFrom(settings: SettingsFile | undefined): ModularPre
 /** Modular window settings plus a setter per list (shared settings file, same keys as the current app). */
 export function useModularPrefs() {
   const { data, isSuccess } = useSettings();
-  const { mutate } = useSaveSettings();
+  const { mutate, mutateAsync } = useSaveSettings();
   return {
     prefs: modularPrefsFrom(data),
     /** Saving before the file is read would clobber it (the backend merges keys, but a list replaces). */
@@ -54,7 +56,10 @@ export function useModularPrefs() {
       mutate({ modularSectionOrder });
     },
     setWidth: (modularWidth: number) => {
-      mutate({ modularWidth });
+      return mutateAsync({ modularWidth });
+    },
+    setCollapsed: (modularCollapsed: boolean) => {
+      mutate({ modularCollapsed });
     },
     setPopout: (modularPopout: boolean) => {
       mutate({ modularPopout });
@@ -85,7 +90,7 @@ export async function openModularPopout(settings: SettingsFile | undefined, dock
   const position = g.x !== undefined && g.y !== undefined && (await onAMonitor(g.x, g.y)) ? { x: g.x, y: g.y } : {};
   const win = new WebviewWindow(POPOUT_LABEL, {
     url: POPOUT_URL,
-    title: "FrameForge — Modular Window",
+    title: "BorkForge — Modular Window",
     width: g.w ?? dockedWidth,
     height: g.h ?? POPOUT_SIZE.height,
     ...position,

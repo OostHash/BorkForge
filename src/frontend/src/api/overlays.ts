@@ -221,7 +221,7 @@ export async function placeRivenWindow(place: { x: number; y: number; width: num
   }
   new WebviewWindow(RIVEN_LABEL, {
     url: "index.html#rivenoverlay",
-    title: "FrameForge Riven",
+    title: "BorkForge Riven",
     transparent: true,
     decorations: false,
     alwaysOnTop: true,
