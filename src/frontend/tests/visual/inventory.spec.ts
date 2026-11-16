@@ -13,10 +13,9 @@ async function open(page: Page, query = "", viewport = { width: 1280, height: 90
   await page.getByRole("button", { name: "Inventory", exact: true }).click();
 }
 
-/** Mastery, mod ranks and Foundry jobs arrive by the mock inventory-update event. */
+/** Mastery and Foundry jobs arrive by the mock inventory-update event. */
 async function liveLoaded(page: Page) {
   await expect(page.getByText("Mastered", { exact: true }).first()).toBeVisible();
-  await expect(page.getByRole("group", { name: "Mod rank" })).toBeVisible();
 }
 
 async function axe(page: Page) {
@@ -33,11 +32,10 @@ test("cards, owned only", async ({ page }) => {
   await expect(page).toHaveScreenshot("inventory-cards.png");
 });
 
-test("mods with ranks", async ({ page }) => {
+test("mods and arcanes by rank", async ({ page }) => {
   await open(page);
-  await page.getByRole("button", { name: /^Mods/ }).click();
-  await expect(page.getByRole("group", { name: "Mod rank" })).toBeVisible();
-  await expect(page.getByRole("definition").first()).toBeVisible();
+  await page.getByRole("tab", { name: "Mods & Arcanes" }).click();
+  await expect(page.getByRole("list", { name: "Serration by rank" })).toBeVisible();
   await axe(page);
   await expect(page).toHaveScreenshot("inventory-mods.png");
 });

@@ -314,7 +314,17 @@ export function RelicsTab({ index, own, prices }: Props) {
           />
         </div>
 
-        <div ref={scroller} className={cn("flex min-h-0 flex-1 flex-col", tableMode ? "" : "gap-3 overflow-y-auto p-4 lg:p-6")}>
+        <div
+          ref={scroller}
+          role="region"
+          aria-label="Relic collection"
+          // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- the card collection is independently scrollable
+          tabIndex={0}
+          className={cn(
+            "flex min-h-0 flex-1 flex-col outline-none focus-visible:outline-2 focus-visible:outline-focus",
+            tableMode ? "" : "gap-3 overflow-y-auto p-4 lg:p-6",
+          )}
+        >
           {rewardMatches && (
             <p className={cn("text-sm text-muted", tableMode && "px-4 pt-3 pb-2")}>Rewards matching your search are marked “Match”.</p>
           )}

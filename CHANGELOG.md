@@ -2,15 +2,12 @@
 
 All notable changes to BorkForge will be documented in this file.
 
-> **BorkForge 1.0.0 is a work in progress.** Nothing listed under
-> `Unreleased` represents a stable release yet.
-
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased] - 1.0.0 WIP
+## [Unreleased]
 
-## Borkforge
+## [1.0.0] - 2026-11-16
 
 ### Added
 

@@ -37,6 +37,7 @@ const SCREENS: readonly ScreenDef[] = [
 ];
 
 const BUG_REPORT_URL = "https://github.com/OostHash/BorkForge/issues/new/choose";
+const NARROW_NAV_ITEM = "justify-center px-0 md:justify-start md:px-3 [&>span]:hidden md:[&>span]:inline";
 
 /** Main window: navigation on the left, the active screen on the right. */
 export function AppShell() {
@@ -58,10 +59,10 @@ export function AppShell() {
       <RivenOverlayController />
       <WindowTitleBar />
       <div className="flex min-h-0 flex-1">
-        <nav aria-label="Main" className="flex w-52 shrink-0 flex-col gap-4 border-e border-border bg-surface p-2">
-          <div className="flex items-center gap-2 px-2 pt-1 text-sm font-semibold">
+        <nav aria-label="Main" className="flex w-14 shrink-0 flex-col gap-4 border-e border-border bg-surface p-2 md:w-52">
+          <div className="flex items-center justify-center gap-2 pt-1 text-sm font-semibold md:justify-start md:px-2">
             <BorkForgeMark className="size-5 text-accent" />
-            BorkForge
+            <span className="hidden md:inline">BorkForge</span>
           </div>
           <ul className="flex flex-col gap-0.5">
             {SCREENS.map((s) => (
@@ -70,6 +71,9 @@ export function AppShell() {
                   active={screen === s.id}
                   label={s.label}
                   icon={s.icon}
+                  aria-label={s.label}
+                  title={s.label}
+                  className={NARROW_NAV_ITEM}
                   onClick={() => {
                     setScreen(s.id);
                   }}
@@ -83,6 +87,9 @@ export function AppShell() {
                 active={false}
                 label="Report a bug"
                 icon={Bug}
+                aria-label="Report a bug"
+                title="Report a bug"
+                className={NARROW_NAV_ITEM}
                 onClick={() => {
                   void openExternal(BUG_REPORT_URL).catch(() => undefined);
                 }}
@@ -93,6 +100,9 @@ export function AppShell() {
                 active={settingsOpen}
                 label="Settings"
                 icon={Settings}
+                aria-label="Settings"
+                title="Settings"
+                className={NARROW_NAV_ITEM}
                 onClick={() => {
                   setSettingsOpen(true);
                 }}

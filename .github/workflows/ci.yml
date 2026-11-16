@@ -2,8 +2,9 @@ name: CI
 
 on:
   pull_request:
+  workflow_dispatch:
   push:
-    branches: [main]
+    branches: [master]
 
 permissions:
   contents: read
@@ -26,6 +27,7 @@ jobs:
           node-version-file: .node-version
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @borkforge/frontend exec playwright install --with-deps chromium
       - run: pnpm format:check
       - run: pnpm lint
       - run: pnpm typecheck

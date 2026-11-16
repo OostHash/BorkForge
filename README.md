@@ -4,8 +4,6 @@ BorkForge is a Windows desktop companion for Warframe. It combines inventory
 and mastery tracking, market tools, timers, relic overlays, and riven analysis
 in one local app.
 
-> BorkForge 1.0.0 is being prepared for its first stable release.
-
 ## Highlights
 
 - **Inventory and Foundry** — track owned items, mastery, crafting requirements,
@@ -77,7 +75,7 @@ lives in `src/backend`.
 
 ## Project Status
 
-BorkForge is an independent opionanted version of
+BorkForge is an independent opinionated version of
 [FrameForge 4.5.0](https://github.com/WyrmStudios/FrameForge). It uses its own
 application identity and storage, so it can be installed alongside FrameForge.
 

@@ -67,8 +67,8 @@ test.describe("forced colors", () => {
 
   test("kitchen sink stays readable", async ({ page }) => {
     await open(page);
-    await page.getByRole("link", { name: "Kitchen sink" }).click();
-    await expect(page.getByRole("main")).toBeVisible();
+    await page.goto("/mock.html?view=kitchen-sink");
+    await expect(page.getByRole("heading", { name: "Kitchen sink" })).toBeVisible();
     await expect(page).toHaveScreenshot("forced-colors-kitchen-sink.png", { fullPage: false });
   });
 });

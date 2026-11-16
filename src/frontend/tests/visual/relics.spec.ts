@@ -10,7 +10,7 @@ async function open(page: Page, query = "", viewport = { width: 1280, height: 90
     localStorage.removeItem("ff-view-relic");
   });
   await page.goto(`/mock.html${query}`);
-  await page.getByRole("button", { name: "Relics" }).click();
+  await page.getByRole("button", { name: "Relics", exact: true }).click();
 }
 
 /** Mastery arrives by the mock inventory-update event; Ash Prime parts turn "Complete" once it has. */

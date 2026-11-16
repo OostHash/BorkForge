@@ -1,4 +1,4 @@
-import { PanelRightOpen } from "lucide-react";
+import { ExternalLink, PanelRightOpen } from "lucide-react";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { isTauri } from "../api/env";
 import { closeModularPopout, openModularPopout, useModularPrefs } from "../api/modular";
@@ -16,6 +16,7 @@ function subscribeResize(listener: () => void) {
   };
 }
 const useWindowWidth = () => useSyncExternalStore(subscribeResize, () => window.innerWidth);
+const NARROW_WINDOW_WIDTH = 720;
 
 /**
  * The modular window docked on the right of the main window, or — with
@@ -50,6 +51,20 @@ export function ModularDock() {
   }, [popout, loaded]);
 
   if (popout) return null;
+  if (windowWidth < NARROW_WINDOW_WIDTH) {
+    return (
+      <aside aria-label="Narrow modular window" className="flex w-10 shrink-0 justify-center border-s border-border bg-surface py-1.5">
+        <IconButton
+          size="sm"
+          icon={ExternalLink}
+          label="Open modular window in its own window"
+          onClick={() => {
+            setPopout(true);
+          }}
+        />
+      </aside>
+    );
+  }
   if (prefs.collapsed) {
     return (
       <aside aria-label="Collapsed modular window" className="flex w-10 shrink-0 justify-center border-s border-border bg-surface py-1.5">

@@ -14,6 +14,7 @@ async function open(page: Page, query = "", viewport = { width: 1280, height: 90
     sessionStorage.removeItem("ff-mock-settings");
   });
   await page.goto(`/mock.html${query}`);
+  await page.getByRole("button", { name: "Timers", exact: true }).click();
 }
 
 async function axe(page: Page) {
