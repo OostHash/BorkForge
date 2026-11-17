@@ -6,7 +6,7 @@ use crate::app_state::AppState;
 use crate::wfm::to_wfm_slug;
 use crate::{cache, refresh};
 
-/// Delete the bulk price cache and re-fetch from FrameForgePricing.
+/// Delete the bulk price cache and re-fetch from the HexDeskPricing mirror.
 /// Updates both relics_run_prices and the WFM price cache in-place.
 #[tauri::command]
 pub(crate) async fn refresh_bulk_prices(
@@ -64,9 +64,9 @@ pub(crate) fn load_relics_run_cache(
     Some((by_name, by_slug))
 }
 
-const PRICING_BASE: &str = "https://raw.githubusercontent.com/WyrmStudios/FrameForgePricing/main";
+const PRICING_BASE: &str = "https://raw.githubusercontent.com/OostHash/HexDeskPricing/main";
 
-/// Fetch items.json + today's price_history from the FrameForgePricing mirror.
+/// Fetch items.json + the latest price_history from the HexDeskPricing mirror.
 /// Returns (by_name, by_slug):
 ///   by_name: item display name (lowercase) → median sell price  (for get_item_price)
 ///   by_slug: authoritative WFM slug         → median sell price  (for wfm_price_cache)

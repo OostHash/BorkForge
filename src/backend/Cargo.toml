@@ -1,6 +1,6 @@
 [package]
 name = "hexdesk-backend"
-version = "1.0.0"
+version = "1.0.1"
 description = "HexDesk desktop backend"
 authors = ["HexDesk contributors"]
 edition = "2021"

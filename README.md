@@ -91,8 +91,9 @@ Bug reports and feature requests are welcome through
 
 ## License
 
-HexDesk is licensed under [GPLv3](LICENSE). Original copyright and licence
-notices from FrameForge are retained as required by the licence.
+HexDesk is licensed under [GPLv3](LICENSE). The frontend was written for
+HexDesk; the backend is derived from FrameForge 4.5.0. See [NOTICE](NOTICE)
+for copyright and authorship details.
 
 HexDesk is not affiliated with Digital Extremes Ltd. Warframe is a trademark
 of Digital Extremes Ltd.

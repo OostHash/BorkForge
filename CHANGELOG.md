@@ -7,6 +7,22 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-11-17
+
+### Fixed
+
+- Bulk prices for relic values, relic recommendations and price lists were up
+  to a month out of date, because the FrameForge pricing mirror stopped
+  updating on 2026-10-14. HexDesk now reads prices and ducat exceptions from
+  its own mirror, [HexDeskPricing](https://github.com/OostHash/HexDeskPricing),
+  which refreshes from relics.run twice a day.
+
+### Changed
+
+- The licence notice now names HexDesk. A new `NOTICE` file records authorship:
+  the frontend was written for HexDesk, the backend is derived from FrameForge
+  4.5.0.
+
 ## [1.0.0] - 2026-11-17
 
 ### Added

@@ -188,10 +188,10 @@ fn fetch_wiki_reward_names() -> HashSet<String> {
 /// Hand-curated exceptions where a prime part's ducat value doesn't follow the
 /// standard drop-rarity formula (`ducat_value_from_rarities`). Mirrors the Warframe
 /// Wiki's `Module:Void/data` `DUCAT_EXCEPTIONS` table. The authoritative copy lives
-/// in our own `FrameForgePricing` mirror (`DUCAT_EXCEPTIONS_URL`) — not the wiki
+/// in the `HexDeskPricing` mirror (`DUCAT_EXCEPTIONS_URL`) — not the wiki
 /// directly, so no per-user runtime dependency on it is added — and gets fetched
 /// through the same catalogue source pipeline as Relics/ExportRecipes/etc, which
-/// means a new exception can ship without a FrameForge release. This bundled copy
+/// means a new exception can ship without a HexDesk release. This bundled copy
 /// is only the offline/first-run fallback for when that fetch fails.
 /// Keys are lowercased full item+part display names.
 const DUCAT_EXCEPTIONS_JSON: &str = include_str!("../resources/ducat_exceptions.json");
@@ -309,7 +309,7 @@ const SYNDICATES_URL: &str =
 /// fetches bulk WFM prices from) so the ducat exceptions table can be corrected
 /// between app releases instead of requiring a new build for every entry.
 const DUCAT_EXCEPTIONS_URL: &str =
-    "https://raw.githubusercontent.com/WyrmStudios/FrameForgePricing/main/ducat_exceptions.json";
+    "https://raw.githubusercontent.com/OostHash/HexDeskPricing/main/ducat_exceptions.json";
 
 /// One upstream file, and what its absence costs.
 struct SourceSpec {

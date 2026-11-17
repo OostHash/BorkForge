@@ -1,0 +1,30 @@
+HexDesk - Warframe companion app for inventory, trading, timers and statistics.
+Copyright (C) 2026  OostHash
+
+This program is free software: you can redistribute it and/or modify it under
+the terms of the GNU General Public License version 3 as published by the Free
+Software Foundation.
+
+This program is distributed in the hope that it will be useful, but WITHOUT ANY
+WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
+PARTICULAR PURPOSE. See the GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License along with
+this program (see LICENSE). If not, see <https://www.gnu.org/licenses/>.
+
+Authorship
+----------
+
+src/frontend/
+    Written for HexDesk.
+    Copyright (C) 2026  OostHash
+
+src/backend/
+    Derived from FrameForge 4.5.0 <https://github.com/WyrmStudios/FrameForge>
+    and modified for HexDesk.
+    Copyright (C) 2026  Sikewyrm
+    Modifications Copyright (C) 2026  OostHash
+
+FrameForge was released under the GNU General Public License version 3 or
+later. Its copyright notice is kept here as section 4 and section 5 of that
+licence require.
