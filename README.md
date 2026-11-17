@@ -1,5 +1,19 @@
 <p align="center">
-  <img src="assets/branding/hexdesk-logo.svg" width="132" alt="HexDesk emblem">
+  <picture>
+    <source
+      media="(prefers-color-scheme: dark)"
+      srcset="assets/branding/hexdesk-logo-white.svg"
+    >
+    <source
+      media="(prefers-color-scheme: light)"
+      srcset="assets/branding/hexdesk-logo.svg"
+    >
+    <img
+      src="assets/branding/hexdesk-logo.svg"
+      width="132"
+      alt="HexDesk emblem"
+    >
+  </picture>
 </p>
 
 <h1 align="center">HexDesk</h1>
