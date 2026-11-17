@@ -33,15 +33,15 @@ The backend is still in a rough state and needs quite a bit of refactoring.
 It also needs some serious work before it meets HIPAA standards. (Yes, that's a joke.)
 On the bright side, this leaves plenty of room to improve the architecture and make things more platform-agnostic.
 
-While I can use WSL, dual-boot, or run a VM, my time is limited.I simply can't commit to actively developing, 
-testing, and maintaining Linux support alongside Windows.
+While I can use WSL, dual-boot, or run a VM, my time is limited. I simply can't commit to actively develop, 
+test, and maintain Linux support alongside Windows.
 
 **That's why I'm looking for a Linux developer interested in contributing to HexDesk.**
 
 Someone who can help identify Windows-specific dependencies, improve cross-platform compatibility, 
 and eventually get HexDesk running reliably on Linux.
 
-If you're interested in helping, feel free to reach out!
+If you're interested in helping, [feel free to reach out!](https://github.com/OostHash/HexDesk/discussions/22#discussion-11333992)
 
 ## Highlights
 
