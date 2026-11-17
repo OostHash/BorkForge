@@ -24,6 +24,25 @@ HexDesk is a free, open-source desktop companion for Warframe. It combines
 inventory and mastery tracking, market tools, timers, relic overlays, and riven
 analysis in one local app. Built by Tenno, for Tenno.
 
+## Looking for a Linux Developer
+
+HexDesk currently only supports Windows, as that's my primary development environment.
+I'd love to bring HexDesk to Linux, but I could use some help.
+
+The backend is still in a rough state and needs quite a bit of refactoring. 
+It also needs some serious work before it meets HIPAA standards. (Yes, that's a joke.)
+On the bright side, this leaves plenty of room to improve the architecture and make things more platform-agnostic.
+
+While I can use WSL, dual-boot, or run a VM, my time is limited.I simply can't commit to actively developing, 
+testing, and maintaining Linux support alongside Windows.
+
+**That's why I'm looking for a Linux developer interested in contributing to HexDesk.**
+
+Someone who can help identify Windows-specific dependencies, improve cross-platform compatibility, 
+and eventually get HexDesk running reliably on Linux.
+
+If you're interested in helping, feel free to reach out!
+
 ## Highlights
 
 - **Inventory and Foundry** — track owned items, mastery, crafting requirements,
