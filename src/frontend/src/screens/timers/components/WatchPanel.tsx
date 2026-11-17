@@ -100,7 +100,7 @@ export function WatchPanel({ watches, notificationsEnabled, permissionDenied, on
       </div>
       {permissionDenied && (
         <Alert tone="warning" title="Notifications are blocked">
-          Allow notifications for BorkForge in Windows settings to get fissure alerts.
+          Allow notifications for HexDesk in Windows settings to get fissure alerts.
         </Alert>
       )}
     </Card>

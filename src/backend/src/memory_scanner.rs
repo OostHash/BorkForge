@@ -683,7 +683,7 @@ pub fn parse_full_account_blob(raw: &[u8]) -> Option<BlobInventory> {
     // small false-positive fragment that matched the end marker by coincidence.
     const MIN_PARSE_BYTES: usize = 50_000;
     if end_pos < MIN_PARSE_BYTES {
-        debug!(target: "borkforge::blob_parse", end_pos, min = MIN_PARSE_BYTES, "too small — skipping");
+        debug!(target: "hexdesk::blob_parse", end_pos, min = MIN_PARSE_BYTES, "too small — skipping");
         return None;
     }
 
@@ -709,7 +709,7 @@ pub fn parse_full_account_blob(raw: &[u8]) -> Option<BlobInventory> {
     for required in CORE_SECTIONS {
         if memchr::memmem::find(search_range, required).is_none() {
             debug!(
-                target: "borkforge::blob_parse",
+                target: "hexdesk::blob_parse",
                 missing = %std::str::from_utf8(required).unwrap_or("?"),
                 "incomplete blob — missing required section, skipping"
             );
@@ -731,7 +731,7 @@ pub fn parse_full_account_blob(raw: &[u8]) -> Option<BlobInventory> {
                     }
                 })
                 .collect();
-            debug!(target: "borkforge::blob_parse", error = %e, head = ?head, "JSON error");
+            debug!(target: "hexdesk::blob_parse", error = %e, head = ?head, "JSON error");
         })
         .ok()?;
 
@@ -1052,7 +1052,7 @@ pub fn parse_full_account_blob(raw: &[u8]) -> Option<BlobInventory> {
     // An empty unique_items means we captured an incomplete blob (game is mid-write,
     // returning from mission, or the blob sections were partially stitched out of order).
     if unique_items.is_empty() {
-        debug!(target: "borkforge::blob_parse", "blob has no warframes/weapons — incomplete blob, rejecting");
+        debug!(target: "hexdesk::blob_parse", "blob has no warframes/weapons — incomplete blob, rejecting");
         return None;
     }
 
@@ -1259,7 +1259,7 @@ pub fn capture_all_blobs(
     let saved = stitch_blobs(&mut *src, blob_dir, ts, blob_tx, save);
     let stats = src.stats();
     debug!(
-        target: "borkforge::blob_capture",
+        target: "hexdesk::blob_capture",
         regions_skipped = stats.regions_skipped,
         vquery_ms = stats.enumerate_ms,
         read_ms = stats.read_ms,
@@ -1705,7 +1705,7 @@ fn stitch_blobs(
     }
 
     debug!(
-        target: "borkforge::blob_capture",
+        target: "hexdesk::blob_capture",
         regions_read,
         starts_found,
         saved,
@@ -1715,7 +1715,7 @@ fn stitch_blobs(
         "capture done"
     );
     if starts_found == 0 {
-        warn!(target: "borkforge::blob_capture", "no start-marker found — FULL_ACCOUNT not in memory (game in mission, on login screen, or Arsenal not open?)");
+        warn!(target: "hexdesk::blob_capture", "no start-marker found — FULL_ACCOUNT not in memory (game in mission, on login screen, or Arsenal not open?)");
     }
     saved
 }

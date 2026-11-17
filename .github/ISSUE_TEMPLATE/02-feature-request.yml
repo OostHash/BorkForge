@@ -1,5 +1,5 @@
 name: Feature request
-description: Suggest an improvement or new capability for BorkForge
+description: Suggest an improvement or new capability for HexDesk
 title: "[Feature]: "
 labels:
   - enhancement
@@ -40,7 +40,7 @@ body:
     id: proposal
     attributes:
       label: Proposed solution
-      description: How would you like BorkForge to address the problem?
+      description: How would you like HexDesk to address the problem?
     validations:
       required: true
 
@@ -63,5 +63,5 @@ body:
       options:
         - label: I searched the existing issues for a similar request.
           required: true
-        - label: This request is about BorkForge rather than a general Warframe support question.
+        - label: This request is about HexDesk rather than a general Warframe support question.
           required: true

@@ -96,7 +96,7 @@ export function MarketTab() {
         )}
         <SwitchRow
           label="Go invisible on start"
-          description="When BorkForge opens, set your warframe.market status to Invisible."
+          description="When HexDesk opens, set your warframe.market status to Invisible."
           checked={settings.wfmInvisibleOnStart === true}
           disabled={!loggedIn}
           onCheckedChange={(on) => {
@@ -105,7 +105,7 @@ export function MarketTab() {
         />
         <SwitchRow
           label="Go invisible on close"
-          description="Before BorkForge exits, set your warframe.market status to Invisible."
+          description="Before HexDesk exits, set your warframe.market status to Invisible."
           checked={settings.wfmInvisibleOnClose === true}
           disabled={!loggedIn}
           onCheckedChange={(on) => {
@@ -134,7 +134,7 @@ export function MarketTab() {
       <SettingsGroup title="Sale automation">
         <SwitchRow
           label="Record automatic sales"
-          description="Record detected sales in your warframe.market statistics. When off, BorkForge only reduces or removes the listing. Recorded sales cannot be undone from BorkForge."
+          description="Record detected sales in your warframe.market statistics. When off, HexDesk only reduces or removes the listing. Recorded sales cannot be undone from HexDesk."
           checked={settings.wfmRecordSales === true}
           disabled={!loggedIn}
           onCheckedChange={(on) => {

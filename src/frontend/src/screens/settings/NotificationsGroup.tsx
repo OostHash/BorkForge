@@ -29,7 +29,7 @@ export function NotificationsGroup() {
       />
       {denied && (
         <div>
-          <ResultText tone="danger">Notifications are blocked for BorkForge in your system settings.</ResultText>
+          <ResultText tone="danger">Notifications are blocked for HexDesk in your system settings.</ResultText>
         </div>
       )}
       <SettingRow
@@ -49,10 +49,10 @@ export function NotificationsGroup() {
             setTest(null);
             void ensureNotificationPermission().then(async (granted) => {
               if (!granted) {
-                setTest({ ok: false, text: "Permission denied: notifications are blocked for BorkForge in your system settings." });
+                setTest({ ok: false, text: "Permission denied: notifications are blocked for HexDesk in your system settings." });
                 return;
               }
-              await notify("BorkForge", "Test notification: watched fissure alerts will look like this.");
+              await notify("HexDesk", "Test notification: watched fissure alerts will look like this.");
               setTest({ ok: true, text: "Sent. If nothing appeared, Windows is dropping it." });
             });
           }}

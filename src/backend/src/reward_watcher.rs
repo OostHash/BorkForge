@@ -43,7 +43,7 @@ pub(crate) fn spawn_reward_watcher_thread(deps: RewardWatcherDeps) {
     let catalog_pairs = build_relic_reward_catalog(&relic_rewards);
     let catalog_pairs = Arc::new(catalog_pairs);
 
-    let last_found_path = std::env::temp_dir().join("borkforge_last_reward.txt");
+    let last_found_path = std::env::temp_dir().join("hexdesk_last_reward.txt");
 
     // EE.log path
     let ee_log_path = dirs::data_local_dir().map(|d| d.join("Warframe").join("EE.log"));
@@ -84,7 +84,7 @@ pub(crate) fn spawn_reward_watcher_thread(deps: RewardWatcherDeps) {
     let ee_ocr_app = app.clone();
     let ee_catalog = Arc::clone(&catalog_pairs);
     let ee_last_path = last_found_path.clone();
-    let session_log_path = std::env::temp_dir().join("borkforge_overlay_session.txt");
+    let session_log_path = std::env::temp_dir().join("hexdesk_overlay_session.txt");
     let ee_auto_capture_dir = auto_capture_dir.clone();
 
     if let Some(log_path) = ee_log_path {
@@ -130,7 +130,7 @@ pub(crate) fn spawn_reward_watcher_thread(deps: RewardWatcherDeps) {
             // candidate list from ~700 items to the ~6-24 rewards of the active relics.
             let mut session_relics: Vec<String> = Vec::new();
             // Catch up relics already loaded this mission before this thread
-            // started (e.g. BorkForge launched mid-mission) — otherwise the
+            // started (e.g. HexDesk launched mid-mission) — otherwise the
             // live tailer below, which only reads forward from file_pos, would
             // never see those earlier "Resource load completed" lines.
             log_watcher::seed_session_relics(&log_path, &mut session_relics);

@@ -113,7 +113,7 @@ pub struct AppState {
     /// syndicate name → purchasable items (all known syndicates)
     pub syndicate_catalog: Mutex<HashMap<String, Vec<SyndicateOffer>>>,
     pub syndicate_catalog_path: PathBuf,
-    /// IDs of riven auctions created via BorkForge — persisted so hidden auctions survive restarts.
+    /// IDs of riven auctions created via HexDesk — persisted so hidden auctions survive restarts.
     pub auction_ids: Mutex<Vec<String>>,
     pub auction_ids_path: PathBuf,
     /// Companion API quantities held in memory so the scanner includes them in cache writes.

@@ -1358,13 +1358,13 @@ pub fn extract_reward_items_twophase(
         };
     if raw_full.len() < 4 {
         let _ = std::fs::write(
-            std::env::temp_dir().join("borkforge_capture_debug.bmp"),
+            std::env::temp_dir().join("hexdesk_capture_debug.bmp"),
             to_bmp(pixels, pix_w, pix_h),
         );
         let avg = windows::avg_brightness(pixels);
         let kind = if avg < 30 { "dark-frame" } else { "ocr-empty" };
         return (false, false, vec![], vec![], format!(
-            "├─ Capture  : {}\n└─ OCR      : returned no text ({}, avg={})\n   Saved: %TEMP%\\borkforge_capture_debug.bmp",
+            "├─ Capture  : {}\n└─ OCR      : returned no text ({}, avg={})\n   Saved: %TEMP%\\hexdesk_capture_debug.bmp",
             capture_info, kind, avg
         ));
     }

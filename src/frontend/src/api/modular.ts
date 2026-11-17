@@ -90,7 +90,7 @@ export async function openModularPopout(settings: SettingsFile | undefined, dock
   const position = g.x !== undefined && g.y !== undefined && (await onAMonitor(g.x, g.y)) ? { x: g.x, y: g.y } : {};
   const win = new WebviewWindow(POPOUT_LABEL, {
     url: POPOUT_URL,
-    title: "BorkForge — Modular Window",
+    title: "HexDesk — Modular Window",
     width: g.w ?? dockedWidth,
     height: g.h ?? POPOUT_SIZE.height,
     ...position,

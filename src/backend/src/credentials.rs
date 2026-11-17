@@ -2,7 +2,7 @@
 
 use crate::platform::{CredentialStore, Platform};
 
-const WFM_TARGET: &str = "BorkForge_WFM";
+const WFM_TARGET: &str = "HexDesk_WFM";
 
 #[tauri::command]
 pub(crate) fn wfm_save_credentials(email: String, token: String) -> Result<(), String> {

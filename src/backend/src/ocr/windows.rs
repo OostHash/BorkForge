@@ -685,7 +685,7 @@ fn capture_dxgi(cap_frac: f32) -> Option<(Vec<u8>, u32, u32, u32)> {
     }
 }
 
-/// Captures the full desktop for diagnostics so the BorkForge overlay is visible.
+/// Captures the full desktop for diagnostics so the HexDesk overlay is visible.
 /// Uses GDI BitBlt from the desktop DC — DWM composites all windows (including the
 /// WebView2 overlay) before BitBlt reads them, so the overlay appears in the BMP.
 /// DXGI captures GPU output before DWM overlay compositing and misses WebView2 windows.

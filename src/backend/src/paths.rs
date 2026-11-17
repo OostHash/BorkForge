@@ -1,4 +1,4 @@
-//! Where BorkForge keeps its files.
+//! Where HexDesk keeps its files.
 //!
 //! Throwaway downloads live in the cache root, settings in the config root,
 //! the database and auction IDs in the data root, and logs and debug dumps in
@@ -10,7 +10,7 @@ use std::sync::OnceLock;
 
 use tracing::warn;
 
-const APP_DIR: &str = "borkforge";
+const APP_DIR: &str = "hexdesk";
 
 /// When set, all four roots become subdirectories of this path. Tests use it to
 /// keep off the real user directories.
@@ -23,20 +23,20 @@ pub fn set_root_override(root: PathBuf) -> Result<(), PathBuf> {
 }
 
 /// Picks the root before anything reads a path. Debug builds live entirely in
-/// `.borkforge-dev/` beside the project, so running `pnpm desktop:dev` never
+/// `.hexdesk-dev/` beside the project, so running `pnpm desktop:dev` never
 /// touches the installed production files; release builds compile this body
-/// away and keep using the user directories. Set `BORKFORGE_ROOT` to point a
+/// away and keep using the user directories. Set `HEXDESK_ROOT` to point a
 /// debug build somewhere else.
 pub fn init_root() {
     #[cfg(debug_assertions)]
     {
-        let root = std::env::var_os("BORKFORGE_ROOT")
+        let root = std::env::var_os("HEXDESK_ROOT")
             .map(PathBuf::from)
             .or_else(|| {
                 Path::new(env!("CARGO_MANIFEST_DIR"))
                     .parent()
                     .and_then(Path::parent)
-                    .map(|workspace| workspace.join(".borkforge-dev"))
+                    .map(|workspace| workspace.join(".hexdesk-dev"))
             });
         if let Some(root) = root {
             let _ = ROOT_OVERRIDE.set(root);
@@ -53,9 +53,9 @@ pub fn root() -> Option<&'static Path> {
 /// so a reset requested in dev must not delete production data on next launch.
 pub fn factory_reset_marker() -> PathBuf {
     let name = if root().is_some() {
-        "borkforge_factory_reset_dev"
+        "hexdesk_factory_reset_dev"
     } else {
-        "borkforge_factory_reset"
+        "hexdesk_factory_reset"
     };
     std::env::temp_dir().join(name)
 }
@@ -74,7 +74,7 @@ pub fn cache_dir() -> PathBuf {
         let _ = fs::write(
             &tag,
             "Signature: 8a477f597d28d172789f06886806bc55\n\
-             # This file is a cache directory tag created by BorkForge.\n\
+             # This file is a cache directory tag created by HexDesk.\n\
              # For information about cache directory tags see https://bford.info/cachedir/\n",
         );
     }

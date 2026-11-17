@@ -282,7 +282,7 @@ fn save_auction_ids(state: &State<AppState>) {
 }
 
 /// Record a newly created auction's id so hidden auctions survive restarts.
-/// BorkForge-created auctions can be hidden, and the WFM profile endpoint only
+/// HexDesk-created auctions can be hidden, and the WFM profile endpoint only
 /// lists visible ones, so their ids are the only way to fetch them back.
 fn record_new_auction_id(state: &State<AppState>, json: &serde_json::Value) {
     if let Some(id) = json["payload"]["auction"]["id"].as_str() {

@@ -1,5 +1,5 @@
 {
-  "name": "@borkforge/backend",
+  "name": "@hexdesk/backend",
   "private": true,
   "scripts": {
     "tauri": "tauri",

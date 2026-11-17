@@ -35,7 +35,7 @@ jobs:
           node-version-file: .node-version
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm --filter @borkforge/frontend exec playwright install --with-deps chromium
+      - run: pnpm --filter @hexdesk/frontend exec playwright install --with-deps chromium
       - run: pnpm format:check
       - run: pnpm lint
       - run: pnpm typecheck

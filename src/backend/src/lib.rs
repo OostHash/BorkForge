@@ -460,8 +460,8 @@ async fn start_monitor(app: tauri::AppHandle, state: State<'_, AppState>) -> Res
     // The EE.log tailer itself runs unconditionally from app startup (see `setup_app`) —
     // only the relic-reward OCR trigger and this scan-only legacy worker are tied to
     // the memory scanner's on/off state.
-    let debug_path = std::env::temp_dir().join("borkforge_reward_debug.txt");
-    let last_found_path = std::env::temp_dir().join("borkforge_last_reward.txt");
+    let debug_path = std::env::temp_dir().join("hexdesk_reward_debug.txt");
+    let last_found_path = std::env::temp_dir().join("hexdesk_last_reward.txt");
     monitor::start_legacy_reward_worker(flag, debug_path, last_found_path);
 
     Ok(())
@@ -474,9 +474,9 @@ pub fn run() {
     paths::init_root();
 
     // Directory layout:
-    //   cache_dir  (%LOCALAPPDATA%\borkforge\) — caches, logs, debug dumps, img_cache
-    //   data_dir   (%APPDATA%\borkforge\)      — data.db, auction_ids.json
-    //   config_dir (%APPDATA%\borkforge\)      — settings.json, corrections.json
+    //   cache_dir  (%LOCALAPPDATA%\hexdesk\) — caches, logs, debug dumps, img_cache
+    //   data_dir   (%APPDATA%\hexdesk\)      — data.db, auction_ids.json
+    //   config_dir (%APPDATA%\hexdesk\)      — settings.json, corrections.json
     let config_dir = paths::config_dir();
     let data_dir = paths::data_dir();
     let cache_dir = paths::cache_dir();

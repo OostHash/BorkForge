@@ -139,7 +139,7 @@ test("data: factory reset asks first", async ({ page }) => {
   await open(page);
   await tab(page, "Data").click();
   await page.getByRole("button", { name: "Reset everything" }).click();
-  const confirm = page.getByRole("dialog", { name: "Reset BorkForge?" });
+  const confirm = page.getByRole("dialog", { name: "Reset HexDesk?" });
   await expect(confirm).toBeVisible();
   await axe(page);
   await expect(page).toHaveScreenshot("settings-data-reset.png");

@@ -885,7 +885,7 @@ pub(crate) async fn fetch_worldstate(
             return Ok((result, None));
         }
         let raw = ureq::get("https://api.warframe.com/cdn/worldState.php")
-            .set("User-Agent", concat!("BorkForge/", env!("CARGO_PKG_VERSION")))
+            .set("User-Agent", concat!("HexDesk/", env!("CARGO_PKG_VERSION")))
             .timeout(std::time::Duration::from_secs(20))
             .call()
             .map_err(|e| format!("worldstate fetch failed: {}", e))?
@@ -898,7 +898,7 @@ pub(crate) async fn fetch_worldstate(
         let news: Vec<serde_json::Value> = ureq::get(
             "https://api.steampowered.com/ISteamNews/GetNewsForApp/v2/?appid=230410&count=10&maxlength=500&format=json"
         )
-            .set("User-Agent", concat!("BorkForge/", env!("CARGO_PKG_VERSION")))
+            .set("User-Agent", concat!("HexDesk/", env!("CARGO_PKG_VERSION")))
             .timeout(std::time::Duration::from_secs(10))
             .call()
             .ok()

@@ -22,7 +22,7 @@ pub fn init() {
         return;
     }
 
-    // Logs live with the rest of the app's files, under the plain `borkforge`
+    // Logs live with the rest of the app's files, under the legacy storage
     // name. The Tauri log dir is keyed on the app identifier and holds none of
     // them, so release builds migrate their old files out of it below; dev
     // builds never wrote there.
@@ -31,7 +31,7 @@ pub fn init() {
 
     let appender = tracing_appender::rolling::Builder::new()
         .rotation(tracing_appender::rolling::Rotation::DAILY)
-        .filename_prefix("borkforge")
+        .filename_prefix("hexdesk")
         .filename_suffix("log")
         .max_log_files(5)
         .build(&log_dir)
@@ -48,14 +48,14 @@ pub fn init() {
         // scanner and OCR timings surface.
         .with_span_events(fmt::format::FmtSpan::CLOSE)
         .with_writer(writer)
-        .with_filter(filter("warn,borkforge_backend=debug"));
+        .with_filter(filter("warn,hexdesk_backend=debug"));
 
     let console_layer = fmt::layer()
         .compact()
         .with_ansi(true)
         .with_target(true)
         .with_writer(std::io::stderr)
-        .with_filter(filter("info,borkforge_backend=info"));
+        .with_filter(filter("info,hexdesk_backend=info"));
 
     let _ = tracing_subscriber::registry()
         .with(file_layer)
@@ -85,7 +85,7 @@ pub fn init() {
         pid = std::process::id(),
         os = std::env::consts::OS,
         log_dir = %log_dir.display(),
-        "BorkForge starting"
+        "HexDesk starting"
     );
 }
 

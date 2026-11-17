@@ -1,27 +1,27 @@
 {
-  "name": "borkforge",
+  "name": "hexdesk",
   "private": true,
   "packageManager": "pnpm@11.25.0",
   "engines": {
     "node": ">=24"
   },
   "scripts": {
-    "build": "pnpm --filter @borkforge/frontend build",
+    "build": "pnpm --filter @hexdesk/frontend build",
     "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && cargo fmt --all -- --check && cargo check --workspace --all-targets",
-    "dev": "pnpm --filter @borkforge/frontend dev",
-    "desktop": "pnpm --filter @borkforge/backend tauri",
-    "desktop:build": "pnpm --filter @borkforge/backend tauri:build",
-    "desktop:build:unsigned": "pnpm --filter @borkforge/backend tauri:build:unsigned",
-    "desktop:dev": "pnpm --filter @borkforge/backend tauri:dev",
-    "format": "pnpm --filter @borkforge/frontend format && cargo fmt --all",
-    "format:check": "pnpm --filter @borkforge/frontend format:check",
-    "lint": "pnpm --filter @borkforge/frontend lint",
+    "dev": "pnpm --filter @hexdesk/frontend dev",
+    "desktop": "pnpm --filter @hexdesk/backend tauri",
+    "desktop:build": "pnpm --filter @hexdesk/backend tauri:build",
+    "desktop:build:unsigned": "pnpm --filter @hexdesk/backend tauri:build:unsigned",
+    "desktop:dev": "pnpm --filter @hexdesk/backend tauri:dev",
+    "format": "pnpm --filter @hexdesk/frontend format && cargo fmt --all",
+    "format:check": "pnpm --filter @hexdesk/frontend format:check",
+    "lint": "pnpm --filter @hexdesk/frontend lint",
     "test": "pnpm test:frontend && pnpm test:backend",
-    "test:a11y": "pnpm --filter @borkforge/frontend test:a11y",
+    "test:a11y": "pnpm --filter @hexdesk/frontend test:a11y",
     "test:backend": "cargo test --workspace",
-    "test:e2e": "pnpm --filter @borkforge/frontend test:e2e",
-    "test:frontend": "pnpm --filter @borkforge/frontend test",
-    "test:visual": "pnpm --filter @borkforge/frontend test:visual",
-    "typecheck": "pnpm --filter @borkforge/frontend typecheck"
+    "test:e2e": "pnpm --filter @hexdesk/frontend test:e2e",
+    "test:frontend": "pnpm --filter @hexdesk/frontend test",
+    "test:visual": "pnpm --filter @hexdesk/frontend test:visual",
+    "typecheck": "pnpm --filter @hexdesk/frontend typecheck"
   }
 }

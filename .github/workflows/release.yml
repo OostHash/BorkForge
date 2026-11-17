@@ -47,7 +47,7 @@ jobs:
           }
 
       - run: pnpm install --frozen-lockfile
-      - run: pnpm --filter @borkforge/frontend exec playwright install chromium
+      - run: pnpm --filter @hexdesk/frontend exec playwright install chromium
       - run: pnpm check
 
       - name: Build signed updater and draft release
@@ -60,7 +60,7 @@ jobs:
           projectPath: src/backend
           tauriScript: pnpm tauri
           tagName: v__VERSION__
-          releaseName: BorkForge v__VERSION__
+          releaseName: HexDesk v__VERSION__
           generateReleaseNotes: true
           releaseDraft: true
           prerelease: false

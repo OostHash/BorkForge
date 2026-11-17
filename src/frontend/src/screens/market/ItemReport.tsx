@@ -152,7 +152,7 @@ export function ItemReport() {
         <EmptyState
           icon={ChartLine}
           title="No items tracked yet."
-          description="Search for an item above to follow its daily quantity. A snapshot is saved once a day while BorkForge runs."
+          description="Search for an item above to follow its daily quantity. A snapshot is saved once a day while HexDesk runs."
         />
       ) : (
         <ul aria-label="Tracked items" className="grid grid-cols-[repeat(auto-fill,minmax(min(18rem,100%),1fr))] gap-3">

@@ -124,8 +124,8 @@ function FactoryReset() {
         onClose={() => {
           setConfirming(false);
         }}
-        title="Reset BorkForge?"
-        description="All app data is deleted and BorkForge restarts. This cannot be undone."
+        title="Reset HexDesk?"
+        description="All app data is deleted and HexDesk restarts. This cannot be undone."
         confirmLabel="Reset everything"
         destructive
         busy={busy}

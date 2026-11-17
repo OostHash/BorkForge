@@ -272,7 +272,7 @@ pub fn get_conditional(url: &str, etag: Option<&str>) -> Result<Fetched<String>,
     let mut req = ureq::get(url)
         .set(
             "User-Agent",
-            concat!("BorkForge/", env!("CARGO_PKG_VERSION")),
+            concat!("HexDesk/", env!("CARGO_PKG_VERSION")),
         )
         // Generous because of the body sizes, but bounded: ureq has no default
         // timeout, and a black-holed connection here would otherwise hang the
@@ -322,7 +322,7 @@ mod tests {
 
     /// One process, one root: every test names its own cache file instead.
     fn scratch(name: &str) -> String {
-        let root = std::env::temp_dir().join("borkforge-cache-tests");
+        let root = std::env::temp_dir().join("hexdesk-cache-tests");
         let _ = paths::set_root_override(root);
         let file = format!("{name}.json");
         let _ = std::fs::remove_file(paths::cache_dir().join(&file));

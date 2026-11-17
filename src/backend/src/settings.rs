@@ -20,7 +20,7 @@ pub(crate) async fn factory_reset(
     // Delete WFM credential silently (ignore errors — may not exist)
     {
         use crate::platform::{CredentialStore, Platform};
-        let _ = Platform::delete_credentials("BorkForge_WFM");
+        let _ = Platform::delete_credentials("HexDesk_WFM");
     }
 
     let config_dir = paths::config_dir();
@@ -245,7 +245,7 @@ mod settings_merge_tests {
 
     /// Each test gets its own file so they can run in parallel.
     fn scratch(name: &str) -> PathBuf {
-        let dir = std::env::temp_dir().join("borkforge-settings-tests");
+        let dir = std::env::temp_dir().join("hexdesk-settings-tests");
         std::fs::create_dir_all(&dir).expect("temp dir is always writable");
         let path = dir.join(format!("{name}.json"));
         let _ = std::fs::remove_file(&path);

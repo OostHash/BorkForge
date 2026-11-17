@@ -13,7 +13,7 @@ import { InventoryScreen } from "../screens/inventory/InventoryScreen";
 import { RelicsScreen } from "../screens/relics/RelicsScreen";
 import { TimersScreen } from "../screens/timers/TimersScreen";
 import { AppLifecycle } from "./AppLifecycle";
-import { BorkForgeMark } from "./BorkForgeMark";
+import { HexDeskMark } from "./HexDeskMark";
 import { ChangeLogDock } from "./ChangeLogDock";
 import { FissureAlerts } from "./FissureAlerts";
 import { Header } from "./Header";
@@ -36,7 +36,7 @@ const SCREENS: readonly ScreenDef[] = [
   { id: "market", label: "Market", icon: Store, Screen: MarketScreen },
 ];
 
-const BUG_REPORT_URL = "https://github.com/OostHash/BorkForge/issues/new/choose";
+const BUG_REPORT_URL = "https://github.com/OostHash/HexDesk/issues/new/choose";
 const NARROW_NAV_ITEM = "justify-center px-0 md:justify-start md:px-3 [&>span]:hidden md:[&>span]:inline";
 
 /** Main window: navigation on the left, the active screen on the right. */
@@ -61,8 +61,8 @@ export function AppShell() {
       <div className="flex min-h-0 flex-1">
         <nav aria-label="Main" className="flex w-14 shrink-0 flex-col gap-4 border-e border-border bg-surface p-2 md:w-52">
           <div className="flex items-center justify-center gap-2 pt-1 text-sm font-semibold md:justify-start md:px-2">
-            <BorkForgeMark className="size-5 text-accent" />
-            <span className="hidden md:inline">BorkForge</span>
+            <HexDeskMark className="size-5 text-accent" />
+            <span className="hidden md:inline">HexDesk</span>
           </div>
           <ul className="flex flex-col gap-0.5">
             {SCREENS.map((s) => (

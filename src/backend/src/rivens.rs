@@ -365,10 +365,7 @@ fn load_riven_csv_from_url() -> Result<HashMap<String, RivenEntry>, String> {
             RIVEN_SHEET_ID, gid
         );
         match ureq::get(&url)
-            .set(
-                "User-Agent",
-                concat!("BorkForge/", env!("CARGO_PKG_VERSION")),
-            )
+            .set("User-Agent", concat!("HexDesk/", env!("CARGO_PKG_VERSION")))
             .call()
             .map_err(|e| e.to_string())
             .and_then(|r| r.into_string().map_err(|e| e.to_string()))
@@ -622,7 +619,7 @@ fn parse_original_stats(text: Option<&str>) -> Vec<serde_json::Value> {
 /// Returns (weapon_name, positives, negatives).
 #[tauri::command]
 pub(crate) async fn ocr_riven_screen() -> Result<serde_json::Value, String> {
-    let riven_log = std::env::temp_dir().join("borkforge_riven_session.txt");
+    let riven_log = std::env::temp_dir().join("hexdesk_riven_session.txt");
     let ts1 = chrono::Local::now().format("%H:%M:%S%.3f").to_string();
 
     let _ = append_to_file(
@@ -1003,7 +1000,7 @@ pub(crate) async fn ocr_riven_screen() -> Result<serde_json::Value, String> {
 /// Write an error into the riven session log (called from TypeScript when OCR command fails).
 #[tauri::command]
 pub(crate) fn ocr_riven_log_error(error: String) {
-    let path = std::env::temp_dir().join("borkforge_riven_session.txt");
+    let path = std::env::temp_dir().join("hexdesk_riven_session.txt");
     let ts = chrono::Local::now().format("%H:%M:%S%.3f").to_string();
     let _ = append_to_file(
         &path,

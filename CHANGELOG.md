@@ -1,27 +1,31 @@
 # Changelog
 
-All notable changes to BorkForge will be documented in this file.
+All notable changes to HexDesk will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-## [1.0.0] - 2026-11-16
+## [1.0.0] - 2026-11-17
 
 ### Added
 
-- A new BorkForge anvil-and-ears mark with matching app and installer icons.
+- Introduced the approved HexDesk emblem as scalable SVG artwork, dark and
+  light application icons, transparent black and white exports, Windows icon
+  assets, and a 1280 × 640 GitHub social preview.
+- A free, open-source Windows desktop companion for Warframe under the HexDesk
+  identity: “The Origin System, Connected.”
 
 ### Changed
 
-- Renamed the application from FrameForge to BorkForge throughout product
+- Renamed the application from FrameForge to HexDesk throughout product
   metadata, window names, notifications, network user agents, diagnostics, and
   temporary filenames.
-- BorkForge now uses its own configuration, data, cache, and Windows Credential
+- HexDesk uses its own configuration, data, cache, and Windows Credential
   Manager namespaces. It no longer imports FrameForge data automatically, so
   both applications can coexist.
-- The BorkForge updater now uses its own release endpoint and signature
+- The HexDesk updater uses its own release endpoint and signature
   verification key.
 - Rebuilt the application shell and every main screen around one consistent,
   responsive design system with shared navigation, controls, cards, tables,
@@ -76,7 +80,7 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - Condensed the README and updated repository documentation for the new layout,
   commands, installation, provenance, and licensing.
 - Removed obsolete slash-command automation and editor-specific configuration.
-- A per-machine NSIS installer that installs BorkForge under `Program Files`,
+- A per-machine NSIS installer that installs HexDesk under `Program Files`,
   registers an uninstaller, blocks downgrades, and installs WebView2 when
   needed.
 - GitHub issue forms for structured bug reports and feature requests.
@@ -85,5 +89,5 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Added
 
-- Created the initial BorkForge source snapshot. The upstream Git history was
+- Created the initial HexDesk source snapshot. The upstream Git history was
   not imported; the GPLv3 license and attribution were retained.

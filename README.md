@@ -1,8 +1,14 @@
-# BorkForge
+<p align="center">
+  <img src="assets/branding/hexdesk-logo.svg" width="132" alt="HexDesk emblem">
+</p>
 
-BorkForge is a Windows desktop companion for Warframe. It combines inventory
-and mastery tracking, market tools, timers, relic overlays, and riven analysis
-in one local app.
+<h1 align="center">HexDesk</h1>
+
+<p align="center"><strong>The Origin System, Connected.</strong></p>
+
+HexDesk is a free, open-source desktop companion for Warframe. It combines
+inventory and mastery tracking, market tools, timers, relic overlays, and riven
+analysis in one local app. Built by Tenno, for Tenno.
 
 ## Highlights
 
@@ -22,12 +28,12 @@ for listing and trading features.
 
 ## Safety and Privacy
 
-BorkForge does not modify Warframe, inject code, or write to the game process.
+HexDesk does not modify Warframe, inject code, or write to the game process.
 The optional inventory scanner uses read-only process memory access and is
 disabled until you enable it. Third-party tools are always used at your own risk.
 
-App data is stored locally. BorkForge has no telemetry and sends no data to a
-BorkForge server. Network access is used for public Warframe/community data,
+App data is stored locally. HexDesk has no telemetry and sends no data to a
+HexDesk server. Network access is used for public Warframe/community data,
 warframe.market features, and update checks. Saved warframe.market credentials
 are stored in Windows Credential Manager.
 
@@ -42,9 +48,9 @@ are stored in Windows Credential Manager.
 1. Download the latest Windows installer from [Releases](../../releases).
 2. Run it. SmartScreen may warn for unsigned releases; choose
    **More info → Run anyway** only if you trust the download.
-3. Launch BorkForge from the Start menu.
+3. Launch HexDesk from the Start menu.
 
-The installer places BorkForge in `C:\Program Files\BorkForge`, requests
+The installer places HexDesk in `C:\Program Files\HexDesk`, requests
 administrator approval, and registers it with Windows so it can be removed
 through **Installed apps**.
 
@@ -53,8 +59,8 @@ through **Installed apps**.
 Install Node.js 24+, pnpm, Rust, and the MSVC toolchain, then run:
 
 ```powershell
-git clone https://github.com/OostHash/BorkForge.git
-cd BorkForge
+git clone https://github.com/OostHash/HexDesk.git
+cd HexDesk
 pnpm install
 pnpm check
 pnpm desktop:dev
@@ -62,7 +68,7 @@ pnpm desktop:dev
 
 ## Project Status
 
-BorkForge is an independent opinionated version of
+HexDesk is an independent opinionated version of
 [FrameForge 4.5.0](https://github.com/WyrmStudios/FrameForge). It uses its own
 application identity and storage, so it can be installed alongside FrameForge.
 
@@ -71,8 +77,8 @@ Bug reports and feature requests are welcome through
 
 ## License
 
-BorkForge is licensed under [GPLv3](LICENSE). Original copyright and licence
+HexDesk is licensed under [GPLv3](LICENSE). Original copyright and licence
 notices from FrameForge are retained as required by the licence.
 
-BorkForge is not affiliated with Digital Extremes Ltd. Warframe is a trademark
+HexDesk is not affiliated with Digital Extremes Ltd. Warframe is a trademark
 of Digital Extremes Ltd.

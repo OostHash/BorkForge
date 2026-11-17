@@ -37,7 +37,7 @@ export async function openChangelogPopout(settings: SettingsFile | undefined, on
   const position = x !== undefined && y !== undefined && (await onAMonitor(x, y)) ? { x, y } : {};
   const win = new WebviewWindow(CHANGELOG_POPOUT_LABEL, {
     url: POPOUT_URL,
-    title: "BorkForge — Changelog",
+    title: "HexDesk — Changelog",
     width: n(settings?.changelogWinWidth) ?? SIZE.width,
     height: n(settings?.changelogWinHeight) ?? SIZE.height,
     ...position,

@@ -104,10 +104,7 @@ fn fetch_wiki_reward_names() -> HashSet<String> {
     let url_mod = "https://wiki.warframe.com/api.php?\
                    action=parse&page=Module:Void&prop=wikitext&format=json";
     if let Some(body) = ureq::get(url_mod)
-        .set(
-            "User-Agent",
-            concat!("BorkForge/", env!("CARGO_PKG_VERSION")),
-        )
+        .set("User-Agent", concat!("HexDesk/", env!("CARGO_PKG_VERSION")))
         .call()
         .ok()
         .and_then(|r| r.into_string().ok())
@@ -142,10 +139,7 @@ fn fetch_wiki_reward_names() -> HashSet<String> {
     let url_br = "https://wiki.warframe.com/api.php?\
                   action=parse&page=Void_Relic/ByRelic&prop=text&format=json";
     if let Some(html) = ureq::get(url_br)
-        .set(
-            "User-Agent",
-            concat!("BorkForge/", env!("CARGO_PKG_VERSION")),
-        )
+        .set("User-Agent", concat!("HexDesk/", env!("CARGO_PKG_VERSION")))
         .call()
         .ok()
         .and_then(|r| r.into_string().ok())
@@ -868,10 +862,7 @@ fn parse_relic_item_names(json: Option<&serde_json::Value>) -> HashMap<String, S
 fn fetch_export_index() -> Result<Vec<String>, String> {
     let index_url = "https://origin.warframe.com/PublicExport/index_en.txt.lzma";
     let resp = ureq::get(index_url)
-        .set(
-            "User-Agent",
-            concat!("BorkForge/", env!("CARGO_PKG_VERSION")),
-        )
+        .set("User-Agent", concat!("HexDesk/", env!("CARGO_PKG_VERSION")))
         .call()
         .map_err(|e| format!("index fetch: {}", e))?;
 

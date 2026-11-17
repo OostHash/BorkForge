@@ -38,7 +38,7 @@ export function SettingsDialog({ open, tab, onTabChange, onClose }: Props) {
       size="xl"
       // Same height for every tab, so switching tabs never moves the dialog.
       className="h-[85dvh]"
-      footer={<p className="me-auto text-xs text-muted">BorkForge {version ? `v${version}` : ""}</p>}
+      footer={<p className="me-auto text-xs text-muted">HexDesk {version ? `v${version}` : ""}</p>}
     >
       {open && (
         <Tabs selectedKey={tab} onSelectionChange={onTabChange}>

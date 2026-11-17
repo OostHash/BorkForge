@@ -40,4 +40,4 @@ src/frontend/src/_backup/
 *.sw?
 
 # Dev build data root (pnpm tauri dev) - separate from the installed app's files
-/.borkforge-dev/
+/.hexdesk-dev/
