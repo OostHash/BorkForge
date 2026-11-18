@@ -57,8 +57,8 @@ function RewardRow({ reward }: { reward: PickReward }) {
 
 /**
  * The relic pick window (relic-pick-overlay): when the relic selection
- * screen opens, the three relics most worth running for the chosen priority
- * (vault overlay-relic-pick.md). The backend places and shows the window;
+ * screen opens, the three relics most worth running for the chosen priority.
+ * The backend places and shows the window;
  * clicks pass through to the game except over the close button.
  */
 export function RelicPickOverlay() {

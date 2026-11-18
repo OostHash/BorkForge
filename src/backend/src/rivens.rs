@@ -228,8 +228,8 @@ fn join_wrapped_stat_lines(text: &str) -> Vec<String> {
         // "kuva" comes off the weapon-name filter below but stays here: a reroll
         // comparison screen stacks two cards, so the lower card's title follows
         // the upper card's stats with nothing between, and a title reads as a word.
-        // TODO: only Kuva titles are caught. "Boltor Conci-" still glues, which
-        // needs a title recognised as a title rather than another word on a list.
+        // Only Kuva titles are caught: "Boltor Conci-" still glues, which would
+        // need a title recognised as a title rather than another word on a list.
         let is_ui_noise = ll.contains("fits in")
             || ll.starts_with("mr ")
             || ll.contains("inventory")

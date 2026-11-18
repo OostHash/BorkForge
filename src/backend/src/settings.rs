@@ -59,8 +59,8 @@ pub(crate) fn load_settings(state: State<AppState>) -> String {
 
 // settings.json is written from several threads (the save_settings command,
 // window-event handlers on every move/resize). Every writer must go through
-// merge_settings; an unserialized or non-atomic write used to tear the file
-// and wipe all settings on the next merge.
+// merge_settings; an unserialized or non-atomic write can tear the file and
+// wipe all settings on the next merge.
 static SETTINGS_WRITE_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
 pub(crate) fn read_settings_map(
@@ -255,9 +255,9 @@ mod settings_merge_tests {
     }
 
     /// A truncated settings.json (crash or app kill mid-write, e.g. during an
-    /// update) used to parse as "no settings", and the next merge rewrote the
-    /// file from an empty map, wiping tracked and favorites. A file that
-    /// exists but does not parse must be left exactly as it is.
+    /// update) must not parse as "no settings": the next merge would rewrite
+    /// the file from an empty map and wipe tracked and favorites. A file that
+    /// exists but does not parse is left exactly as it is.
     #[test]
     fn a_corrupt_settings_file_is_never_replaced() {
         let path = scratch("corrupt");

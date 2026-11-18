@@ -7,11 +7,10 @@ import type { RivenView } from "../domain/rivenOverlay";
 import type { TradeCompleted } from "../domain/trading";
 
 /**
- * Backend → frontend events the new frontend uses, with payload types.
- * Names come from src/constants/tauri.ts in the current app (copied, never
- * imported). Add an entry when a screen needs a new event.
+ * Backend → frontend events the frontend uses, with payload types. The names
+ * match src/backend/src/events.rs. Add an entry when a screen needs a new event.
  */
-/** Subset of the backend InventoryUpdate (src-tauri/src/monitor.rs) the frontend reads. */
+/** Subset of the backend InventoryUpdate (src/backend/src/monitor.rs) the frontend reads. */
 export type InventoryUpdatePayload = {
   quantities: Record<string, number>;
   /** uniqueName to mastery rank; only present in some updates (not on heartbeats). */
@@ -79,7 +78,7 @@ export interface EventMap {
   /** Overlays were switched off: every overlay window hides. */
   "overlays-disabled": unknown;
   /** Short backend status line, shown for a few seconds. */
-  "ff-status": string;
+  "status-line": string;
   /** The relic selection screen opened: which relics to run. */
   "relic-pick-open": RelicPick;
   "relic-pick-close": unknown;

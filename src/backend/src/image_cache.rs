@@ -9,9 +9,9 @@ use crate::app_state::AppState;
 /// from `cache_dir`, with keep-alive so one browser connection serves many
 /// images.
 ///
-/// It reads each request up to the blank line after the headers. The old
-/// version read only the first 512 bytes and closed the socket after one
-/// response; Chromium's image requests are often longer, and closing a
+/// It reads each request up to the blank line after the headers. Reading only
+/// a fixed number of bytes and closing the socket after one response does not
+/// work: Chromium's image requests are often longer, and closing a
 /// socket with unread data makes Windows send a reset (ERR_CONNECTION_RESET).
 pub(crate) async fn serve_image_files(listener: tokio::net::TcpListener, cache_dir: PathBuf) {
     let cache_dir = Arc::new(cache_dir);

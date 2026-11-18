@@ -96,7 +96,7 @@ it("keeps the backend status line for the header", async () => {
   const { client } = setup();
   await mount(client);
   await vi.waitFor(async () => {
-    await emit("ff-status", "Reading rewards…");
+    await emit("status-line", "Reading rewards…");
     expect(client.getQueryData(["overlay", "status"])).toBe("Reading rewards…");
   });
 });

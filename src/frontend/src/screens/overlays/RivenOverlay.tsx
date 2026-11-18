@@ -86,7 +86,7 @@ function Analysis({ analysis }: { analysis: OverlayAnalysis }) {
 
 /**
  * The riven overlay window (riven-overlay, #rivenoverlay): what the check read
- * from the riven card and how good the roll is (vault overlay-riven.md). The
+ * from the riven card and how good the roll is. The
  * main window owns the check and the window; this one only draws.
  */
 export function RivenOverlay() {

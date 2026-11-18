@@ -1132,14 +1132,6 @@ pub(crate) fn get_craftable_items(state: State<AppState>) -> Vec<CatalogItem> {
     result
 }
 
-/// Returns the recipe component tree for a single item (empty vec = not found).
-/// Returns Vec instead of Option to avoid Tauri serialization edge cases.
-#[tauri::command]
-pub(crate) fn get_recipe(state: State<AppState>, unique_name: String) -> Vec<RecipeComponent> {
-    let recipes = state.recipes.lock().unwrap_or_else(|e| e.into_inner());
-    recipes.get(&unique_name).cloned().unwrap_or_default()
-}
-
 #[tauri::command]
 pub(crate) fn get_recipes_bulk(
     state: State<AppState>,

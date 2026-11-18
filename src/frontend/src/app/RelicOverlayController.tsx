@@ -12,8 +12,8 @@ export const STATUS_MS = 4000;
 
 /**
  * Main window: tells the backend which overlays may run, and places the relic
- * reward window over the game when the reward screen opens (current app:
- * useOverlays). The overlay window draws the cards itself.
+ * reward window over the game when the reward screen opens. The overlay
+ * window draws the cards itself.
  */
 export function RelicOverlayController() {
   const queryClient = useQueryClient();
@@ -82,7 +82,7 @@ export function RelicOverlayController() {
     keep(onEvent("relic-screen", hide));
     keep(onEvent("overlays-disabled", hide));
     keep(
-      onEvent("ff-status", (text) => {
+      onEvent("status-line", (text) => {
         setOverlayStatus(queryClient, text);
         window.clearTimeout(statusTimer);
         statusTimer = window.setTimeout(() => {

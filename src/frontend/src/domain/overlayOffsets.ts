@@ -1,5 +1,5 @@
 /**
- * Position offsets per overlay (vault overlay-settings.md): logical pixels on
+ * Position offsets per overlay: logical pixels on
  * top of the built-in place; 0 keeps it. The backend reads the relic and
  * relic pick offsets from the settings file, the main window the riven one.
  * Pure functions.

@@ -5,7 +5,7 @@ import { Button } from "../../primitives/actions";
 
 export type ExportResult = { tone: "success" | "danger"; text: string } | null;
 
-/** The diagnostics export (#2): where the last zip went, and whether one is being written. */
+/** The diagnostics export: where the last zip went, and whether one is being written. */
 export function useDiagnosticsExport() {
   const [busy, setBusy] = useState(false);
   const [path, setPath] = useState<string | null>(null);

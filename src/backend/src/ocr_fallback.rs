@@ -4,7 +4,7 @@
 // (~10 MB total) to the app data directory on first use.
 //
 // TO REMOVE THIS FALLBACK (delete in one go):
-//   1. Delete this file (src-tauri/src/ocr_fallback.rs)
+//   1. Delete this file (src/backend/src/ocr_fallback.rs)
 //   2. Remove `mod ocr_fallback;` from lib.rs
 //   3. Remove the fallback block in ocr.rs (search "BEGIN ocrs fallback")
 //   4. Remove the ocrs + rten lines from Cargo.toml (search "BEGIN ocrs fallback")

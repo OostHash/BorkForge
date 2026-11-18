@@ -258,9 +258,9 @@ fn ducat_value_from_rarities(rarities: &HashSet<&str>) -> Option<u32> {
 // Upstream sources
 // ==============================================================================
 
-/// warframe-items stopped publishing the combined `All.json` once it outgrew
-/// what the repository would carry, so the catalogue is rebuilt from the
-/// per-category files that file used to be a concatenation of.
+/// warframe-items does not publish a combined `All.json` (it outgrew what the
+/// repository would carry), so the catalogue is built from the per-category
+/// files.
 ///
 /// `Enemy`, `Node` and `Quests` are deliberately left out: nothing in them can
 /// be owned, and node entries are discarded downstream in any case.
@@ -1618,7 +1618,7 @@ fn fetch_from_wfcd(
                         Some(u) => u.trim().to_string(),
                         None => continue,
                     };
-                    // WFCD's components[] no longer carry a `name`. Look the
+                    // WFCD's components[] do not carry a `name`. Look the
                     // component's uniqueName up in DE's name tables; the result is
                     // the full display name ("Ash Prime Chassis"), parent included.
                     let resolved = resolver.resolve(&cunique);
@@ -2008,7 +2008,7 @@ fn fetch_from_wfcd(
         }
     }
 
-    // WFCD's components[] no longer carry an `imageName`, so every part and blueprint
+    // WFCD's components[] do not carry an `imageName`, so every part and blueprint
     // above inherited its parent's image (all of Yareli Prime's parts wore
     // Yareli Prime's portrait). Give each the icon DE's data lists for its own
     // uniqueName; entries DE has no icon for keep what they have. This runs before
@@ -2048,7 +2048,7 @@ fn fetch_from_wfcd(
     // Build relic_rewards from pre-fetched Relics.json.
     let relic_rewards = parse_relics_rewards(relics_json, &image_by_name);
 
-    // Backfill ducat values that WFCD's components[] no longer carries (the same
+    // Backfill ducat values that WFCD's components[] do not carry (the same
     // upstream schema change that dropped `name`/`imageName` from every component
     // sub-object also dropped `ducats`, but with no parent-item fallback available —
     // see `ducat_value_from_rarities`). This must run before blueprint_names below,
@@ -2092,7 +2092,10 @@ fn fetch_from_wfcd(
                 }
             }
         }
-        info!(backfilled, "backfilled ducat values from relic drop rarity (WFCD components[] no longer carries them)");
+        info!(
+            backfilled,
+            "backfilled ducat values from relic drop rarity (WFCD components[] do not carry them)"
+        );
     }
 
     // Build blueprint_names: blueprint_path → (display_name, ducats)

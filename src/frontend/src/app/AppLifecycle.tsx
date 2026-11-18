@@ -25,7 +25,7 @@ const GEOMETRY_DEBOUNCE_MS = 400;
 const withTimeout = (work: Promise<unknown>, ms: number) => Promise.race([work, new Promise<void>((resolve) => window.setTimeout(resolve, ms))]);
 
 /**
- * The app core of the main window (vault app-core.md): memory scanner,
+ * The app core of the main window: memory scanner,
  * catalogue at start, updater, blob status, warframe.market auto-invisible,
  * closing and window geometry. Renders nothing; the header and Settings show
  * and drive the state it keeps in the query cache.
@@ -121,7 +121,7 @@ export function AppLifecycle() {
 
   // ── Window position and size ──────────────────────────────────────────────
   // Saved straight to the file: the window moving is not a settings change
-  // the UI needs to see (current app: App.tsx).
+  // the UI needs to see.
   useEffect(() => {
     if (!isTauri()) return;
     let disposed = false;

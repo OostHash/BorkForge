@@ -1,6 +1,6 @@
 import type { RivenAnalysis, RollStat } from "./rivens";
 
-/** Riven overlay rules (vault overlay-riven.md). Pure functions. */
+/** Riven overlay rules. Pure functions. */
 
 /** analyze_riven also reports these (the screens did not need them so far). */
 export type OverlayAnalysis = RivenAnalysis & { matched_positives?: string[]; missing_positives?: string[] };
@@ -98,7 +98,7 @@ export function weaponTitle(weapon: string): string {
     .join(" ");
 }
 
-/** "Tenora prime · Roll #4 · 12 Nov", like the current app. */
+/** "Tenora prime · Roll #4 · 12 Nov". */
 export function savedRollLabel(weapon: string, rollCount: number, date: Date): string {
   const month = date.toLocaleString("en", { month: "short" });
   return `${weapon.charAt(0).toUpperCase()}${weapon.slice(1)} · Roll #${String(rollCount)} · ${String(date.getDate())} ${month}`;

@@ -1,7 +1,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
 
-/** Settings in browser mode: every ported tab, keyboard, confirmations, narrow window — with axe. */
+/** Settings in browser mode: every tab, keyboard, confirmations, narrow window — with axe. */
 
 const PRESETS = {
   presets: [

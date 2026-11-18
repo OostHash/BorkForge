@@ -832,7 +832,7 @@ pub fn match_reward_items(params: MatchParams<'_>) -> (bool, bool, Vec<String>, 
         .collect();
     // Count prime/forma keywords only in title-row text, not the full OCR blob.
     // Hover-tooltip descriptions and duplicate badge-style lines below the bar
-    // (y >= ocr_y_max) also say "Prime"/"Forma" and previously inflated this
+    // (y >= ocr_y_max) also say "Prime"/"Forma"; counting them would push this
     // count above the true number of cards, making the estimated card count
     // (and therefore is_complete) unreachable — the retry loop would then spin
     // for the full timeout without ever handing off to the overlay.
@@ -1375,8 +1375,8 @@ pub fn extract_reward_items_twophase(
         let lower = raw_full.to_lowercase();
         const QUALITY: &[&str] = &["intact", "exceptional", "flawless", "radiant"];
         // The reward card screen's own header names the cracked relic (e.g. "Axi D6
-        // Intact"), which previously tripped this same check and caused the real
-        // reward screen to be skipped for its entire lifetime. The pre-mission/
+        // Intact"); matching it here would skip the real reward screen for its
+        // entire lifetime. The pre-mission/
         // inter-rotation relic PICKER screen is the thing this check is meant to
         // catch, and it lists several of the player's relics at once — so require
         // at least two quality-word hits (one single mention is just the reward

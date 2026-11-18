@@ -2,7 +2,7 @@ import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
 
 /**
- * Appearance axes in browser mode (vault theming-7a.md): the colour-blind
+ * Appearance axes in browser mode: the colour-blind
  * palette, density, and Windows High Contrast (forced colors).
  */
 

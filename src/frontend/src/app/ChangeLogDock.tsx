@@ -155,7 +155,7 @@ type Props = {
 };
 
 /**
- * The changelog along the bottom of the main window (vault changelog.md):
+ * The changelog along the bottom of the main window:
  * collapsed it shows the newest batch as a feed, open it lists every change
  * with search, and each name or category opens Inventory on it.
  */

@@ -12,7 +12,7 @@ import { offsetsFrom, type OverlayOffsets } from "../domain/overlayOffsets";
 import { worthAnalysing, type OcrRiven, type OverlayAnalysis } from "../domain/rivenOverlay";
 import { useCrafting, useQuantities } from "./inventory";
 
-/** Overlay switches and choices from the shared settings file (vault overlay-relic-reward.md). */
+/** Overlay switches and choices from the shared settings file. */
 export type OverlayPrefs = {
   /** All overlays (default on). */
   overlaysEnabled: boolean;
@@ -54,7 +54,7 @@ export async function syncOverlaySwitches(prefs: OverlayPrefs): Promise<void> {
   if (!prefs.overlaysEnabled) await emitEvent("overlays-disabled");
 }
 
-/** A line in the overlay session log, for bug reports (current app: log_relic_fe). */
+/** A line from an overlay window in the log (Settings → Console), for bug reports. */
 export const logRelic = (msg: string) => invoke("log_relic_fe", { msg }).catch(() => null);
 
 /** The game's client area, or the first screen when the game is not found (`log` hears which). */
@@ -98,7 +98,7 @@ export async function hideRewardPreview(): Promise<void> {
   await emitEvent("relic-reward-preview-close");
 }
 
-// ── Backend status line (ff-status) ─────────────────────────────────────────
+// ── Backend status line (status-line) ─────────────────────────────────────────
 
 const statusKey = ["overlay", "status"] as const;
 

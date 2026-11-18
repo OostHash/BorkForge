@@ -7,7 +7,7 @@ import { invoke } from "./invoke";
 
 /**
  * App-wide state that is not owned by a screen: memory scanner, game and
- * account, blob capture, catalogue refresh and updater (vault app-core.md).
+ * account, blob capture, catalogue refresh and updater.
  * The header (block B) and Settings (block C) read and drive it.
  */
 export const appKeys = {
@@ -51,8 +51,7 @@ export type CatalogueResult = { items: number; recipes: number };
 /**
  * Loads the item catalogue and refreshes everything built on it. With force
  * the catalogue is downloaded again; the scanner builds its own catalogue at
- * start, so a running scanner is stopped first and started again afterwards
- * (current app: useInventoryData handleFetch).
+ * start, so a running scanner is stopped first and started again afterwards.
  */
 export async function refreshCatalogue(queryClient: QueryClient, force: boolean): Promise<CatalogueResult> {
   const restart = force && (await invoke("get_monitor_status").catch(() => false));

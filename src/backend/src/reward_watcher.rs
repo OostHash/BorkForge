@@ -255,14 +255,12 @@ pub(crate) fn spawn_reward_watcher_thread(deps: RewardWatcherDeps) {
                 }
 
                 // Trigger: "VoidProjections: OpenVoidProjectionRewardScreenRMI" fires when
-                // the reward screen actually opens on screen. A prior version of this code
-                // waited for "GetVoidProjectionReward[s]" instead (the server delivering the
-                // reward choices), believing the open event fired before cards were visible —
-                // but field EE.log captures show the open event consistently precedes "Get"
-                // by ~5s, and OCR attempts right after "Get" immediately see populated card
-                // text, meaning those 5 seconds of real display time were being missed. Kept
-                // "Get"/sequence-completed too since they're free (same line family) and
-                // harmless as a fallback if "Open" is ever missing from a read batch.
+                // the reward screen actually opens on screen. It is used instead of
+                // "GetVoidProjectionReward[s]" (the server delivering the reward choices):
+                // EE.log captures show "Open" about 5 s before "Get", and OCR right after
+                // "Open" already sees the cards, so waiting for "Get" loses those seconds.
+                // "Get" and sequence-completed stay as a fallback in case "Open" is
+                // missing from a read batch.
                 // Matching the singular prefix catches both "Reward" and "Rewards" variants.
                 let has_trigger = lower
                     .contains("voidprojections: openvoidprojectionrewardscreenrmi")
@@ -373,14 +371,14 @@ pub(crate) fn spawn_reward_watcher_thread(deps: RewardWatcherDeps) {
                     });
                     if overlays_on {
                         let _ =
-                            ee_ocr_app.emit(events::FF_STATUS, "🔍 Relic reward screen detected");
+                            ee_ocr_app.emit(events::STATUS_LINE, "🔍 Relic reward screen detected");
                         // Tell App.tsx to pre-create the overlay window NOW, before OCR finishes.
                         // Window creation takes 1-2 s; pre-creating shaves that off the visible delay.
                         let _ = ee_ocr_app.emit(events::RELIC_TRIGGER, ());
                     }
 
                     let app = ee_ocr_app.clone();
-                    let cat = filtered_cat; // relic prefilter (was: Arc::clone(&ee_catalog))
+                    let cat = filtered_cat; // narrowed to this session's relics
                     let _cat_len = cat.len();
                     let fallback_cat = Arc::clone(&ee_catalog); // full catalog — used after 3 no-match attempts
                     let active = reward_screen_active2.clone();
@@ -449,7 +447,7 @@ pub(crate) fn spawn_reward_watcher_thread(deps: RewardWatcherDeps) {
                                     cat = fallback;
                                 }
                             }
-                            let _ = app.emit(events::FF_STATUS, "📷 OCR scanning...");
+                            let _ = app.emit(events::STATUS_LINE, "📷 OCR scanning...");
                             let result = log_watcher::capture_reward_items(
                                 Arc::clone(&cat),
                                 Arc::clone(&squad_arc),

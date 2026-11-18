@@ -32,7 +32,6 @@ memchr = "2"
 ureq = { version = "2", features = ["json"] }
 tungstenite = { version = "0.26", features = ["native-tls"] }
 native-tls = "0.2"
-whirlpool = "0.10"
 lzma-rs = "0.3"
 hexdesk-diag = { path = "crates/diag" }
 tracing = "0.1"

@@ -313,7 +313,7 @@ type Props = {
   className?: string;
 };
 
-/** Tracked items, favourites, pinned timers and watched fissures (vault modular-window.md). */
+/** Tracked items, favourites, pinned timers and watched fissures. */
 export function ModularWindow({ onPopout, onCollapse, className }: Props) {
   const { prefs } = useModularPrefs();
   return (

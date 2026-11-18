@@ -76,6 +76,34 @@ pub(crate) fn get_monitor_status(state: State<AppState>) -> bool {
     state.monitor_active.load(Ordering::SeqCst)
 }
 
+/// The rivens from the last account blob, from the inventory cache. Runs in a
+/// blocking thread so the large cache read does not stall the UI.
+#[tauri::command]
+pub(crate) async fn get_rivens(
+    state: tauri::State<'_, AppState>,
+) -> Result<Vec<memory_scanner::BlobRivenEntry>, String> {
+    let path = state.inventory_state_cache_path.clone();
+    tauri::async_runtime::spawn_blocking(move || load_inventory_state_cache(&path).rivens)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// What get_saved_inventory returns: camelCase for the frontend.
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct SavedInventory {
+    consumed_suits: Vec<String>,
+}
+
+/// Called once on startup so the frontend can restore state without waiting for Warframe to run.
+#[tauri::command]
+pub(crate) fn get_saved_inventory(state: tauri::State<'_, AppState>) -> SavedInventory {
+    let cache = load_inventory_state_cache(&state.inventory_state_cache_path);
+    SavedInventory {
+        consumed_suits: cache.consumed_suits(),
+    }
+}
+
 /// Forgets the inventory: the change history, the in-memory state and the
 /// cache files, so nothing reloads on the next start.
 #[tauri::command]
@@ -102,16 +130,6 @@ pub(crate) fn clear_cache(state: State<AppState>) -> Result<(), String> {
         .lock()
         .map_err(|e| e.to_string())?
         .clear();
-    state
-        .api_quantities_cache
-        .lock()
-        .map_err(|e| e.to_string())?
-        .clear();
-    state
-        .api_mod_copies_cache
-        .lock()
-        .map_err(|e| e.to_string())?
-        .clear();
 
     // Delete cache and hint files so nothing reloads on next start
     let _ = std::fs::remove_file(&state.quantities_cache_path);
@@ -121,8 +139,6 @@ pub(crate) fn clear_cache(state: State<AppState>) -> Result<(), String> {
             .inventory_state_cache_path
             .with_file_name("section_baseline.json"),
     );
-    let _ = std::fs::remove_file(state.log_path.with_file_name("inventory_hints.json"));
-    let _ = std::fs::remove_file(state.log_path.with_file_name("mod_hints.json"));
 
     Ok(())
 }

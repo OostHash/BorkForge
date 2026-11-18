@@ -25,10 +25,8 @@ pub fn init() {
         return;
     }
 
-    // Logs live with the rest of the app's files, under the legacy storage
-    // name. The Tauri log dir is keyed on the app identifier and holds none of
-    // them, so release builds migrate their old files out of it below; dev
-    // builds never wrote there.
+    // Logs live in the state folder with the rest of the app's files, not in
+    // the Tauri log dir.
     let log_dir = crate::paths::state_dir().join("logs");
     let _ = std::fs::create_dir_all(&log_dir);
 

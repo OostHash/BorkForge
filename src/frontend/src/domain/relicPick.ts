@@ -1,4 +1,4 @@
-/** Relic pick overlay rules (vault overlay-relic-pick.md). Pure functions. */
+/** Relic pick overlay rules. Pure functions. */
 
 export type PickReward = { name: string; rarity: string; drop_rate: number; ducats: number; plat: number; vaulted: boolean; owned: boolean };
 export type PickRelic = {
@@ -72,7 +72,7 @@ export function recommendedRefinement(rarity: string): "Radiant" | "Exceptional"
 
 export const refinementLabel = (r: string) => r.charAt(0).toUpperCase() + r.slice(1);
 
-/** The current app's example for Settings → Overlays → Show. */
+/** The example for Settings → Overlays → Show. */
 export const PREVIEW_PICK: RelicPick = {
   era: "ALL",
   relics: [
