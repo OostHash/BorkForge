@@ -1,10 +1,12 @@
-//! One-click diagnostics export (#2): a zip with logs, recent entries, system
-//! facts and settings, all redacted by `hexdesk-diag`.
+//! Diagnostics at the Tauri boundary: the one-click export (#2) and the feed
+//! for the activity console (#3). Everything comes from `hexdesk-diag` and is
+//! already redacted.
 
+use std::cell::Cell;
 use std::path::{Path, PathBuf};
 
-use hexdesk_diag::{info, Bundle, DiagError, Kind, Source};
-use tauri::State;
+use hexdesk_diag::{info, Bundle, DiagError, Entry, Kind, Source};
+use tauri::{Emitter, State};
 
 use crate::app_state::AppState;
 
@@ -23,6 +25,34 @@ What is in this zip:
 Passwords, tokens, e-mail addresses and player names are replaced with
 [redacted]. Your Windows user folder is shown as %USERPROFILE%.
 ";
+
+/// The most recent log entries, oldest first: what the console shows when it
+/// opens. New entries follow as `diag-entry` events.
+#[tauri::command]
+pub(crate) fn get_recent_logs(limit: Option<usize>) -> Vec<Entry> {
+    hexdesk_diag::recent(limit.unwrap_or(usize::MAX))
+}
+
+thread_local! {
+    /// Set while an entry is being forwarded. Emitting can log in turn; those
+    /// entries are not forwarded again, so forwarding never recurses.
+    static FORWARDING: Cell<bool> = const { Cell::new(false) };
+}
+
+/// Sends every new log entry to the main window as a `diag-entry` event.
+pub(crate) fn forward_entries_to(app: tauri::AppHandle) {
+    let Some(collector) = hexdesk_diag::collector() else {
+        return;
+    };
+    collector.set_listener(move |entry| {
+        if FORWARDING.with(|f| f.replace(true)) {
+            return;
+        }
+        // No window yet, or it closed: nothing to show the entry in.
+        let _ = app.emit_to("main", crate::events::DIAG_ENTRY, entry);
+        FORWARDING.with(|f| f.set(false));
+    });
+}
 
 /// Creates the diagnostics zip and returns its full path.
 #[tauri::command]

@@ -2,6 +2,7 @@ import type { InvokeArgs } from "@tauri-apps/api/core";
 import type { SyndicateStore, WeaponItem } from "../domain/completionist";
 import type { FoundryItem, RecipeComponent } from "../domain/foundry";
 import type { CacheStatuses } from "../domain/cache";
+import type { LogEntry } from "../domain/console";
 import type { RelicRewards } from "./events";
 import type { OcrRiven } from "../domain/rivenOverlay";
 import type { DebugFolder, SizedFolder } from "../domain/debug";
@@ -217,6 +218,8 @@ export interface CommandMap {
   /** Appends "[FE] msg" to the overlay session log (Settings → Debugging → Overlay log). */
   log_relic_fe: { args: { msg: string }; result: null };
   // ── Debug and diagnostics (Settings → Debugging, vault debugging.md) ──
+  /** The most recent log entries, oldest first (activity console); new ones follow as diag-entry events. */
+  get_recent_logs: { args: { limit?: number }; result: LogEntry[] };
   /** Writes the diagnostics zip (logs, system facts, settings; redacted) and returns its path. */
   export_diagnostics: { args: undefined; result: string };
   /** Opens Explorer with an exported diagnostics zip selected. */

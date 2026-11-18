@@ -299,6 +299,7 @@ fn setup_app(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     use tauri::Manager;
 
     logging::init();
+    diag_export::forward_entries_to(app.handle().clone());
 
     match paths::root() {
         Some(root) => info!("app root: {} (dev)", root.display()),
@@ -759,6 +760,7 @@ pub fn run() {
             diagnostics::open_debug_folder,
             diag_export::export_diagnostics,
             diag_export::show_diagnostics_export,
+            diag_export::get_recent_logs,
             diagnostics::clear_debug_data,
             diagnostics::get_debug_data_size,
             start_monitor,

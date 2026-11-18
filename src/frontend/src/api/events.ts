@@ -1,5 +1,6 @@
 import { emit, listen, type UnlistenFn } from "@tauri-apps/api/event";
 import type { CacheStatuses } from "../domain/cache";
+import type { LogEntry } from "../domain/console";
 import type { ChangeEntry } from "../domain/inventory";
 import type { RelicPick } from "../domain/relicPick";
 import type { RivenView } from "../domain/rivenOverlay";
@@ -49,6 +50,8 @@ export interface EventMap {
   "blob-status": { stage: string; detail: string };
   /** Logged-in Warframe account, from EE.log. */
   "player-name": string;
+  /** One new log entry for the activity console (main window only). */
+  "diag-entry": LogEntry;
   /** All data cache statuses, after any cache changed. */
   "cache-status": CacheStatuses;
   "bulk-prices-updated": unknown;

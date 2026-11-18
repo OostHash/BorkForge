@@ -1,22 +1,14 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { Copy, Eye, FlaskConical, FolderOpen, Palette } from "lucide-react";
 import { useId, useState, type ReactNode } from "react";
-import {
-  clearDebugFolder,
-  exportDiagnostics,
-  openDebugFolder,
-  reloadSizes,
-  showDiagnosticsExport,
-  useDebugSizes,
-  useRunning,
-  useSetRunning,
-} from "../../api/debug";
+import { clearDebugFolder, openDebugFolder, reloadSizes, useDebugSizes, useRunning, useSetRunning } from "../../api/debug";
 import { invoke } from "../../api/invoke";
 import { alreadyRunning, clearLabel, probeSummary, rawScanActive, TEST_ERAS, type DebugFolder, type SizedFolder } from "../../domain/debug";
 import { Button } from "../../primitives/actions";
 import { Select, Switch, Textarea } from "../../primitives/forms";
 import { Modal } from "../../primitives/overlay";
 import { setBatchPreviewOpen } from "../../state/batchPreview";
+import { ExportDiagnosticsButtons, useDiagnosticsExport } from "./ExportDiagnostics";
 import { ResultText, SettingRow, SettingsGroup, useSettingsFile } from "./parts";
 
 type Result = { tone: "success" | "danger"; text: string } | null;
@@ -123,32 +115,14 @@ function OverlayLogRow() {
 
 /** One zip for a bug report; the path stays visible so it can be shown in Explorer. */
 function ExportRow() {
-  const action = useAction();
-  const [path, setPath] = useState<string | null>(null);
+  const exporting = useDiagnosticsExport();
   return (
     <DebugRow
       title="Diagnostics export"
       description="One zip with logs, system facts and settings to attach to a bug report. Passwords, tokens, e-mail addresses and player names are removed."
-      result={action.result}
+      result={exporting.result}
     >
-      {path !== null && (
-        <Button size="sm" leadingIcon={FolderOpen} onClick={() => void showDiagnosticsExport(path).catch(() => undefined)}>
-          Show in folder
-        </Button>
-      )}
-      <Button
-        size="sm"
-        loading={action.busy}
-        onClick={() => {
-          action.run(async () => {
-            const saved = await exportDiagnostics();
-            setPath(saved);
-            return { tone: "success", text: `Saved to ${saved}` };
-          }, "Export failed");
-        }}
-      >
-        {action.busy ? "Exporting…" : "Export"}
-      </Button>
+      <ExportDiagnosticsButtons state={exporting} />
     </DebugRow>
   );
 }
