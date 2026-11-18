@@ -5,6 +5,9 @@ planned, developed, reviewed and released. Everything in the repository and on
 GitHub — code, comments, commits, issues, pull requests and docs — is written
 in English.
 
+*Still figuring out what works, maybe some parts are overkill. But with AI better 
+safe then sorry*
+
 ## Setting up
 
 Requirements (versions are pinned in the repository):
