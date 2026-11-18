@@ -98,6 +98,8 @@ pub fn init() {
 /// Writes pending repeat counts and everything still buffered to the log
 /// file. Call right before the process exits.
 pub fn shutdown() {
+    // Pending repeat counts first, so "HexDesk stopping" is the last line.
+    hexdesk_diag::flush();
     tracing::info!("HexDesk stopping");
     hexdesk_diag::flush();
     let guard = FILE_GUARD.lock().unwrap_or_else(|e| e.into_inner()).take();

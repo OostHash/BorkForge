@@ -983,10 +983,10 @@ pub(crate) async fn ocr_riven_screen() -> Result<serde_json::Value, DiagError> {
     }))
 }
 
-/// Logs a riven OCR failure as the overlay window saw it.
+/// Logs what the riven overlay window reports: a failed check or why it hid.
 #[tauri::command]
 pub(crate) fn ocr_riven_log_error(error: String) {
-    debug!(overlay, error = %error, "Riven OCR failure reported by the overlay window");
+    debug!(overlay, window_message = %error, "Riven overlay window reported");
 }
 
 // ── Saved rivens commands ─────────────────────────────────────────────────────

@@ -565,7 +565,7 @@ pub(crate) fn spawn_reward_watcher_thread(deps: RewardWatcherDeps) {
                                             if let Ok(mut g) = shared_best.lock() {
                                                 *g = None;
                                             }
-                                            log_watcher::schedule_reward_safety_cleanup(app.clone());
+                                            log_watcher::schedule_reward_safety_cleanup(app.clone(), active.clone());
                                             break;
                                         } else {
                                             if soft_complete_at.is_none() {
@@ -599,7 +599,7 @@ pub(crate) fn spawn_reward_watcher_thread(deps: RewardWatcherDeps) {
                                         if let Ok(mut g) = shared_best.lock() {
                                             *g = None;
                                         }
-                                        log_watcher::schedule_reward_safety_cleanup(app.clone());
+                                        log_watcher::schedule_reward_safety_cleanup(app.clone(), active.clone());
                                         break;
                                     } else if incomplete_stable_at.is_some_and(|sa| {
                                         (attempt as usize).saturating_sub(sa)
@@ -637,7 +637,7 @@ pub(crate) fn spawn_reward_watcher_thread(deps: RewardWatcherDeps) {
                                         if let Ok(mut g) = shared_best.lock() {
                                             *g = None;
                                         }
-                                        log_watcher::schedule_reward_safety_cleanup(app.clone());
+                                        log_watcher::schedule_reward_safety_cleanup(app.clone(), active.clone());
                                         break;
                                     }
                                     // Partial result (or soft-complete pending confirmation) — retry

@@ -17,7 +17,7 @@ use std::collections::VecDeque;
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
-use hexdesk_diag::{debug, DiagError, Kind, Source};
+use hexdesk_diag::{debug, info, DiagError, Kind, Source};
 
 const API_BASE: &str = "https://api.warframe.market";
 const USER_AGENT: &str = concat!("HexDesk/", env!("CARGO_PKG_VERSION"));
@@ -1461,7 +1461,9 @@ fn trimmed_median_from_stats(arr: &[serde_json::Value]) -> Option<u32> {
 /// Longest response body kept as the cause of a failed request.
 const MAX_BODY_IN_LOG: usize = 300;
 
-/// Logs a request made through `call` / `send_json` at debug level.
+/// Logs a request made through `call` / `send_json`. Reads are debug entries;
+/// requests that change something on warframe.market (an order, an auction)
+/// are info, so they show in the console by default.
 fn log_request(
     method: &str,
     path: &str,
@@ -1470,28 +1472,17 @@ fn log_request(
 ) {
     let elapsed_ms = started.elapsed().as_millis() as u64;
     let path = strip_query(path);
-    match result {
-        Ok(resp) => debug!(
-            market,
-            method,
-            path,
-            status = resp.status(),
-            elapsed_ms,
-            "Request done"
-        ),
-        Err(ureq::Error::Status(code, _)) => {
-            debug!(
-                market,
-                method,
-                path,
-                status = *code,
-                elapsed_ms,
-                "Request done"
-            )
-        }
-        Err(ureq::Error::Transport(_)) => {
-            debug!(market, method, path, elapsed_ms, "Request got no answer")
-        }
+    let status = match result {
+        Ok(resp) => Some(resp.status()),
+        Err(ureq::Error::Status(code, _)) => Some(*code),
+        Err(ureq::Error::Transport(_)) => None,
+    };
+    let changes_something = method != "GET";
+    match (status, changes_something) {
+        (Some(status), true) => info!(market, method, path, status, elapsed_ms, "Request done"),
+        (Some(status), false) => debug!(market, method, path, status, elapsed_ms, "Request done"),
+        (None, true) => info!(market, method, path, elapsed_ms, "Request got no answer"),
+        (None, false) => debug!(market, method, path, elapsed_ms, "Request got no answer"),
     }
 }
 

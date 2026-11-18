@@ -114,7 +114,7 @@ const quote = (value: string) => (value === "" || /[\s"=]/.test(value) ? JSON.st
 export function entryLine(entry: LogEntry): string {
   const op = entry.op === null ? "" : `#${String(entry.op)}`;
   const prefix = `${logTime(entry.time)} ${entry.level.toUpperCase().padEnd(5)} ${entry.source.padEnd(10)} ${op.padEnd(6)} `;
-  let line = prefix + (entry.repeat ? repeatText(entry.repeat) : oneLine(entry.message));
+  let line = prefix + oneLine(entry.message) + (entry.repeat ? ` ${repeatText(entry.repeat)}` : "");
   const fields = Object.entries(entry.fields);
   if (fields.length > 0) line += " " + fields.map(([k, v]) => ` ${k}=${quote(v)}`).join("");
   if (entry.code !== null) line += ` [${entry.code}]`;

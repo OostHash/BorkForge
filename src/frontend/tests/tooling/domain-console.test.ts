@@ -103,7 +103,7 @@ describe("log lines", () => {
 
   it("writes repeat lines", () => {
     const line = entryLine(entry(8, { repeat: { of: 7, count: 36, until: "2026-11-18T15:09:44+01:00", last_op: 78 } }));
-    expect(line.endsWith("… repeated 36 times until 15:09:44, last in #78")).toBe(true);
+    expect(line.endsWith("Entry 8 … repeated 36 times until 15:09:44, last in #78")).toBe(true);
   });
 
   it("keeps a message or cause with line breaks on its own line", () => {

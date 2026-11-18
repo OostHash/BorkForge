@@ -108,8 +108,9 @@ impl Collector {
             let mut inner = self.inner.lock().unwrap_or_else(|e| e.into_inner());
             let mut out = Vec::new();
             let keys: Vec<String> = inner.sources.keys().cloned().collect();
+            let now = Local::now();
             for source in keys {
-                inner.flush_source(&source, &mut out);
+                inner.flush_source(&source, &mut out, now);
             }
             out
         };
@@ -162,7 +163,7 @@ impl Inner {
                 s.pending_since
                     .is_some_and(|t| now - t >= config.repeat_flush)
             }) {
-                self.flush_source(&source, &mut out);
+                self.flush_source(&source, &mut out, now);
             }
         }
 
@@ -188,7 +189,7 @@ impl Inner {
         // what was counted for this source, then start over.
         let had_pending = seen.iter().any(|s| s.pending.is_some());
         if had_pending {
-            self.flush_source(&source, &mut out);
+            self.flush_source(&source, &mut out, now);
         }
         let seen = self.sources.entry(source.clone()).or_default();
         if had_pending || seen.len() >= MAX_SEEN_PER_SOURCE {
@@ -208,7 +209,7 @@ impl Inner {
         out
     }
 
-    fn flush_source(&mut self, source: &str, out: &mut Vec<Entry>) {
+    fn flush_source(&mut self, source: &str, out: &mut Vec<Entry>, now: DateTime<Local>) {
         let Some(seen) = self.sources.get_mut(source) else {
             return;
         };
@@ -217,7 +218,7 @@ impl Inner {
             if let Some(repeat) = s.pending.take() {
                 s.pending_since = None;
                 let mut entry = s.entry.clone();
-                entry.time = repeat.until;
+                entry.time = now;
                 entry.fields.clear();
                 entry.causes.clear();
                 entry.op = None;
@@ -290,7 +291,9 @@ mod tests {
         let text = sink.text();
         let lines: Vec<&str> = text.lines().collect();
         assert_eq!(lines.len(), 3);
-        assert!(lines[1].contains("… repeated 36 times until 15:00:36, last in #76"));
+        assert!(lines[1].contains("Blob not found … repeated 36 times until 15:00:36, last in #76"));
+        // Written when the new entry arrived, so the file stays in time order.
+        assert_eq!(written[0].time, at(15, 1, 0));
     }
 
     #[test]

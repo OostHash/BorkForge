@@ -105,8 +105,9 @@ impl Entry {
         let mut line = prefix.clone();
         match &self.repeat {
             Some(r) => {
+                line.push_str(&one_line(&self.message));
                 line.push_str(&format!(
-                    "… repeated {} {} until {}",
+                    " … repeated {} {} until {}",
                     r.count,
                     if r.count == 1 { "time" } else { "times" },
                     r.until.format("%H:%M:%S")
@@ -142,14 +143,32 @@ impl Entry {
     }
 
     /// Whether `other` is a repeat of this entry: same level, source, code,
-    /// message and causes. Fields and operation may differ.
+    /// message, causes and identifying fields. Fields that only measure
+    /// (numbers, memory addresses) and the operation may differ, so repeated
+    /// scans with other timings collapse, while a POST next to a GET or two
+    /// different rivens stay apart.
     pub(crate) fn same_as(&self, other: &Entry) -> bool {
         self.level == other.level
             && self.source == other.source
             && self.code == other.code
             && self.message == other.message
             && self.causes == other.causes
+            && identifying_fields(&self.fields).eq(identifying_fields(&other.fields))
     }
+}
+
+/// The fields that say *what* happened, as opposed to how much or where in
+/// memory: everything except numbers and `0x…` addresses.
+fn identifying_fields(fields: &[(String, String)]) -> impl Iterator<Item = &(String, String)> {
+    fields.iter().filter(|(_, value)| !is_measurement(value))
+}
+
+fn is_measurement(value: &str) -> bool {
+    let v = value.trim();
+    if let Some(hex) = v.strip_prefix("0x") {
+        return !hex.is_empty() && hex.chars().all(|c| c.is_ascii_hexdigit());
+    }
+    !v.is_empty() && v.parse::<f64>().is_ok()
 }
 
 /// Text that must stay on one line of the log: line breaks are written as
@@ -220,6 +239,42 @@ pub(crate) mod tests {
         let message_col = first.find("Account").unwrap();
         assert_eq!(second.find("caused by:"), Some(message_col));
         assert!(lines.next().is_none());
+    }
+
+    #[test]
+    fn entries_that_differ_in_what_happened_are_not_repeats() {
+        let with = |fields: &[(&str, &str)]| {
+            let mut e = entry("Request done");
+            e.fields = fields
+                .iter()
+                .map(|(k, v)| (k.to_string(), v.to_string()))
+                .collect();
+            e
+        };
+        let get = with(&[
+            ("method", "GET"),
+            ("path", "/v2/orders/my"),
+            ("elapsed_ms", "105"),
+        ]);
+        let get_later = with(&[
+            ("method", "GET"),
+            ("path", "/v2/orders/my"),
+            ("elapsed_ms", "140"),
+        ]);
+        let post = with(&[
+            ("method", "POST"),
+            ("path", "/v2/order"),
+            ("elapsed_ms", "98"),
+        ]);
+        assert!(get.same_as(&get_later));
+        assert!(!get.same_as(&post));
+
+        let scan = with(&[("regions_read", "3736"), ("addr", "0x01cd0e7e6000")]);
+        let other_scan = with(&[("regions_read", "658"), ("addr", "0x7ff4c6cc0010")]);
+        assert!(scan.same_as(&other_scan));
+
+        let riven = |weapon: &str| with(&[("weapon", weapon), ("positives", "2")]);
+        assert!(!riven("akarius").same_as(&riven("soma")));
     }
 
     #[test]

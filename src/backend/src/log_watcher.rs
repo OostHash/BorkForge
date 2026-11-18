@@ -684,7 +684,7 @@ pub(crate) fn collect_void_projection_state(
                 hexdesk_diag::debug!(
                     overlay,
                     own_item = %state.own_item,
-                    other_players = state.other_ids.len(),
+                    others_in_squad = state.other_ids.len(),
                     null_rewards = state.null_reward_ids.len(),
                     squad_total,
                     expected_cards = squad,
@@ -1059,9 +1059,15 @@ pub(crate) async fn capture_reward_items(
 }
 
 /// Schedule the final cleanup when the normal EE.log dismissal never arrives.
-pub(crate) fn schedule_reward_safety_cleanup(app: tauri::AppHandle) {
+pub(crate) fn schedule_reward_safety_cleanup(
+    app: tauri::AppHandle,
+    screen_active: std::sync::Arc<std::sync::atomic::AtomicBool>,
+) {
     tauri::async_runtime::spawn(async move {
         tokio::time::sleep(std::time::Duration::from_secs(20)).await;
+        // The screen normally closes through EE.log well before this; then the
+        // hide below only repeats what the close already did.
+        let still_open = screen_active.load(Ordering::SeqCst);
         if let Ok(mut rewards) = app.state::<AppState>().pending_relic_rewards.lock() {
             *rewards = None;
         }
@@ -1072,11 +1078,13 @@ pub(crate) fn schedule_reward_safety_cleanup(app: tauri::AppHandle) {
                 y: -3000,
             }));
         }
-        hexdesk_diag::info!(
-            overlay,
-            reason = "no close line in EE.log within 20 s of opening",
-            "Relic reward overlay hidden"
-        );
+        if still_open {
+            hexdesk_diag::info!(
+                overlay,
+                reason = "no close line in EE.log within 20 s of opening",
+                "Relic reward overlay hidden"
+            );
+        }
     });
 }
 
