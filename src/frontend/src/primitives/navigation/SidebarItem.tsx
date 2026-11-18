@@ -15,7 +15,7 @@ type Props = Omit<ComponentProps<"button">, "children"> & {
 
 /**
  * Category/navigation entry for a sidebar list. Put it in <nav><ul><li>.
- * The active entry gets aria-current="page" (replaces CategoryButton).
+ * The active entry gets aria-current="page".
  */
 export function SidebarItem({ active, label, icon, count, badge, className, type = "button", ...rest }: Props) {
   return (

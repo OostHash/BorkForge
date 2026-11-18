@@ -1,5 +1,5 @@
-//! Diagnostics at the Tauri boundary: the one-click export (#2) and the feed
-//! for the activity console (#3). Everything comes from `hexdesk-diag` and is
+//! Diagnostics at the Tauri boundary: the one-click export and the feed for
+//! the activity console. Everything comes from `hexdesk-diag` and is
 //! already redacted.
 
 use std::cell::Cell;

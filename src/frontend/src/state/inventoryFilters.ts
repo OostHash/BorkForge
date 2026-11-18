@@ -29,7 +29,7 @@ export function useInventoryFilters(): [InventoryFilters, typeof setInventoryFil
   return [useSyncExternalStore(subscribe, getInventoryFilters), setInventoryFilters];
 }
 
-/** Only this item by name; the other filters stay (current app: openChangeLogItem). */
+/** Only this item by name; the other filters stay. */
 export const showItem = (name: string) => {
   setInventoryFilters((previous) => ({ ...previous, search: name }));
 };

@@ -13,7 +13,7 @@ type Props = {
   /** Plural noun for itemCount, e.g. "relics". */
   itemLabel?: string;
   /**
-   * What the list holds, e.g. "800 relics · 32 owned"; replaces itemCount.
+   * What the list holds, e.g. "800 relics · 32 owned".
    * Shown after the page, and on its own when everything fits on one page.
    */
   summary?: string;

@@ -97,7 +97,7 @@ export function usePostAuction() {
   return useMutation({
     mutationFn: (params: CommandArgs<"wfm_create_riven_auction">["params"]) => invokeWfm("wfm_create_riven_auction", { params }),
     onSuccess: () => {
-      // warframe.market can take a moment to list it (current app: 1.5 s).
+      // warframe.market can take a moment to list it.
       window.setTimeout(() => {
         void queryClient.invalidateQueries({ queryKey: tradingKeys.auctions });
       }, 1500);

@@ -15,7 +15,7 @@ export type StoredPreset = {
   pinned?: boolean;
   color?: string;
   dividerAfter?: boolean;
-  /** Module-specific, in the stored (current app) format. */
+  /** Module-specific, in the stored format. */
   filters: unknown;
 };
 

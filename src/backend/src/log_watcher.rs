@@ -770,7 +770,7 @@ pub(crate) fn dismiss_relic_rewards(
     // already in memory, so clearing on every rotation's dismiss (as opposed to
     // just the final one) would empty session_relics for every rotation after
     // the first, forcing OCR to fall back to the full ~700-item catalog instead
-    // of the narrowed one. That's what made 4.5.9 feel slow on infinite missions.
+    // of the narrowed one, which makes reward reads slow on endless missions.
     if lower.contains("matchingservice::endsession") {
         session_relics.clear();
     }

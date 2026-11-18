@@ -54,7 +54,7 @@ export async function syncOverlaySwitches(prefs: OverlayPrefs): Promise<void> {
   if (!prefs.overlaysEnabled) await emitEvent("overlays-disabled");
 }
 
-/** A line in the overlay session log, for bug reports (current app: log_relic_fe). */
+/** A line from an overlay window in the log (Settings → Console), for bug reports. */
 export const logRelic = (msg: string) => invoke("log_relic_fe", { msg }).catch(() => null);
 
 /** The game's client area, or the first screen when the game is not found (`log` hears which). */

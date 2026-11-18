@@ -10,7 +10,7 @@ type Props = {
   onOpen: (url: string) => void;
 };
 
-/** ⋮ menu per item: open the wiki page or copy its link. Keyboard reachable, unlike the old right-click menu. */
+/** ⋮ menu per item: open the wiki page or copy its link. Reachable by keyboard. */
 export function WikiMenu({ name, url, onOpen }: Props) {
   return (
     <Menu

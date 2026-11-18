@@ -347,7 +347,7 @@ const SHARD_TYPES: ReadonlyArray<[prefix: string, type: string]> = [
   ["ACC_PURPLE", "Violet"],
 ];
 
-/** colour names or numbers 0–9 (5+ = Tauforged). */
+/** Shard colour from a colour name or a number 0–9 (5+ = Tauforged). */
 export function parseShard(raw: RawShard): ArchonShard {
   let color = raw.color.toUpperCase();
   const numeric = /^\d+$/.test(color);

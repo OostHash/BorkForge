@@ -121,7 +121,7 @@ export function AppLifecycle() {
 
   // ── Window position and size ──────────────────────────────────────────────
   // Saved straight to the file: the window moving is not a settings change
-  // the UI needs to see (current app: App.tsx).
+  // the UI needs to see.
   useEffect(() => {
     if (!isTauri()) return;
     let disposed = false;

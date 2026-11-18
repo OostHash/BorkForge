@@ -101,6 +101,26 @@ done.
 - Do not add, remove or upgrade dependencies, or change the pinned toolchain,
   in an unrelated pull request.
 
+### Comments
+
+Comments are read by people who only have the code, so they describe the
+code as it is, in this repository.
+
+- Explain why: a rule, a constraint, a workaround or a choice that is not
+  obvious. Do not restate what the code plainly does.
+- Describe the present. History such as "used to", "the old version" or
+  "replaces X" belongs in the commit message and the changelog.
+- Only reference what a reader can open: paths in this repository, written
+  from the root (`src/backend/src/wfm.rs`), or public external sources that
+  explain a rule. No private notes or documents.
+- Issue numbers only for HexDesk issues (`#12`), and only when the comment
+  needs the issue to make sense.
+- Name other products only where the code is about them (warframe.market,
+  WFCD, relics.run).
+- No commented-out code, and no `TODO` or `FIXME` without an issue number.
+- When code changes, update or remove the comments that describe it in the
+  same change.
+
 ## Changelog
 
 `CHANGELOG.md` follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)

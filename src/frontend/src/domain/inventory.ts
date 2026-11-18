@@ -241,7 +241,7 @@ export function recentDelta(changes: readonly ChangeEntry[], uniqueName: string,
 
 const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
 
-/** (types/filterPresets.ts). */
+/** Reads a stored Inventory preset, older shapes included; null when it is not valid. */
 export const inventoryPresetCodec: PresetCodec<InventoryFilters> = {
   module: "inventory",
   decode: (v) => {

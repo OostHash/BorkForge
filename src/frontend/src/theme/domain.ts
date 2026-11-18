@@ -1,8 +1,8 @@
 /**
  * Layer 3: domain colours (rarity, relics, syndicates, transactions, ...).
  * Not UI roles: never used for chrome, only passed to a primitive as
- * --ff-tone. Not exposed as Tailwind colours. Values come from the
- * current app and stay equal across themes until fase 7 decides otherwise.
+ * --ff-tone. Not exposed as Tailwind colours. The values are the same in
+ * dark and light; the colour-blind palette below replaces some of them.
  */
 export const domainColors = {
   "rarity-bronze": "#cd7f32",

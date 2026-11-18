@@ -972,8 +972,8 @@ const ANCHORS: &[&[u8]] = &[
 /// can exist at different addresses. We track every potential start point as a
 /// separate in-flight scan and stitch them all in parallel as the region walk
 /// advances. The first scan that produces a valid JSON blob wins; all others are
-/// dropped. This is far more robust than the old single-start approach when the
-/// blob is large or when the first start hit leads to a truncated region.
+/// dropped. Following every start point instead of the first one found holds up
+/// when the blob is large or when the first start hit leads to a truncated region.
 ///
 /// Algorithm:
 ///   1. Walk every committed readable region.

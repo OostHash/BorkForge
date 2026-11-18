@@ -1,6 +1,5 @@
 /**
- * Statistics: trade report and tracked item quantities, same rules as the
- * current app.
+ * Statistics: trade report and tracked item quantities.
  */
 
 export type Trade = {

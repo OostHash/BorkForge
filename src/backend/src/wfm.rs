@@ -4,8 +4,8 @@
 //
 // `Wfm` is the single seam to warframe.market. A caller names an endpoint and
 // gets a result; the rate limits, the Bearer-vs-`JWT` auth scheme, the CSRF
-// dance and the blueprint-slug retry quirk all live behind the interface rather
-// than in the ~40 command handlers that used to reach for them by hand.
+// dance and the blueprint-slug retry quirk all live behind the interface, not
+// in the command handlers.
 //
 // What stays *outside* this module, at the Tauri boundary: acquiring a session
 // (the login webview + injected token scrape needs an `AppHandle`), persisting

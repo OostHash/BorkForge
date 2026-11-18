@@ -2,8 +2,7 @@ import type { Ownership } from "./completionist.ts";
 import type { PresetCodec } from "./filterPresets.ts";
 
 /**
- * Relic logic
- * plus a working "Avg Plat" sort.
+ * Relic logic, including the "Avg Plat" sort.
  */
 
 // ── Catalogue ───────────────────────────────────────────────────────────────

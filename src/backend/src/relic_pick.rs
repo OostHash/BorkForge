@@ -49,7 +49,7 @@ pub(crate) fn relic_pick_show(app: &tauri::AppHandle) {
             (w - 440.0, dpi)
         })
         .unwrap_or((1920.0 - 440.0, 1.0));
-    // User offset on top of that default (issue #73).
+    // The user's offset (Settings → Overlays) on top of that default.
     let (off_x, off_y) = saved_offset(app, "relicPick");
     let _ = win.set_position(tauri::Position::Logical(tauri::LogicalPosition {
         x: x + off_x,

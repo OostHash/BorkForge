@@ -4,8 +4,7 @@
  * Stat values follow calamity-inc/warframe-riven-info RivenParser.js:
  *   buff  = cap * (1.5 * omega * 10) * 1.25^curses * lerp(0.9, 1.1, raw) * buffAtten[buffs] * (rank + 1)
  *   curse = -cap * (1.5 * omega * 10) * lerp * curseAtten[buffs] * buffAtten[curses] * (rank + 1)
- * Kitgun caps equal Pistol caps; Zaw caps equal Melee caps. The tables below
- * are copied unchanged from src/market/MarketHelper.tsx.
+ * Kitgun caps equal Pistol caps; Zaw caps equal Melee caps.
  */
 
 // AG=Archgun  ME=Melee/Zaw  PL=Pistol/Kitgun  RI=Rifle  SG=Shotgun

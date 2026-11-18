@@ -177,7 +177,7 @@ function Filters({ filter, sources, onChange }: { filter: ConsoleFilter; sources
   );
 }
 
-/** Live background activity (#3): what HexDesk does and why something failed. */
+/** Live background activity: what HexDesk does and why something failed. */
 export function ConsoleTab() {
   const entries = useConsoleEntries();
   const [filter, setFilter] = useState<ConsoleFilter>(DEFAULT_FILTER);

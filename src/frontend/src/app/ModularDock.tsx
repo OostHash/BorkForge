@@ -20,8 +20,7 @@ const NARROW_WINDOW_WIDTH = 720;
 
 /**
  * The modular window docked on the right of the main window, or — with
- * modularPopout — in its own window, which this component opens and closes
- * (current app: useModularWindow).
+ * modularPopout — in its own window, which this component opens and closes.
  */
 export function ModularDock() {
   const { prefs, loaded, setWidth, setCollapsed, setPopout } = useModularPrefs();
@@ -92,8 +91,8 @@ export function ModularDock() {
         onValueCommit={(value) => {
           const commit = ++widthCommit.current;
           // Keep the committed width visible until the asynchronous settings
-          // save finishes. Clearing it immediately briefly restored the old
-          // width before the optimistic settings cache caught up.
+          // save finishes; clearing it at once would show the previous width
+          // until the optimistic settings cache catches up.
           setDragWidth(value);
           void setWidth(value).finally(() => {
             if (widthCommit.current === commit) setDragWidth(null);

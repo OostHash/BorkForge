@@ -317,8 +317,8 @@ export async function revertListing(info: RevertInfo) {
 
 /**
  * Writes a finished in-game trade to the trade log (Statistics), one row at a
- * time so their order is kept, then tells every window (current app:
- * useOverlays). A failed row is logged and the rest still written.
+ * time so their order is kept, then tells every window. A failed row is
+ * logged and the rest still written.
  */
 export async function logInGameTrade(trade: TradeCompleted): Promise<void> {
   for (const params of tradeLogRows(trade)) {

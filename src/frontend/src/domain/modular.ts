@@ -13,7 +13,7 @@ export const POPOUT_SIZE = { minWidth: 180, minHeight: 300, height: 700 } as con
 
 const isSection = (v: unknown): v is SectionId => (SECTION_IDS as readonly unknown[]).includes(v);
 
-/** Stored order, unknown ids dropped, missing sections appended (current app). */
+/** Stored order, unknown ids dropped, missing sections appended. */
 export function sectionOrderFrom(raw: unknown): SectionId[] {
   const stored = Array.isArray(raw) ? raw.filter(isSection) : [];
   const unique = [...new Set(stored)];

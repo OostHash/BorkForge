@@ -310,7 +310,7 @@ export type WfmPublicOrder = {
 export type WfmItemOrders = { sell: WfmPublicOrder[]; buy: WfmPublicOrder[] };
 export type WfmItemInfo = { id: string; modMaxRank?: number };
 
-/** The current app shows the second-to-last point as "48h median". */
+/** The "48h median" is the second-to-last statistics point. */
 export const median48h = (stats: readonly WfmStatPoint[]): number | null => stats.slice(-2)[0]?.median ?? null;
 
 export type Sparkline = { points: string; area: string; low: number; high: number; last: number };
@@ -353,7 +353,7 @@ export function prefillPrice(side: "sell" | "buy", orders: WfmItemOrders | undef
 const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
 const isList = (v: unknown, allowed: readonly string[]) => Array.isArray(v) && v.every((x) => typeof x === "string" && allowed.includes(x));
 
-/**; the open tab is not part of a preset. */
+/** Validates a stored Market preset; the open tab is not part of a preset. */
 export function marketPresetCodec(activeMarketTab: MarketFilters["activeMarketTab"]): PresetCodec<MarketFilters> {
   return {
     module: "market",

@@ -387,9 +387,8 @@ pub(crate) fn load_inventory_state_cache(path: &PathBuf) -> InventoryStateCache 
 /// Shared read-modify-write for inventory_state_cache.json: loads via
 /// `load_inventory_state_cache` (so every writer sees the same read-or-default
 /// behavior), applies `mutate`, then serializes and atomically writes back.
-/// Callers that used to hand-roll this (read → mutate → atomic_write) should
-/// go through this instead so there's one place that owns the file's
-/// read/write contract.
+/// Callers go through this rather than read → mutate → atomic_write by hand,
+/// so there is one place that owns the file's read/write contract.
 pub(crate) fn persist_inventory_state_cache(
     path: &PathBuf,
     mutate: impl FnOnce(&mut InventoryStateCache),

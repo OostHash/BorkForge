@@ -5,7 +5,7 @@ const MINUTE = 60 * SECOND;
 const HOUR = 60 * MINUTE;
 const DAY = 24 * HOUR;
 
-/** "2d 3h 4m", "3h 4m 5s" or "4m 5s"; "—" when the time has passed.. */
+/** "2d 3h 4m", "3h 4m 5s" or "4m 5s"; "—" when the time has passed. */
 export function formatDuration(ms: number): string {
   if (ms <= 0) return "—";
   const s = Math.floor(ms / SECOND) % 60;
