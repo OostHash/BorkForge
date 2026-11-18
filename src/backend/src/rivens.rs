@@ -618,7 +618,7 @@ fn parse_original_stats(text: Option<&str>) -> Vec<serde_json::Value> {
 /// Capture the riven reroll screen and OCR the stats + weapon name.
 /// Returns (weapon_name, positives, negatives).
 #[tauri::command]
-pub(crate) async fn ocr_riven_screen() -> Result<serde_json::Value, String> {
+pub(crate) async fn ocr_riven_screen() -> Result<serde_json::Value, DiagError> {
     let started = std::time::Instant::now();
     info!(overlay, "Riven OCR started");
     let riven_log = std::env::temp_dir().join("hexdesk_riven_session.txt");
@@ -666,7 +666,6 @@ pub(crate) async fn ocr_riven_screen() -> Result<serde_json::Value, String> {
                 .with("attempt", attempt + 1)
                 .caused_by_text(e)
                 .log()
-                .to_string()
             })?;
             let (pixels, w, h) = px;
             let full_text = ocr::ocr_pixels_rect(&pixels, w, h, 0.0, 1.0, 0.0, 0.82)
@@ -679,12 +678,11 @@ pub(crate) async fn ocr_riven_screen() -> Result<serde_json::Value, String> {
                 "[STEP 2] OCR attempt {} — {}\n├─ Full text:\n{}\n├─ Panel text:\n{}\n└─ Card text:\n{}\n\n",
                 attempt + 1, ts, full_text, panel_text, card_text
             ));
-            Ok::<_, String>((full_text, panel_text, card_text))
+            Ok::<_, DiagError>((full_text, panel_text, card_text))
         }).await.map_err(|e| {
             DiagError::new(Source::Overlay, Kind::Internal, "Riven OCR failed: its worker task stopped")
                 .caused_by(&e)
                 .log()
-                .to_string()
         })??;
 
         let (full_text, panel_text, card_text) = attempt_result;
@@ -812,7 +810,6 @@ pub(crate) async fn ocr_riven_screen() -> Result<serde_json::Value, String> {
             DiagError::new(Source::Overlay, Kind::Internal, "Riven OCR failed: its worker task stopped")
                 .caused_by(&e)
                 .log()
-                .to_string()
         })?;
         cols
     } else {

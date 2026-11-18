@@ -2,17 +2,16 @@ use hexdesk_diag::{info, DiagError, Kind, Source};
 use tauri_plugin_updater::UpdaterExt;
 
 /// The error for a failed updater step, with the plugin's error as the cause.
-fn update_error(what: &'static str, kind: Kind, e: tauri_plugin_updater::Error) -> String {
+fn update_error(what: &'static str, kind: Kind, e: tauri_plugin_updater::Error) -> DiagError {
     DiagError::new(Source::Updater, kind, what)
         .caused_by(&e)
         .log()
-        .to_string()
 }
 
 /// Checks the release endpoint. Returns the new version, or `None` when this
 /// is the latest.
 #[tauri::command]
-pub(crate) async fn check_for_update(app: tauri::AppHandle) -> Result<Option<String>, String> {
+pub(crate) async fn check_for_update(app: tauri::AppHandle) -> Result<Option<String>, DiagError> {
     let current = app.package_info().version.to_string();
     info!(updater, current = %current, "Checking for an update");
     let updater = app.updater_builder().build().map_err(|e| {
@@ -40,7 +39,7 @@ pub(crate) async fn check_for_update(app: tauri::AppHandle) -> Result<Option<Str
 
 /// Downloads and installs the available update, then restarts the app.
 #[tauri::command]
-pub(crate) async fn install_update(app: tauri::AppHandle) -> Result<(), String> {
+pub(crate) async fn install_update(app: tauri::AppHandle) -> Result<(), DiagError> {
     let updater = app.updater_builder().build().map_err(|e| {
         update_error(
             "Update install failed: the updater could not be set up",

@@ -150,7 +150,7 @@ it("shows results under the row instead of alerts", async () => {
   await row("Manual capture").getByRole("button", { name: "Capture" }).click();
   await expect.element(row("Manual capture").getByRole("status")).toHaveTextContent("Saved to C:/Debug/Manual-Capture/x");
   await row("OCR era detect").getByRole("button", { name: "Test OCR" }).click();
-  await expect.element(row("OCR era detect").getByRole("status")).toHaveTextContent("Failed: Error: no game window");
+  await expect.element(row("OCR era detect").getByRole("status")).toHaveTextContent("Failed: no game window");
   await row("Test overlay").getByRole("combobox", { name: "Era" }).selectOptions("NEO");
   await row("Test overlay").getByRole("button", { name: "Launch" }).click();
   await expect.element(row("Test overlay").getByText("Emitted relic-pick-open: era=NEO, 3 relics in inventory")).toBeVisible();

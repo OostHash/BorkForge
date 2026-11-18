@@ -247,23 +247,23 @@ impl Wfm {
     // ── Auth derivation (internal) ────────────────────────────────────────────
 
     /// Bearer auth header, or an error when there is no session.
-    fn auth(&self) -> Result<String, String> {
+    fn auth(&self) -> Result<String, DiagError> {
         self.session
             .lock()
             .unwrap_or_else(|e| e.into_inner())
             .as_ref()
             .map(|s| s.auth_header())
-            .ok_or_else(|| "Not logged in to warframe.market".into())
+            .ok_or_else(not_logged_in)
     }
 
     /// v1 ("JWT ...") auth header, or an error when there is no session.
-    fn v1_auth(&self) -> Result<String, String> {
+    fn v1_auth(&self) -> Result<String, DiagError> {
         self.session
             .lock()
             .unwrap_or_else(|e| e.into_inner())
             .as_ref()
             .map(|s| s.v1_auth_header())
-            .ok_or_else(|| "Not logged in to warframe.market".into())
+            .ok_or_else(not_logged_in)
     }
 
     /// Bearer auth header when logged in, or `None` — for read endpoints that
@@ -277,13 +277,13 @@ impl Wfm {
     }
 
     /// The raw access token, or an error when there is no session.
-    fn access_token(&self) -> Result<String, String> {
+    fn access_token(&self) -> Result<String, DiagError> {
         self.session
             .lock()
             .unwrap_or_else(|e| e.into_inner())
             .as_ref()
             .map(|s| s.access_token.clone())
-            .ok_or_else(|| "Not logged in".into())
+            .ok_or_else(not_logged_in)
     }
 
     // ── Session lifecycle ─────────────────────────────────────────────────────
@@ -340,7 +340,11 @@ impl Wfm {
     /// callers that validate a token *before* it lives in the session can't route
     /// through `self.call` (which reads the token from the session), so they share
     /// this instead. `err_ctx` prefixes the failure string each caller wants.
-    fn me(&self, access_token: &str, err_ctx: &'static str) -> Result<serde_json::Value, String> {
+    fn me(
+        &self,
+        access_token: &str,
+        err_ctx: &'static str,
+    ) -> Result<serde_json::Value, DiagError> {
         self.wait();
         ureq::get(&format!("{}/v2/me", API_BASE))
             .set("Authorization", &format!("Bearer {}", access_token))
@@ -355,7 +359,7 @@ impl Wfm {
 
     /// Restore a session from a saved token JSON string, validating via /v2/me.
     /// Returns (username, status).
-    pub fn restore_from_json(&self, jwt: &str) -> Result<(String, String), String> {
+    pub fn restore_from_json(&self, jwt: &str) -> Result<(String, String), DiagError> {
         // Backward compat: an old save was the bare access token, not a JSON bundle.
         let data: serde_json::Value =
             serde_json::from_str(jwt).unwrap_or_else(|_| serde_json::json!({ "accessToken": jwt }));
@@ -401,7 +405,7 @@ impl Wfm {
     /// Log in via v1 signin (current recommended method per WFM Discord).
     /// The token arrives in the set-cookie header as "JWT=eyJ...".
     /// Returns the ingame username.
-    pub fn login(&self, email: &str, password: &str) -> Result<String, String> {
+    pub fn login(&self, email: &str, password: &str) -> Result<String, DiagError> {
         let body = serde_json::json!({ "email": email, "password": password });
         self.wait();
         let resp = ureq::post(&format!("{}/v1/auth/signin", API_BASE))
@@ -416,7 +420,7 @@ impl Wfm {
             .and_then(|h| h.split(';').next())
             .and_then(|s| s.strip_prefix("JWT="))
             .map(|s| s.to_string())
-            .ok_or("No JWT token in response cookies")?;
+            .ok_or_else(|| invalid("Sign-in failed: warframe.market sent no JWT cookie"))?;
 
         let json: serde_json::Value = resp.into_json().map_err(unreadable)?;
         let username = json["payload"]["user"]["ingame_name"]
@@ -442,10 +446,10 @@ impl Wfm {
     }
 
     /// Use the stored refresh token to silently mint a new access token.
-    pub fn refresh(&self) -> Result<(), String> {
+    pub fn refresh(&self) -> Result<(), DiagError> {
         let (refresh_token, client_id, device_id) = {
             let lock = self.session.lock().unwrap_or_else(|e| e.into_inner());
-            let s = lock.as_ref().ok_or("Not logged in")?;
+            let s = lock.as_ref().ok_or_else(not_logged_in)?;
             (
                 s.refresh_token.clone(),
                 s.client_id.clone(),
@@ -453,7 +457,9 @@ impl Wfm {
             )
         };
         if refresh_token.is_empty() {
-            return Err("No refresh token".into());
+            return Err(invalid(
+                "Session could not be refreshed: the saved session has no refresh token",
+            ));
         }
         let body = serde_json::json!({
             "grantType": "refresh_token",
@@ -471,7 +477,9 @@ impl Wfm {
             .map_err(unreadable)?;
         let new_access = json["data"]["accessToken"]
             .as_str()
-            .ok_or("No accessToken")?
+            .ok_or_else(|| {
+                invalid("Session could not be refreshed: the answer has no access token")
+            })?
             .to_string();
         let new_refresh = json["data"]["refreshToken"]
             .as_str()
@@ -530,7 +538,7 @@ impl Wfm {
 
     /// Fetch the user's actual current status from WFM (/v2/me).
     /// Returns one of: "online" | "ingame" | "invisible" | "offline".
-    pub fn fetch_status(&self) -> Result<String, String> {
+    pub fn fetch_status(&self) -> Result<String, DiagError> {
         let token = self.access_token()?;
         let json = self.me(&token, "Status could not be loaded")?;
         Ok(json["data"]["status"]
@@ -542,9 +550,9 @@ impl Wfm {
     /// Set WFM online status via WebSocket. Connects, authenticates, sends the
     /// status with a 6-hour duration (so it persists after disconnect), then
     /// closes. Values: "online" | "ingame" | "invisible".
-    pub fn set_status(&self, status: &str) -> Result<(), String> {
+    pub fn set_status(&self, status: &str) -> Result<(), DiagError> {
         if !["online", "ingame", "invisible"].contains(&status) {
-            return Err("Status must be: online, ingame, or invisible".into());
+            return Err(invalid("Status must be online, ingame or invisible"));
         }
         let token = self.access_token()?;
         let status_for_ws = status.to_string();
@@ -605,7 +613,7 @@ impl Wfm {
         let wait_for = |ws: &mut tungstenite::WebSocket<_>,
                         ok_route: &str,
                         err_route: &str|
-         -> Result<(), String> {
+         -> Result<(), DiagError> {
             for _ in 0..20 {
                 match ws.read() {
                     Ok(Message::Text(text)) => {
@@ -623,8 +631,7 @@ impl Wfm {
                             )
                             .with("route", route)
                             .caused_by_text(format!("payload: {}", v["payload"]))
-                            .log()
-                            .to_string());
+                            .log());
                         }
                     }
                     Err(e) => {
@@ -641,8 +648,7 @@ impl Wfm {
                 "Status could not be set: no answer from warframe.market within 20 messages",
             )
             .with("expected_route", ok_route)
-            .log()
-            .to_string())
+            .log())
         };
 
         send(
@@ -680,7 +686,7 @@ impl Wfm {
         &self,
         url_name: &str,
         mod_rank: Option<u32>,
-    ) -> Result<serde_json::Value, String> {
+    ) -> Result<serde_json::Value, DiagError> {
         let auth = self.auth_opt();
         self.wait();
         let mut req = ureq::get(&format!("{}/v2/orders/item/{}", API_BASE, url_name))
@@ -752,7 +758,7 @@ impl Wfm {
     }
 
     /// 90-day daily price statistics for an item (for the chart).
-    pub fn item_statistics(&self, url_name: &str) -> Result<serde_json::Value, String> {
+    pub fn item_statistics(&self, url_name: &str) -> Result<serde_json::Value, DiagError> {
         let auth = self.auth_opt();
         self.wait();
         let mut req = ureq::get(&format!("{}/v1/items/{}/statistics", API_BASE, url_name))
@@ -772,7 +778,7 @@ impl Wfm {
 
     /// The internal WFM item detail for a slug (needed to create orders). The
     /// caller enriches it further; `Wfm` returns only what the wire gives.
-    pub fn item_info(&self, url_name: &str) -> Result<serde_json::Value, String> {
+    pub fn item_info(&self, url_name: &str) -> Result<serde_json::Value, DiagError> {
         let auth = self.auth_opt().unwrap_or_default();
         self.wait();
         self.call("GET", &format!("/v2/items/{}", url_name), &auth)
@@ -783,7 +789,7 @@ impl Wfm {
     }
 
     /// The authenticated user's active buy + sell orders.
-    pub fn my_orders(&self) -> Result<serde_json::Value, String> {
+    pub fn my_orders(&self) -> Result<serde_json::Value, DiagError> {
         let auth = self.auth()?;
         self.wait();
         let json: serde_json::Value = self
@@ -795,7 +801,7 @@ impl Wfm {
     }
 
     /// Raw authenticated GET, pretty-printed — for the debug console only.
-    pub fn debug_dump(&self, path: &str) -> Result<String, String> {
+    pub fn debug_dump(&self, path: &str) -> Result<String, DiagError> {
         let auth = self.auth()?;
         self.wait();
         let json: serde_json::Value = self
@@ -803,7 +809,7 @@ impl Wfm {
             .map_err(fail("Debug request failed"))?
             .into_json()
             .map_err(unreadable)?;
-        serde_json::to_string_pretty(&json).map_err(|e| e.to_string())
+        serde_json::to_string_pretty(&json).map_err(unreadable)
     }
 
     /// Create a buy or sell order. `mod_rank` must be set for mods — WFM 400s without it.
@@ -815,7 +821,7 @@ impl Wfm {
         quantity: u32,
         visible: bool,
         mod_rank: Option<u32>,
-    ) -> Result<serde_json::Value, String> {
+    ) -> Result<serde_json::Value, DiagError> {
         let auth = self.auth()?;
         let mut body = serde_json::json!({
             "itemId": item_id, "type": order_type, "platinum": platinum,
@@ -839,7 +845,7 @@ impl Wfm {
         platinum: u32,
         quantity: u32,
         visible: bool,
-    ) -> Result<serde_json::Value, String> {
+    ) -> Result<serde_json::Value, DiagError> {
         let auth = self.auth()?;
         let body =
             serde_json::json!({ "platinum": platinum, "quantity": quantity, "visible": visible });
@@ -852,7 +858,7 @@ impl Wfm {
     }
 
     /// Delete an order.
-    pub fn delete_order(&self, order_id: &str) -> Result<(), String> {
+    pub fn delete_order(&self, order_id: &str) -> Result<(), DiagError> {
         let auth = self.auth()?;
         self.wait();
         self.call("DELETE", &format!("/v2/order/{}", order_id), &auth)
@@ -862,7 +868,11 @@ impl Wfm {
 
     /// Record a sale or purchase against an order. WFM decrements the quantity
     /// and removes a fully completed order while retaining transaction history.
-    pub fn close_order(&self, order_id: &str, quantity: u32) -> Result<serde_json::Value, String> {
+    pub fn close_order(
+        &self,
+        order_id: &str,
+        quantity: u32,
+    ) -> Result<serde_json::Value, DiagError> {
         let auth = self.auth()?;
         let body = serde_json::json!({ "quantity": quantity });
         self.wait();
@@ -882,7 +892,7 @@ impl Wfm {
 
     /// Known riven attribute url_names, scraped from live auction listings
     /// (/v1/riven/attributes was removed by WFM).
-    pub fn riven_attributes(&self) -> Result<Vec<String>, String> {
+    pub fn riven_attributes(&self) -> Result<Vec<String>, DiagError> {
         self.auction_wait();
         let json: serde_json::Value = ureq::get(&format!("{}/v1/auctions/search", API_BASE))
             .query("type", "riven")
@@ -928,7 +938,7 @@ impl Wfm {
         note: &str,
         visible: bool,
         is_direct_sell: bool,
-    ) -> Result<serde_json::Value, String> {
+    ) -> Result<serde_json::Value, DiagError> {
         let auth = self.v1_auth()?;
         let attrs: Vec<serde_json::Value> = attributes
             .iter()
@@ -971,7 +981,7 @@ impl Wfm {
         starting_price: u32,
         buyout_price: Option<u32>,
         visible: bool,
-    ) -> Result<serde_json::Value, String> {
+    ) -> Result<serde_json::Value, DiagError> {
         let auth = self.v1_auth()?;
 
         // Fetch the full detail so every field (attributes, polarity, ...) carries over.
@@ -1025,7 +1035,7 @@ impl Wfm {
     }
 
     /// Close (delete) a riven auction.
-    pub fn delete_auction(&self, auction_id: &str) -> Result<(), String> {
+    pub fn delete_auction(&self, auction_id: &str) -> Result<(), DiagError> {
         let auth = self.v1_auth()?;
         self.auction_wait();
         self.call(
@@ -1045,7 +1055,7 @@ impl Wfm {
         starting_price: u32,
         buyout_price: Option<u32>,
         visible: bool,
-    ) -> Result<(), String> {
+    ) -> Result<(), DiagError> {
         let auth = self.v1_auth()?;
         let mut body = serde_json::json!({ "starting_price": starting_price, "visible": visible });
         body["buyout_price"] =
@@ -1062,7 +1072,7 @@ impl Wfm {
     }
 
     /// Toggle an auction's visibility.
-    pub fn set_auction_visible(&self, auction_id: &str, visible: bool) -> Result<(), String> {
+    pub fn set_auction_visible(&self, auction_id: &str, visible: bool) -> Result<(), DiagError> {
         let auth = self.v1_auth()?;
         self.auction_wait();
         self.send_json(
@@ -1078,10 +1088,10 @@ impl Wfm {
     /// The current user's riven auctions. Phase 1 hits the profile endpoint
     /// (visible auctions); phase 2 fetches each stored id not already returned
     /// (hidden auctions HexDesk created), skipping closed ones.
-    pub fn my_riven_auctions(&self, stored_ids: &[String]) -> Result<serde_json::Value, String> {
+    pub fn my_riven_auctions(&self, stored_ids: &[String]) -> Result<serde_json::Value, DiagError> {
         let (v1_auth, username) = {
             let lock = self.session.lock().unwrap_or_else(|e| e.into_inner());
-            let s = lock.as_ref().ok_or("Not logged in to warframe.market")?;
+            let s = lock.as_ref().ok_or_else(not_logged_in)?;
             (s.v1_auth_header(), s.username.clone())
         };
 
@@ -1135,7 +1145,7 @@ impl Wfm {
     // ── Item list ─────────────────────────────────────────────────────────────
 
     /// The full warframe.market item list (v2; v1 /items 404s).
-    pub fn items(&self) -> Result<Vec<WfmItem>, String> {
+    pub fn items(&self) -> Result<Vec<WfmItem>, DiagError> {
         self.wait();
         let json: serde_json::Value = ureq::get(&format!("{}/v2/items", API_BASE))
             .call()
@@ -1144,7 +1154,7 @@ impl Wfm {
             .map_err(unreadable)?;
         let items = json["data"]
             .as_array()
-            .ok_or("no data array in v2 response")?
+            .ok_or_else(|| invalid("Item list could not be loaded: the answer has no data array"))?
             .iter()
             .filter_map(|v| {
                 Some(WfmItem {
@@ -1163,7 +1173,7 @@ impl Wfm {
     /// VWAP when there are ≥3 recent trades, else falls back to the 90-day window.
     /// Returns Err only for network/parse failures, not for "item not listed" (Ok(None)).
     #[tracing::instrument(level = "debug", skip_all, fields(slug = %slug))]
-    pub fn price_for_slug(&self, slug: &str) -> Result<Option<u32>, String> {
+    pub fn price_for_slug(&self, slug: &str) -> Result<Option<u32>, DiagError> {
         self.wait();
         let url = format!("{}/v1/items/{}/statistics", API_BASE, slug);
         match ureq::get(&url).call() {
@@ -1183,13 +1193,13 @@ impl Wfm {
             }
             // 404 = item not on WFM, not a transient error — treat as unlisted.
             Err(ureq::Error::Status(404, _)) => Ok(None),
-            Err(e) => Err(format!("wfm price fetch: {e}")),
+            Err(e) => Err(market_error("Price could not be loaded", e).log()),
         }
     }
 
     /// Price for a slug, retrying the blueprint-suffix variant — WFM is
     /// inconsistent about whether component blueprints keep the "_blueprint" suffix.
-    pub fn price_with_fallback(&self, slug: &str) -> Result<Option<u32>, String> {
+    pub fn price_with_fallback(&self, slug: &str) -> Result<Option<u32>, DiagError> {
         match self.price_for_slug(slug)? {
             Some(p) => Ok(Some(p)),
             None => {
@@ -1586,23 +1596,22 @@ fn market_error(what: &str, e: ureq::Error) -> DiagError {
 
 /// `map_err` adapter: logs the failed request and returns the message the UI
 /// shows.
-fn fail(what: &'static str) -> impl FnOnce(ureq::Error) -> String {
-    move |e| market_error(what, e).log().to_string()
+fn fail(what: &'static str) -> impl FnOnce(ureq::Error) -> DiagError {
+    move |e| market_error(what, e).log()
 }
 
 /// Like [`fail`] for steps that are not plain HTTP requests (DNS, TCP,
 /// WebSocket).
-fn fail_other<E: std::fmt::Display>(what: &'static str) -> impl FnOnce(E) -> String {
+fn fail_other<E: std::fmt::Display>(what: &'static str) -> impl FnOnce(E) -> DiagError {
     move |e| {
         DiagError::new(Source::Market, Kind::Network, what)
             .caused_by_text(e)
             .log()
-            .to_string()
     }
 }
 
 /// `map_err` adapter for a response body that could not be read or parsed.
-fn unreadable<E: std::fmt::Display>(e: E) -> String {
+fn unreadable<E: std::fmt::Display>(e: E) -> DiagError {
     DiagError::new(
         Source::Market,
         Kind::Parse,
@@ -1610,7 +1619,20 @@ fn unreadable<E: std::fmt::Display>(e: E) -> String {
     )
     .caused_by_text(e)
     .log()
-    .to_string()
+}
+
+/// No session: a normal state, so it is returned without being logged.
+fn not_logged_in() -> DiagError {
+    DiagError::new(
+        Source::Market,
+        Kind::Denied,
+        "Not logged in to warframe.market",
+    )
+}
+
+/// An answer or input that does not have what the request needs. Logged.
+fn invalid(message: &'static str) -> DiagError {
+    DiagError::new(Source::Market, Kind::Invalid, message).log()
 }
 
 // ==============================================================================
