@@ -86,6 +86,19 @@ test("debugging, results and the batch preview", async ({ page }) => {
   await expect(page.getByRole("dialog", { name: "Settings" })).toBeVisible();
 });
 
+test("console, an entry opened and the export", async ({ page }) => {
+  await open(page);
+  await tab(page, "Console").click();
+  const entries = page.getByRole("list", { name: "Log entries" });
+  const failure = entries.getByRole("button", { name: /Order could not be created/ });
+  await failure.click();
+  await expect(entries.getByText("market.denied")).toBeVisible();
+  await page.getByRole("button", { name: "Export", exact: true }).click();
+  await expect(page.getByText(/^Saved to .*hexdesk-diagnostics-.*\.zip$/)).toBeVisible();
+  await expect(page.getByRole("button", { name: "Show in folder" })).toBeVisible();
+  await axe(page);
+});
+
 test("market, logged in", async ({ page }) => {
   await open(page);
   await tab(page, "Market").click();
