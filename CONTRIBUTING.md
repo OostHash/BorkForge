@@ -32,14 +32,16 @@ pnpm desktop:dev
 ## Planning
 
 - Work is tracked in GitHub issues. Every change starts with an issue; use the
-  bug report or feature request template.
-- Each version has a milestone (for example `v1.1.0`). An issue's milestone is
-  the version it ships in. Unscheduled ideas go to the `Later` milestone.
+  bug report or feature request template and assign the appropriate issue type.
+- The `Target Version` project field records the release an issue is planned
+  for (`1.1`, `1.2`, …). New and unplanned work defaults to `Unscheduled`.
 - Issues carry an `area:` label for the part of the app they touch.
 - The [HexDesk Roadmap](https://github.com/users/OostHash/projects/2) project
-  shows progress with the statuses New, Ready, In progress and Done.
+  shows progress with the statuses Backlog, Ready, In progress and Done. Its
+  Release Roadmap groups work by `Target Version`; the Bug Tracker shows open
+  issues with the Bug issue type.
 - Versions are large minor releases (1.1, 1.2, …) without deadlines. A version
-  is released when its milestone is done.
+  is released when the planned work for its `Target Version` is done.
 
 ## Branches
 
@@ -78,11 +80,24 @@ Types in use: `feat`, `fix`, `refactor`, `test`, `docs`, `style`, `ci`,
 
 ## Pull requests
 
+For a feature or fix pull request targeting `release/x.y`, link its issue in
+GitHub's Development sidebar instead of using a closing keyword. This keeps the
+issue open while the change is tested as part of the release and lets the
+project workflows move linked work to In progress. Confirm that the issue has
+the correct `Target Version`.
+
+The final `release/x.y` pull request targeting `master` lists every delivered
+issue with `Closes #…`. GitHub then closes those issues when the release reaches
+`master`, not when an individual change first reaches the release branch.
+
 Before opening a pull request:
 
-- [ ] It is linked to an issue (`Closes #…`) and targets the right branch.
-- [ ] `pnpm check` passes locally (format, lint, typecheck, all tests,
-      `cargo fmt --check`, `cargo check`).
+- [ ] It is linked to the relevant issue and targets the right branch. A
+      release pull request to `master` contains the required `Closes #…`
+      references.
+- [ ] For code changes, `pnpm check` passes locally (format, lint, typecheck,
+      all tests, `cargo fmt --check`, `cargo check`). Documentation-only pull
+      requests retain the required CI checks but skip the heavy test suites.
 - [ ] Behaviour changes have tests; UI changes were checked in the running
       app, with screenshots in the PR when the look changed.
 - [ ] User-visible changes have an entry under `## [Unreleased]` in
@@ -131,18 +146,21 @@ Write entries for users: what changed for them, not how the code changed.
 
 Releases are made by the maintainer.
 
-1. Make sure the milestone is complete and the release branch is green.
+1. Make sure the planned work for the `Target Version` is complete and the
+   release branch is green.
 2. Set the new version in all three places:
    `src/backend/tauri.conf.json`, `src/backend/Cargo.toml` and
    `src/frontend/package.json`.
 3. In `CHANGELOG.md`, rename `## [Unreleased]` to `## [x.y.z] - YYYY-MM-DD`
    and add a fresh empty `## [Unreleased]` above it.
-4. Merge the release (or hotfix) branch into `master`.
+4. Open the release (or hotfix) pull request to `master`, include `Closes #…`
+   for every delivered issue, and merge it.
 5. Tag the merge commit `vx.y.z` and push the tag. The release workflow checks
    that the tag matches the app version, runs `pnpm check`, and builds a signed
    draft release.
 6. Review the draft release on GitHub and publish it.
-7. Close the milestone and create the next `release/x.y` branch.
+7. Create the next `release/x.y` branch and move newly planned work from
+   `Unscheduled` to the appropriate `Target Version`.
 
 ## License
 
