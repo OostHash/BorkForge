@@ -53,14 +53,6 @@ pub fn detect_fissure_era() -> Option<String> {
     None
 }
 
-pub fn capture_screen_for_diagnostics_half() -> Result<(Vec<u8>, u32, u32), String> {
-    Err("Screen capture not supported on Linux yet".into())
-}
-
-pub fn capture_desktop_for_diag() -> Option<(Vec<u8>, u32, u32)> {
-    None
-}
-
 pub type OcrResult = (String, Vec<(String, f32, f32)>);
 
 pub fn run_windows_ocr(_bmp: Vec<u8>, _w: u32, _h: u32) -> Result<OcrResult, String> {

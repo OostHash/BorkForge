@@ -27,10 +27,6 @@ pub(crate) struct BlobCaptureDeps {
     pub shared_unique: Arc<Mutex<HashMap<String, i64>>>,
     pub shared_mods: Arc<Mutex<HashMap<String, memory_scanner::ModCount>>>,
     pub shared_crafting: Arc<Mutex<Vec<monitor::CraftingJob>>>,
-    pub blob_log_enabled: Arc<AtomicBool>,
-    pub blob_log_dir: std::path::PathBuf,
-    pub debug_cat_enabled: Arc<AtomicBool>,
-    pub unmatched_paths_dir: std::path::PathBuf,
     pub force_pid_check: Arc<AtomicBool>,
     pub blob_rx: Receiver<memory_scanner::BlobInventory>,
     pub blob_tx: Sender<memory_scanner::BlobInventory>,
@@ -53,10 +49,6 @@ pub(crate) fn spawn_blob_capture_thread(deps: BlobCaptureDeps, catalog: monitor:
         shared_unique,
         shared_mods,
         shared_crafting,
-        blob_log_enabled,
-        blob_log_dir,
-        debug_cat_enabled,
-        unmatched_paths_dir,
         force_pid_check,
         blob_rx,
         blob_tx,
@@ -69,9 +61,6 @@ pub(crate) fn spawn_blob_capture_thread(deps: BlobCaptureDeps, catalog: monitor:
         path_to_tradable,
         path_to_masterable,
         path_to_category,
-        path_to_item_type,
-        path_to_product_category,
-        path_to_wfcd_cat,
         alias_excluded,
         ignored_paths,
         stackable_paths,
@@ -240,12 +229,7 @@ pub(crate) fn spawn_blob_capture_thread(deps: BlobCaptureDeps, catalog: monitor:
                     &alias_excluded,
                     &stackable_paths,
                     &path_aliases,
-                    &path_to_item_type,
-                    &path_to_product_category,
-                    &path_to_wfcd_cat,
                     &ignored_paths,
-                    &unmatched_paths_dir,
-                    &debug_cat_enabled,
                     &shared_quantities,
                     &shared_mods,
                     &shared_unique,
@@ -363,10 +347,6 @@ pub(crate) fn spawn_blob_capture_thread(deps: BlobCaptureDeps, catalog: monitor:
                 if should_capture && !already_running {
                     blob_scan_active.store(true, Ordering::SeqCst);
                     last_blob_time = Some(std::time::Instant::now());
-                    // UTC, suffixed "Z" so filenames aren't mistaken for local wall-clock time.
-                    let ts = chrono::Utc::now().format("%Y-%m-%dT%H-%M-%SZ").to_string();
-                    let dir = blob_log_dir.clone();
-                    let save = blob_log_enabled.load(Ordering::SeqCst);
                     let active = blob_scan_active.clone();
                     let tx = blob_tx.clone();
                     let _ = app.emit(
@@ -385,14 +365,8 @@ pub(crate) fn spawn_blob_capture_thread(deps: BlobCaptureDeps, catalog: monitor:
                         }
                         let _guard = ClearOnDrop(active);
                         let _op = hexdesk_diag::op!(scanner, "Inventory scan").entered();
-                        match memory_scanner::capture_all_blobs(&dir, &ts, tx, save) {
-                            Ok(files_saved) if save => {
-                                debug!(scanner, files_saved, "Blob files saved");
-                            }
-                            Ok(_) => {}
-                            Err(e) => {
-                                let _ = e.log();
-                            }
+                        if let Err(e) = memory_scanner::capture_all_blobs(tx) {
+                            let _ = e.log();
                         }
                     });
                 }
@@ -477,12 +451,7 @@ fn process_blob(
     alias_excluded: &std::collections::HashSet<String>,
     stackable_paths: &std::collections::HashSet<String>,
     path_aliases: &HashMap<String, String>,
-    path_to_item_type: &HashMap<String, String>,
-    path_to_product_category: &HashMap<String, String>,
-    path_to_wfcd_cat: &HashMap<String, String>,
     ignored_paths: &std::collections::HashSet<String>,
-    unmatched_paths_dir: &std::path::Path,
-    debug_cat_enabled: &AtomicBool,
     shared_quantities: &Arc<Mutex<HashMap<String, i64>>>,
     shared_mods: &Arc<Mutex<HashMap<String, memory_scanner::ModCount>>>,
     shared_unique: &Arc<Mutex<HashMap<String, i64>>>,
@@ -569,21 +538,7 @@ fn process_blob(
         monitor::apply_blob_to_state(blob, &mut inv_state, path_aliases, stackable_paths);
     }
 
-    // Debug: write paths with no WFCD entry or Misc fallback to the Unmatched Paths folder.
-    if debug_cat_enabled.load(Ordering::Relaxed) {
-        catalogue::write_debug_unmatched_paths(
-            blob,
-            catalogue::UnmatchedPathMaps {
-                path_to_name,
-                path_to_item_type,
-                path_to_product_category,
-                path_to_wfcd_cat,
-                path_to_category,
-            },
-            ignored_paths,
-            unmatched_paths_dir,
-        );
-    }
+    catalogue::log_unmatched_paths(blob, path_to_name, path_to_category, ignored_paths);
 
     // Sync shared state
     if let Ok(mut q) = shared_quantities.lock() {

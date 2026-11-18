@@ -312,164 +312,6 @@ pub fn find_warframe_pid_pub() -> Option<u32> {
     Platform::find_warframe_pid()
 }
 
-// ─── Raw memory format probe ──────────────────────────────────────────────────
-//
-// Scans Warframe's memory and returns raw text context around every occurrence
-// of a set of known strings.  Capped at max_hits total.  Used to reverse-engineer
-// the actual JSON format for inventory items without any parsing assumptions.
-
-#[tracing::instrument(target = "hexdesk::scanner", level = "info", skip_all, fields(max_hits = max_hits))]
-pub fn dump_inventory_regions(max_hits: usize) -> Vec<String> {
-    use crate::platform::{Platform, ProcessAccess};
-
-    // Patterns to search for — ordered by diagnostic value.
-    // "MiscItems":[{ marks the beginning of the actual inventory JSON array from DE's API
-    // response (the most useful single needle for finding the real JSON blob).
-    const NEEDLES: &[&[u8]] = &[
-        b"\"MiscItems\":[{", // inventory JSON array start — best diagnostic
-        b"\"ItemCount\":",
-        b"MiscItems",
-        b"AlloyPlate",
-        b"Circuits\"",
-        b"/Lotus/Types/Items/MiscItems/",
-    ];
-
-    let pid = match find_warframe_pid() {
-        Some(p) => p,
-        None => return vec!["Warframe not running".to_string()],
-    };
-
-    let handle = match Platform::open_process(pid) {
-        Ok(h) => h,
-        Err(e) => return vec![format!("OpenProcess failed: {}", e)],
-    };
-
-    let mut results: Vec<String> = Vec::new();
-    let mut addr: usize = 0x10000;
-    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(30);
-
-    const MAX_REGION: usize = 256 * 1024 * 1024;
-    const CHUNK_SIZE: usize = 64 * 1024 * 1024;
-
-    'outer: while std::time::Instant::now() < deadline && results.len() < max_hits {
-        let regions: Vec<_> = handle.regions_from(addr).collect();
-        if regions.is_empty() {
-            break;
-        }
-
-        for region in &regions {
-            if results.len() >= max_hits {
-                break 'outer;
-            }
-            if std::time::Instant::now() >= deadline {
-                break 'outer;
-            }
-
-            addr = region.base_address + region.region_size;
-            if !region.is_committed || !region.is_readable || region.is_executable {
-                continue;
-            }
-            if region.region_size < 4096 || region.region_size > MAX_REGION {
-                continue;
-            }
-
-            let chunks = if region.region_size > CHUNK_SIZE {
-                region.region_size.div_ceil(CHUNK_SIZE)
-            } else {
-                1
-            };
-
-            'chunk: for chunk_idx in 0..chunks {
-                if results.len() >= max_hits {
-                    break 'outer;
-                }
-                if std::time::Instant::now() >= deadline {
-                    break 'outer;
-                }
-
-                let chunk_offset = chunk_idx * CHUNK_SIZE;
-                let read_size = CHUNK_SIZE.min(region.region_size - chunk_offset);
-                let chunk_addr = region.base_address + chunk_offset;
-
-                let buf = match handle.read(chunk_addr, read_size) {
-                    Some(r) => r,
-                    None => continue 'chunk,
-                };
-                if buf.len() < 8 {
-                    continue 'chunk;
-                }
-                let data = &buf;
-
-                for needle in NEEDLES {
-                    if results.len() >= max_hits {
-                        break 'outer;
-                    }
-                    if let Some(pos) = data.windows(needle.len()).position(|w| w == *needle) {
-                        let ctx_start = pos.saturating_sub(80);
-                        let ctx_end = data.len().min(pos + 200);
-                        let snip: String = data[ctx_start..ctx_end]
-                            .iter()
-                            .map(|&b| {
-                                if (0x20..0x7f).contains(&b) {
-                                    b as char
-                                } else {
-                                    '·'
-                                }
-                            })
-                            .collect();
-                        results.push(format!(
-                            "0x{:012x}  needle=\"{}\"  ctx: {}",
-                            chunk_addr + ctx_start,
-                            String::from_utf8_lossy(needle),
-                            snip
-                        ));
-                        // Also grab up to 2 more occurrences of the same needle in this chunk
-                        let mut search = pos + needle.len();
-                        let mut extra = 0;
-                        while extra < 2 && search + needle.len() <= data.len() {
-                            if let Some(rel) = data[search..]
-                                .windows(needle.len())
-                                .position(|w| w == *needle)
-                            {
-                                let p2 = search + rel;
-                                let s2 = p2.saturating_sub(80);
-                                let e2 = data.len().min(p2 + 200);
-                                let snip2: String = data[s2..e2]
-                                    .iter()
-                                    .map(|&b| {
-                                        if (0x20..0x7f).contains(&b) {
-                                            b as char
-                                        } else {
-                                            '·'
-                                        }
-                                    })
-                                    .collect();
-                                results.push(format!(
-                                    "0x{:012x}  needle=\"{}\"  ctx: {}",
-                                    chunk_addr + s2,
-                                    String::from_utf8_lossy(needle),
-                                    snip2
-                                ));
-                                search = p2 + needle.len();
-                                extra += 1;
-                            } else {
-                                break;
-                            }
-                        }
-                    }
-                }
-            } // end 'chunk loop
-        }
-    }
-
-    if results.is_empty() {
-        results.push("No matches found".to_string());
-    }
-    results
-}
-
-// Scan all Warframe process memory and save every relevant blob found into `blob_dir`.
-// "Relevant" = region ≥ 100 KB that contains at least one of: MiscItems, Suits,
 // ─── Full-account blob parser ─────────────────────────────────────────────────
 
 /// Find the end of the FULL_ACCOUNT blob.
@@ -1245,15 +1087,8 @@ const ANCHORS: &[&[u8]] = &[
 ///      The walk always continues through all of memory — every blob start is found.
 ///   5. Drop any scan that grows past MAX_SCAN_BYTES without finding the end.
 ///
-/// When `save=true` also writes the raw text to `blob_dir` for debugging.
-/// Returns the number of files written (always 0 when `save=false`), or why
-/// no blob was found.
-pub fn capture_all_blobs(
-    blob_dir: &std::path::Path,
-    ts: &str,
-    blob_tx: std::sync::mpsc::Sender<BlobInventory>,
-    save: bool,
-) -> Result<usize, DiagError> {
+/// Returns why no blob was found when none was.
+pub fn capture_all_blobs(blob_tx: std::sync::mpsc::Sender<BlobInventory>) -> Result<(), DiagError> {
     use crate::mem_regions;
     const MIN_REGION: usize = 64_000;
 
@@ -1262,7 +1097,7 @@ pub fn capture_all_blobs(
         Kind::NotFound,
         "Warframe process not found",
     )?;
-    debug!(scanner, pid, save, "Reading Warframe memory");
+    debug!(scanner, pid, "Reading Warframe memory");
     let mut src = mem_regions::open_region_source(
         pid,
         MIN_REGION,
@@ -1288,11 +1123,11 @@ pub fn capture_all_blobs(
     })?;
 
     let cached_addr = LAST_BLOB_REGION.load(std::sync::atomic::Ordering::Relaxed) as usize;
-    if !save && cached_addr != 0 && try_cached_blob(&*src, cached_addr, &blob_tx) {
-        return Ok(0);
+    if cached_addr != 0 && try_cached_blob(&*src, cached_addr, &blob_tx) {
+        return Ok(());
     }
 
-    let report = stitch_blobs(&mut *src, blob_dir, ts, blob_tx, save);
+    let report = stitch_blobs(&mut *src, blob_tx);
     let stats = src.stats();
     debug!(
         scanner,
@@ -1311,7 +1146,6 @@ pub fn capture_all_blobs(
 /// What one walk over Warframe's memory found.
 #[derive(Debug, Default)]
 struct StitchReport {
-    saved: usize,
     regions_read: usize,
     starts_found: usize,
     /// Candidates that parsed into an inventory.
@@ -1324,9 +1158,9 @@ struct StitchReport {
 }
 
 impl StitchReport {
-    fn into_result(self) -> Result<usize, DiagError> {
-        if self.candidates > 0 || self.saved > 0 {
-            return Ok(self.saved);
+    fn into_result(self) -> Result<(), DiagError> {
+        if self.candidates > 0 {
+            return Ok(());
         }
         if self.starts_found == 0 {
             return Err(DiagError::new(
@@ -1450,17 +1284,12 @@ fn try_cached_blob(
 }
 
 /// Walk all memory regions via `src`, stitch blobs, parse and send them.
-/// Returns what the walk found, including the number of blob files saved
-/// (always 0 when `save=false`).
+/// Returns what the walk found.
 fn stitch_blobs(
     src: &mut dyn crate::mem_regions::RegionSource,
-    blob_dir: &std::path::Path,
-    ts: &str,
     blob_tx: std::sync::mpsc::Sender<BlobInventory>,
-    save: bool,
 ) -> StitchReport {
-    const MAX_BLOBS: usize = 25;
-    // Outside save mode: cap on how many distinct candidate seeds (start-marker
+    // Cap on how many distinct candidate seeds (start-marker
     // occurrences) we'll open scans for, and how much further (in bytes read)
     // we'll keep walking after the first candidate resolves, looking for a second,
     // competing one. Bounded so the common case (exactly one blob in memory) still
@@ -1495,26 +1324,19 @@ fn stitch_blobs(
     let mut pre_buf: std::collections::VecDeque<PreChunk> = std::collections::VecDeque::new();
     const PRE_BUF_BYTES: usize = 8 * 1024 * 1024; // keep ≤8 MB of prefix history
 
-    let mut saved = 0usize;
     let mut regions_read = 0usize;
     let mut starts_found = 0usize;
     let mut t_search = std::time::Duration::ZERO;
     let mut bytes_read: u64 = 0;
-    // Once we have at least one successful parse we stop opening new scans.
-    // Active scans already in progress are still stitched to completion (or dropped).
-    // The loop exits as soon as all active scans are gone.
-    let mut found_result = false;
     // Multiple copies of the FULL_ACCOUNT blob can be readable in memory at once
     // (e.g. a buffer from before a re-serialize, not yet reclaimed/overwritten —
     // `blob_seed_offsets`'s `{"` check only catches a copy whose brace was already
     // clobbered, not one that's merely stale but still fully intact). Taking
     // whichever candidate happens to finish stitching first is a race that can pick
     // that stale-but-intact copy over the live one, silently rolling the displayed
-    // inventory back. So outside `save` mode we don't commit to the first candidate:
-    // every scan already in flight is left to resolve (succeed or get dropped for
-    // growing too large) and the most complete one is chosen once none are left.
-    // `save` mode is unaffected — it's a diagnostic dump of every candidate found,
-    // not the live inventory feed, and keeps sending on each completion as before.
+    // inventory back. So we don't commit to the first candidate: every scan
+    // already in flight is left to resolve (succeed or get dropped for growing too
+    // large) and the most complete one is chosen once none are left.
     // `candidate_at_bytes` is set the moment the first candidate resolves and drives
     // the EXTRA_SEED_BUDGET window below (see also MAX_CANDIDATE_SEEDS above).
     let mut candidate_at_bytes: Option<u64> = None;
@@ -1523,13 +1345,9 @@ fn stitch_blobs(
     let mut rejected: Vec<(usize, BlobReject)> = Vec::new();
 
     loop {
-        if saved >= MAX_BLOBS {
-            break;
-        }
         let seed_budget_exhausted =
             candidate_at_bytes.is_some_and(|b| bytes_read.saturating_sub(b) > EXTRA_SEED_BUDGET);
-        let no_more_seeds =
-            found_result || starts_found >= MAX_CANDIDATE_SEEDS || (!save && seed_budget_exhausted);
+        let no_more_seeds = starts_found >= MAX_CANDIDATE_SEEDS || seed_budget_exhausted;
         // Early exit: we won't open any more candidate seeds and none are still in flight.
         if no_more_seeds && scans.is_empty() {
             break;
@@ -1554,9 +1372,7 @@ fn stitch_blobs(
         scans.retain_mut(|scan| {
             // Every scan already in flight is left to run to its own completion (or
             // get dropped below for growing too large) regardless of whether another
-            // scan already completed — in save mode that's always been true (each
-            // completion is its own diagnostic dump); outside save mode it's now true
-            // too, so the decision between multiple valid candidates (see
+            // scan already completed, so the decision between multiple valid candidates (see
             // `completed` above) is made once, after every in-flight scan has
             // resolved, not by which one merely finishes stitching first.
             // Advance the search cursor before appending so the overlap catches split markers.
@@ -1590,29 +1406,10 @@ fn stitch_blobs(
                             mods = inv.mods.len(),
                             "Candidate read"
                         );
-                        if save {
-                            LAST_BLOB_REGION
-                                .store(scan.seed_addr as u64, std::sync::atomic::Ordering::Relaxed);
-                            let name = format!(
-                                "Actual_inventory_FULL_ACCOUNT_v{}_{}_{:02}.txt",
-                                env!("CARGO_PKG_VERSION"),
-                                ts,
-                                saved + 1
-                            );
-                            let path = blob_dir.join(&name);
-                            if let Some(json) = extract_blob_json(&scan.data) {
-                                if std::fs::write(&path, &json).is_ok() {
-                                    saved += 1;
-                                }
-                            }
-                            blob_tx.send(inv).ok();
-                            found_result = true;
-                        } else {
-                            if candidate_at_bytes.is_none() {
-                                candidate_at_bytes = Some(bytes_read);
-                            }
-                            completed.push((scan.seed_addr, inv));
+                        if candidate_at_bytes.is_none() {
+                            candidate_at_bytes = Some(bytes_read);
                         }
+                        completed.push((scan.seed_addr, inv));
                     }
                     Err(reason) => {
                         debug!(
@@ -1632,7 +1429,7 @@ fn stitch_blobs(
         });
 
         // ── Step 2: check if this chunk opens a new scan ──
-        // Reuses `no_more_seeds` computed at the top of the loop (found_result, the
+        // Reuses `no_more_seeds` computed at the top of the loop (the
         // seed cap, or the post-first-candidate search budget). Deliberately *not*
         // gated on merely having one candidate already — a single realized candidate
         // must not stop us from also opening the one true live copy if it happens to
@@ -1743,28 +1540,10 @@ fn stitch_blobs(
                             stackable = inv.stackable_items.len(),
                             "Candidate read"
                         );
-                        if save {
-                            LAST_BLOB_REGION
-                                .store(seed_addr as u64, std::sync::atomic::Ordering::Relaxed);
-                            let name = format!(
-                                "Actual_inventory_FULL_ACCOUNT_v{}_{}_{:02}.txt",
-                                env!("CARGO_PKG_VERSION"),
-                                ts,
-                                saved + 1
-                            );
-                            if let Some(json) = extract_blob_json(&seed) {
-                                if std::fs::write(blob_dir.join(&name), &json).is_ok() {
-                                    saved += 1;
-                                }
-                            }
-                            blob_tx.send(inv).ok();
-                            found_result = true;
-                        } else {
-                            if candidate_at_bytes.is_none() {
-                                candidate_at_bytes = Some(bytes_read);
-                            }
-                            completed.push((seed_addr, inv));
+                        if candidate_at_bytes.is_none() {
+                            candidate_at_bytes = Some(bytes_read);
                         }
+                        completed.push((seed_addr, inv));
                     }
                     Err(reason) => {
                         debug!(
@@ -1819,7 +1598,6 @@ fn stitch_blobs(
         "Marker search time"
     );
     StitchReport {
-        saved,
         regions_read,
         starts_found,
         candidates,
@@ -1827,105 +1605,6 @@ fn stitch_blobs(
         rejected,
         bytes_read,
     }
-}
-
-// ─── Continuous raw memory string dump ───────────────────────────────────────
-//
-// Scans every committed readable region in the Warframe process and extracts
-// every run of 12+ consecutive printable ASCII bytes.  Each string is written
-// to `out_file` as: `0xADDR  <string>\n`.  No needle filtering — everything.
-//
-// Designed to be called repeatedly from a loop: one call = one full pass.
-// Returns the number of strings written this pass, or an error string.
-//
-// Large regions (>64 MB) are read in 64 MB chunks so the heap stays bounded.
-// The caller is responsible for not holding the file lock across sleeps.
-
-pub fn raw_scan_pass(out: &mut impl std::io::Write) -> Result<usize, String> {
-    use crate::platform::{Platform, ProcessAccess};
-
-    const MIN_LEN: usize = 8;
-    const CHUNK: usize = 64 * 1024 * 1024;
-    const TIMEOUT: u64 = 600; // 10 minutes — full coverage over full scan
-
-    let pid = find_warframe_pid().ok_or("Warframe not running")?;
-    let handle = Platform::open_process(pid).map_err(|e| format!("OpenProcess failed: {}", e))?;
-
-    let mut addr: usize = 0x10000;
-    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(TIMEOUT);
-    let mut count = 0usize;
-
-    while std::time::Instant::now() < deadline {
-        let regions: Vec<_> = handle.regions_from(addr).collect();
-        if regions.is_empty() {
-            break;
-        }
-
-        for region in &regions {
-            if std::time::Instant::now() >= deadline {
-                break;
-            }
-
-            addr = region.base_address + region.region_size;
-            if !region.is_committed || !region.is_readable {
-                continue;
-            }
-
-            let chunks = region.region_size.div_ceil(CHUNK);
-            for ci in 0..chunks {
-                if std::time::Instant::now() >= deadline {
-                    break;
-                }
-                let off = ci * CHUNK;
-                let read_size = CHUNK.min(region.region_size - off);
-                let chunk_base = region.base_address + off;
-
-                let buf = match handle.read(chunk_base, read_size) {
-                    Some(r) => r,
-                    None => continue,
-                };
-                if buf.len() < MIN_LEN {
-                    continue;
-                }
-
-                // Extract printable ASCII runs of MIN_LEN+
-                let data = &buf;
-                let mut run_start: Option<usize> = None;
-                for (i, &b) in data.iter().enumerate() {
-                    let printable = (0x20..0x7f).contains(&b);
-                    if printable {
-                        if run_start.is_none() {
-                            run_start = Some(i);
-                        }
-                    } else {
-                        if let Some(s) = run_start.take() {
-                            let len = i - s;
-                            if len >= MIN_LEN {
-                                let s_str = std::str::from_utf8(&data[s..i]).unwrap_or("?");
-                                let _ = writeln!(out, "0x{:012x}  {}", chunk_base + s, s_str);
-                                count += 1;
-                            }
-                        }
-                    }
-                }
-                // flush any run that reaches end of chunk
-                if let Some(s) = run_start {
-                    let len = data.len() - s;
-                    if len >= MIN_LEN {
-                        let s_str = std::str::from_utf8(&data[s..]).unwrap_or("?");
-                        let _ = writeln!(out, "0x{:012x}  {}", chunk_base + s, s_str);
-                        count += 1;
-                    }
-                }
-            }
-        }
-    }
-
-    Ok(count)
-}
-
-fn find_warframe_pid() -> Option<u32> {
-    <crate::platform::Platform as crate::platform::ProcessAccess>::find_warframe_pid()
 }
 
 #[cfg(test)]
@@ -2171,8 +1850,7 @@ mod stitch_engine_tests {
     fn run(regions: Vec<(usize, Vec<u8>)>) -> Option<BlobInventory> {
         let mut src = RecordedRegions::new(regions);
         let (tx, rx) = std::sync::mpsc::channel();
-        let dir = std::env::temp_dir();
-        stitch_blobs(&mut src, &dir, "test", tx, false);
+        stitch_blobs(&mut src, tx);
         rx.try_recv().ok()
     }
 
@@ -2376,7 +2054,7 @@ mod failure_reason_tests {
     fn walk(regions: Vec<(usize, Vec<u8>)>) -> StitchReport {
         let mut src = RecordedRegions::new(regions);
         let (tx, _rx) = std::sync::mpsc::channel();
-        stitch_blobs(&mut src, &std::env::temp_dir(), "test", tx, false)
+        stitch_blobs(&mut src, tx)
     }
 
     #[test]

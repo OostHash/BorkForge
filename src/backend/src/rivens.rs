@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use tauri::State;
 
 use crate::app_state::AppState;
-use crate::{append_to_file, ocr};
+use crate::ocr;
 
 // ─── Riven database ───────────────────────────────────────────────────────────
 
@@ -621,18 +621,6 @@ fn parse_original_stats(text: Option<&str>) -> Vec<serde_json::Value> {
 pub(crate) async fn ocr_riven_screen() -> Result<serde_json::Value, DiagError> {
     let started = std::time::Instant::now();
     info!(overlay, "Riven OCR started");
-    let riven_log = std::env::temp_dir().join("hexdesk_riven_session.txt");
-    let ts1 = chrono::Local::now().format("%H:%M:%S%.3f").to_string();
-
-    let _ = append_to_file(
-        &riven_log,
-        &format!(
-            "[STEP 2] OCR STARTED — {}\n\
-         ├─ Capture region : y 0%–75% (header + card + FITS IN panel)\n\
-         └─ Validating: expects \"INVENTORY/MODS\" at top + \"FITS IN\" on right\n",
-            ts1
-        ),
-    );
 
     // Capture y 0–0.75: includes the "INVENTORY / MODS" header at the top and the
     // "FITS IN" weapon panel on the right. We retry until both markers are visible —
@@ -650,13 +638,11 @@ pub(crate) async fn ocr_riven_screen() -> Result<serde_json::Value, DiagError> {
             tokio::time::sleep(std::time::Duration::from_millis(RETRY_MS)).await;
         }
 
-        let riven_log2 = riven_log.clone();
         // One PrintWindow capture; two OCR passes from the same pixels:
         //   • Full width (0–100%) for validation markers ("INVENTORY/MODS" + "FITS IN")
         //   • Card column only (20–65%) for stat parsing — excludes the right panel whose
         //     "FITS IN" / weapon label text can interfere with reading the card's bottom stats.
         let attempt_result = tokio::task::spawn_blocking(move || {
-            let ts = chrono::Local::now().format("%H:%M:%S%.3f").to_string();
             let px = ocr::capture_warframe_pixels().map_err(|e| {
                 DiagError::new(
                     Source::Overlay,
@@ -668,37 +654,29 @@ pub(crate) async fn ocr_riven_screen() -> Result<serde_json::Value, DiagError> {
                 .log()
             })?;
             let (pixels, w, h) = px;
-            let full_text = ocr::ocr_pixels_rect(&pixels, w, h, 0.0, 1.0, 0.0, 0.82)
-                .unwrap_or_default();
-            let card_text = ocr::ocr_pixels_rect(&pixels, w, h, 0.20, 0.65, 0.28, 0.82)
-                .unwrap_or_default();
-            let panel_text = ocr::ocr_pixels_rect_raw(&pixels, w, h, 0.73, 1.0, 0.30, 0.95)
-                .unwrap_or_default();
-            let _ = append_to_file(&riven_log2, &format!(
-                "[STEP 2] OCR attempt {} — {}\n├─ Full text:\n{}\n├─ Panel text:\n{}\n└─ Card text:\n{}\n\n",
-                attempt + 1, ts, full_text, panel_text, card_text
-            ));
+            let full_text =
+                ocr::ocr_pixels_rect(&pixels, w, h, 0.0, 1.0, 0.0, 0.82).unwrap_or_default();
+            let card_text =
+                ocr::ocr_pixels_rect(&pixels, w, h, 0.20, 0.65, 0.28, 0.82).unwrap_or_default();
+            let panel_text =
+                ocr::ocr_pixels_rect_raw(&pixels, w, h, 0.73, 1.0, 0.30, 0.95).unwrap_or_default();
             Ok::<_, DiagError>((full_text, panel_text, card_text))
-        }).await.map_err(|e| {
-            DiagError::new(Source::Overlay, Kind::Internal, "Riven OCR failed: its worker task stopped")
-                .caused_by(&e)
-                .log()
+        })
+        .await
+        .map_err(|e| {
+            DiagError::new(
+                Source::Overlay,
+                Kind::Internal,
+                "Riven OCR failed: its worker task stopped",
+            )
+            .caused_by(&e)
+            .log()
         })??;
 
         let (full_text, panel_text, card_text) = attempt_result;
         let lower = full_text.to_lowercase();
         let has_header = lower.contains("inventory") || lower.contains("mods");
         let has_fits_in = says_fits_in(&lower) || says_fits_in(&panel_text.to_lowercase());
-
-        let _ = append_to_file(
-            &riven_log,
-            &format!(
-                "[STEP 2] attempt {} — header={} fits_in={}\n",
-                attempt + 1,
-                has_header,
-                has_fits_in
-            ),
-        );
 
         // Count stat lines in card_text — 5+ means comparison mode (two cards visible).
         // In comparison mode the "FITS IN" panel shifts and may not OCR correctly.
@@ -725,15 +703,7 @@ pub(crate) async fn ocr_riven_screen() -> Result<serde_json::Value, DiagError> {
             full_text_for_fallback = full_text;
             panel_for_weapon = panel_text;
             confirmed = true;
-            if comparison_likely && !has_fits_in {
-                let _ = append_to_file(
-                    &riven_log,
-                    &format!(
-                        "[STEP 2] Comparison mode early-confirm ({} stat lines, no FITS IN)\n",
-                        stat_count
-                    ),
-                );
-            }
+            if comparison_likely && !has_fits_in {}
             break;
         }
         text = card_text;
@@ -747,7 +717,6 @@ pub(crate) async fn ocr_riven_screen() -> Result<serde_json::Value, DiagError> {
             attempts = MAX_ATTEMPTS,
             "Riven screen markers not seen in any attempt, using the last read"
         );
-        let _ = append_to_file(&riven_log, "[STEP 2] Screen markers not confirmed after all attempts — proceeding with last OCR result anyway\n\n");
     }
 
     // Detect comparison mode: >4 stat lines means two cards are visible (3–4 stats each).
@@ -761,17 +730,12 @@ pub(crate) async fn ocr_riven_screen() -> Result<serde_json::Value, DiagError> {
         .count();
     let is_comparison = stat_line_count > 4;
 
-    if is_comparison {
-        let _ = append_to_file(&riven_log, &format!(
-            "[STEP 2] COMPARISON MODE detected ({} stat lines) — capturing card columns separately\n", stat_line_count
-        ));
-    }
+    if is_comparison {}
 
     // In comparison mode: one PrintWindow capture, OCR left and right card columns.
     // Original card is ALWAYS on the left; new roll is always on the right.
     // Card area x 20–65% is split roughly in half: left=20–42%, right=42–65%.
     let (left_text, right_text) = if is_comparison {
-        let riven_log3 = riven_log.clone();
         let cols = tokio::task::spawn_blocking(move || {
             match ocr::capture_warframe_pixels() {
                 Ok((px, w, h)) => {
@@ -780,13 +744,6 @@ pub(crate) async fn ocr_riven_screen() -> Result<serde_json::Value, DiagError> {
                         ocr::ocr_pixels_rect(&px, w, h, 0.18, 0.44, 0.25, 0.84).unwrap_or_default();
                     let right =
                         ocr::ocr_pixels_rect(&px, w, h, 0.44, 0.68, 0.25, 0.84).unwrap_or_default();
-                    let _ = append_to_file(
-                        &riven_log3,
-                        &format!(
-                            "[STEP 2] Original (left):\n{}\n\nNew roll (right):\n{}\n\n",
-                            left, right
-                        ),
-                    );
                     (left, right)
                 }
                 Err(e) => {
@@ -797,10 +754,6 @@ pub(crate) async fn ocr_riven_screen() -> Result<serde_json::Value, DiagError> {
                     )
                     .caused_by_text(&e)
                     .log();
-                    let _ = append_to_file(
-                        &riven_log3,
-                        &format!("[STEP 2] Column capture failed: {}\n", e),
-                    );
                     (String::new(), String::new())
                 }
             }
@@ -827,10 +780,6 @@ pub(crate) async fn ocr_riven_screen() -> Result<serde_json::Value, DiagError> {
         &right_text
     } else if !card_has_stats && !full_text_for_fallback.is_empty() {
         // Card column empty — fall back to the full-width validated text
-        let _ = append_to_file(
-            &riven_log,
-            "[STEP 2] Card column had no stats — using full-width text as fallback\n",
-        );
         &full_text_for_fallback
     } else {
         &text
@@ -1013,18 +962,6 @@ pub(crate) async fn ocr_riven_screen() -> Result<serde_json::Value, DiagError> {
         }
     }
 
-    let ts3 = chrono::Local::now().format("%H:%M:%S%.3f").to_string();
-    let _ = append_to_file(
-        &riven_log,
-        &format!(
-            "[STEP 3] PARSE RESULT — {}\n\
-         ├─ Weapon    : \"{}\"\n\
-         ├─ Positives : {:?}\n\
-         └─ Negatives : {:?}\n\n",
-            ts3, weapon, positives, negatives
-        ),
-    );
-
     info!(
         overlay,
         weapon = %weapon,
@@ -1046,19 +983,10 @@ pub(crate) async fn ocr_riven_screen() -> Result<serde_json::Value, DiagError> {
     }))
 }
 
-/// Write an error into the riven session log (called from TypeScript when OCR command fails).
+/// Logs a riven OCR failure as the overlay window saw it.
 #[tauri::command]
 pub(crate) fn ocr_riven_log_error(error: String) {
     debug!(overlay, error = %error, "Riven OCR failure reported by the overlay window");
-    let path = std::env::temp_dir().join("hexdesk_riven_session.txt");
-    let ts = chrono::Local::now().format("%H:%M:%S%.3f").to_string();
-    let _ = append_to_file(
-        &path,
-        &format!(
-            "[STEP 2] OCR COMMAND FAILED — {}\n└─ Error: {}\n\n",
-            ts, error
-        ),
-    );
 }
 
 // ── Saved rivens commands ─────────────────────────────────────────────────────

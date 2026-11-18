@@ -322,17 +322,6 @@ pub fn get_system_locale() -> String {
     }
 }
 
-pub fn initialize_com() {
-    unsafe {
-        windows_sys::Win32::System::Com::CoInitializeEx(
-            std::ptr::null(),
-            windows_sys::Win32::System::Com::COINIT_MULTITHREADED
-                .try_into()
-                .unwrap(),
-        );
-    }
-}
-
 // ─── Window Management ────────────────────────────────────────────────────────
 
 pub fn get_warframe_window_rect() -> Result<[i32; 4], String> {

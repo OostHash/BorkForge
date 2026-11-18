@@ -9,7 +9,7 @@ import {
   setBlobStatus,
   setScanner,
 } from "../api/app";
-import { installWfmConsoleHelpers, syncLoggers } from "../api/debug";
+import { installWfmConsoleHelpers } from "../api/debug";
 import { isTauri } from "../api/env";
 import { onEvent } from "../api/events";
 import { invoke } from "../api/invoke";
@@ -48,16 +48,6 @@ export function AppLifecycle() {
       console.error("memory scanner: switching failed", error);
     });
   }, [queryClient, scannerEnabled, settingsLoaded]);
-
-  // ── Debug loggers follow the settings (vault debugging.md) ────────────────
-  const blobLog = settings?.blobLogEnabled === true;
-  const apiLog = settings?.apiLogEnabled === true;
-  useEffect(() => {
-    if (!settingsLoaded || !isTauri()) return;
-    syncLoggers(blobLog, apiLog).catch((error: unknown) => {
-      console.error("debug loggers: syncing failed", error);
-    });
-  }, [settingsLoaded, blobLog, apiLog]);
 
   // ── Once at start ─────────────────────────────────────────────────────────
   const started = useRef(false);

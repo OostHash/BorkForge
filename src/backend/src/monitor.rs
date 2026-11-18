@@ -76,36 +76,55 @@ pub(crate) fn get_monitor_status(state: State<AppState>) -> bool {
     state.monitor_active.load(Ordering::SeqCst)
 }
 
-pub(crate) fn start_legacy_reward_worker(
-    monitor_active: std::sync::Arc<std::sync::atomic::AtomicBool>,
-    debug_path: std::path::PathBuf,
-    last_found_path: std::path::PathBuf,
-) {
-    std::thread::spawn(move || {
-        // Initialize COM (required for Windows OCR / WinRT APIs).
-        // std::thread::spawn creates a raw OS thread with no COM apartment;
-        // WinRT calls silently fail without this, returning empty strings.
-        <crate::platform::Platform as crate::platform::ComInit>::initialize_com();
+/// Forgets the inventory: the change history, the in-memory state and the
+/// cache files, so nothing reloads on the next start.
+#[tauri::command]
+pub(crate) fn clear_cache(state: State<AppState>) -> Result<(), String> {
+    // Clear change log from DB
+    let conn = state.conn.lock().map_err(|e| e.to_string())?;
+    conn.execute("DELETE FROM quantity_changes", [])
+        .map_err(|e| e.to_string())?;
+    drop(conn);
 
-        while monitor_active.load(Ordering::SeqCst) {
-            let _relic_screen = false;
-            let mut debug = String::new();
-            let ts = chrono::Local::now().format("%H:%M:%S%.3f");
-            debug.push_str(&format!("=== {} ===\n", ts));
+    // Reset all in-memory inventory state
+    state
+        .current_quantities
+        .lock()
+        .map_err(|e| e.to_string())?
+        .clear();
+    state
+        .unique_quantities
+        .lock()
+        .map_err(|e| e.to_string())?
+        .clear();
+    state
+        .current_mods
+        .lock()
+        .map_err(|e| e.to_string())?
+        .clear();
+    state
+        .api_quantities_cache
+        .lock()
+        .map_err(|e| e.to_string())?
+        .clear();
+    state
+        .api_mod_copies_cache
+        .lock()
+        .map_err(|e| e.to_string())?
+        .clear();
 
-            // OCR is now triggered by the EE.log watcher (AlecaFrame-style),
-            // not by this polling loop. This loop only handles inventory scanning.
-            let rewards: Option<serde_json::Value> = None;
+    // Delete cache and hint files so nothing reloads on next start
+    let _ = std::fs::remove_file(&state.quantities_cache_path);
+    let _ = std::fs::remove_file(&state.inventory_state_cache_path);
+    let _ = std::fs::remove_file(
+        state
+            .inventory_state_cache_path
+            .with_file_name("section_baseline.json"),
+    );
+    let _ = std::fs::remove_file(state.log_path.with_file_name("inventory_hints.json"));
+    let _ = std::fs::remove_file(state.log_path.with_file_name("mod_hints.json"));
 
-            let _ = std::fs::write(&debug_path, &debug);
-            if rewards.is_some() {
-                let _ = std::fs::write(&last_found_path, &debug);
-            }
-
-            // Overlay is controlled entirely by the EE.log watcher — do NOT emit here.
-            std::thread::sleep(std::time::Duration::from_millis(500));
-        }
-    });
+    Ok(())
 }
 
 // ── Monitor catalog ───────────────────────────────────────────────────────────
@@ -117,9 +136,6 @@ pub(crate) struct MonitorCatalog {
     pub path_to_tradable: HashMap<String, bool>,
     pub path_to_masterable: HashMap<String, bool>,
     pub path_to_category: HashMap<String, String>,
-    pub path_to_item_type: HashMap<String, String>,
-    pub path_to_product_category: HashMap<String, String>,
-    pub path_to_wfcd_cat: HashMap<String, String>,
     pub alias_excluded: std::collections::HashSet<String>,
     pub ignored_paths: std::collections::HashSet<String>,
     pub stackable_paths: std::collections::HashSet<String>,
@@ -190,18 +206,6 @@ pub(crate) fn build_monitor_catalog(
         .iter()
         .filter_map(|i| i.masterable.map(|m| (i.unique_name.clone(), m)))
         .collect();
-    let path_to_item_type: HashMap<String, String> = wfcd_items
-        .iter()
-        .map(|i| (i.unique_name.clone(), i.item_type.clone()))
-        .collect();
-    let path_to_product_category: HashMap<String, String> = wfcd_items
-        .iter()
-        .map(|i| (i.unique_name.clone(), i.product_category.clone()))
-        .collect();
-    let path_to_wfcd_cat: HashMap<String, String> = wfcd_items
-        .iter()
-        .map(|i| (i.unique_name.clone(), i.category.clone()))
-        .collect();
     let mut path_to_category: HashMap<String, String> = wfcd_items
         .iter()
         .map(|i| {
@@ -265,9 +269,6 @@ pub(crate) fn build_monitor_catalog(
         path_to_tradable,
         path_to_masterable,
         path_to_category,
-        path_to_item_type,
-        path_to_product_category,
-        path_to_wfcd_cat,
         alias_excluded,
         ignored_paths,
         stackable_paths,

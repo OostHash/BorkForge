@@ -101,13 +101,6 @@ pub trait LocaleProvider {
     fn get_system_locale() -> String;
 }
 
-// ─── COM Initialization ──────────────────────────────────────────────────────
-
-/// Initialize COM (Component Object Model) for the current thread.
-pub trait ComInit {
-    fn initialize_com();
-}
-
 // ─── Window Management ────────────────────────────────────────────────────────
 
 /// Interact with OS windows.
@@ -156,13 +149,6 @@ impl LocaleProvider for Platform {
 }
 
 #[cfg(target_os = "windows")]
-impl ComInit for Platform {
-    fn initialize_com() {
-        windows::initialize_com();
-    }
-}
-
-#[cfg(target_os = "windows")]
 impl WindowManager for Platform {
     fn get_warframe_window_rect() -> Result<[i32; 4], String> {
         windows::get_warframe_window_rect()
@@ -205,11 +191,6 @@ impl LocaleProvider for Platform {
     fn get_system_locale() -> String {
         linux::get_system_locale()
     }
-}
-
-#[cfg(target_os = "linux")]
-impl ComInit for Platform {
-    fn initialize_com() {}
 }
 
 #[cfg(target_os = "linux")]
