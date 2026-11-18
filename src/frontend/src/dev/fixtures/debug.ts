@@ -6,6 +6,11 @@ import type { Fixture } from "./scenario";
 const SIZES: Record<SizedFolder, number> = { blobs: 2_516_582, api_logs: 0, probe: 18_432, raw_scan: 0, unmatched_paths: 3_210 };
 
 export const debugFixtures = {
+  export_diagnostics: {
+    alwaysDefault: true,
+    default: () => "C:/Users/Tenno/Downloads/hexdesk-diagnostics-2026-11-18-150312.zip",
+  } satisfies Fixture<string>,
+  show_diagnostics_export: noResult<{ path: string }>(),
   open_debug_folder: noResult<{ which: DebugFolder }>(),
   get_debug_data_size: { default: ({ which }) => SIZES[which], empty: () => 0 } satisfies Fixture<number, { which: SizedFolder }>,
   clear_debug_data: noResult<{ which: SizedFolder }>(),

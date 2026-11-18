@@ -476,6 +476,7 @@ pub(crate) fn parse_logged_in_name(
         if name.len() < 3 || !remainder.is_empty() {
             continue;
         }
+        hexdesk_diag::redact::register_secret(&name);
         if let Ok(mut g) = squad_names.lock() {
             if !g.iter().any(|n: &String| n == &name) {
                 g.push(name.clone());
@@ -535,6 +536,7 @@ pub(crate) fn seed_ee_log_names(
                         None
                     };
                 if let Some(name) = name {
+                    hexdesk_diag::redact::register_secret(name);
                     if let Ok(mut names) = squad_names.lock() {
                         if !names.iter().any(|existing| existing == name) {
                             names.push(name.to_string());
@@ -569,6 +571,7 @@ pub(crate) fn collect_ee_log_names(
             None
         };
         if let Some(name) = name {
+            hexdesk_diag::redact::register_secret(name);
             if let Ok(mut names) = squad_names.lock() {
                 if !names.iter().any(|existing| existing == name) {
                     names.push(name.to_string());

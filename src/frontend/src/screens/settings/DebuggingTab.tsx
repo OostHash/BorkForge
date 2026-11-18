@@ -1,7 +1,16 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { Copy, Eye, FlaskConical, FolderOpen, Palette } from "lucide-react";
 import { useId, useState, type ReactNode } from "react";
-import { clearDebugFolder, openDebugFolder, reloadSizes, useDebugSizes, useRunning, useSetRunning } from "../../api/debug";
+import {
+  clearDebugFolder,
+  exportDiagnostics,
+  openDebugFolder,
+  reloadSizes,
+  showDiagnosticsExport,
+  useDebugSizes,
+  useRunning,
+  useSetRunning,
+} from "../../api/debug";
 import { invoke } from "../../api/invoke";
 import { alreadyRunning, clearLabel, probeSummary, rawScanActive, TEST_ERAS, type DebugFolder, type SizedFolder } from "../../domain/debug";
 import { Button } from "../../primitives/actions";
@@ -112,6 +121,38 @@ function OverlayLogRow() {
   );
 }
 
+/** One zip for a bug report; the path stays visible so it can be shown in Explorer. */
+function ExportRow() {
+  const action = useAction();
+  const [path, setPath] = useState<string | null>(null);
+  return (
+    <DebugRow
+      title="Diagnostics export"
+      description="One zip with logs, system facts and settings to attach to a bug report. Passwords, tokens, e-mail addresses and player names are removed."
+      result={action.result}
+    >
+      {path !== null && (
+        <Button size="sm" leadingIcon={FolderOpen} onClick={() => void showDiagnosticsExport(path).catch(() => undefined)}>
+          Show in folder
+        </Button>
+      )}
+      <Button
+        size="sm"
+        loading={action.busy}
+        onClick={() => {
+          action.run(async () => {
+            const saved = await exportDiagnostics();
+            setPath(saved);
+            return { tone: "success", text: `Saved to ${saved}` };
+          }, "Export failed");
+        }}
+      >
+        {action.busy ? "Exporting…" : "Export"}
+      </Button>
+    </DebugRow>
+  );
+}
+
 function DiagnosticsGroup() {
   const queryClient = useQueryClient();
   const { settings, set } = useSettingsFile();
@@ -124,6 +165,7 @@ function DiagnosticsGroup() {
   const memRelic = useAction();
   return (
     <SettingsGroup title="Diagnostics">
+      <ExportRow />
       <OverlayLogRow />
       <DebugRow
         title="Relic captures"

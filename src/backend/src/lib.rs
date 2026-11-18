@@ -27,6 +27,7 @@ mod companion_api;
 mod console_login; // [console-login feature] remove this line to drop the feature
 mod credentials;
 mod db;
+mod diag_export;
 mod diagnostics;
 mod events;
 mod image_cache;
@@ -756,6 +757,8 @@ pub fn run() {
             image_cache::get_img_cache_dir,
             image_cache::prewarm_image_cache,
             diagnostics::open_debug_folder,
+            diag_export::export_diagnostics,
+            diag_export::show_diagnostics_export,
             diagnostics::clear_debug_data,
             diagnostics::get_debug_data_size,
             start_monitor,

@@ -27,6 +27,12 @@ export const reloadSizes = (queryClient: QueryClient) => queryClient.invalidateQ
 
 export const openDebugFolder = (which: DebugFolder) => invoke("open_debug_folder", { which });
 
+/** Writes the diagnostics zip and returns where it was saved. */
+export const exportDiagnostics = () => invoke("export_diagnostics");
+
+/** Opens Explorer with the exported zip selected. */
+export const showDiagnosticsExport = (path: string) => invoke("show_diagnostics_export", { path });
+
 export async function clearDebugFolder(queryClient: QueryClient, which: SizedFolder | "diag"): Promise<void> {
   if (which === "diag") await invoke("clear_diag_folder");
   else await invoke("clear_debug_data", { which });

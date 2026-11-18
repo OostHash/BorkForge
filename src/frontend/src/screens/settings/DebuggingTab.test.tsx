@@ -50,6 +50,8 @@ function setup(settings: Record<string, unknown> = {}, overrides: Record<string,
         return "a\nb\nc\n";
       case "capture_diagnostics":
         return "C:/Debug/Manual-Capture/x";
+      case "export_diagnostics":
+        return "C:/Users/Tenno/Downloads/hexdesk-diagnostics-2026-11-18-150312.zip";
       case "debug_ee_log_tail":
         return "12.3 Sys [Info]: ProjectionRewardChoice";
       case "test_relic_pick_overlay":
@@ -156,6 +158,27 @@ it("shows results under the row instead of alerts", async () => {
   await expect.element(row("Test overlay").getByText("Emitted relic-pick-open: era=NEO, 3 relics in inventory")).toBeVisible();
   await row("EE.log tail").getByRole("button", { name: "Read log" }).click();
   await expect.element(page.getByRole("textbox", { name: "EE.log tail" })).toHaveValue("12.3 Sys [Info]: ProjectionRewardChoice");
+});
+
+it("exports diagnostics and then offers to show the zip in its folder", async () => {
+  const { client, find } = setup();
+  await mount(client);
+  const exportRow = row("Diagnostics export");
+  await expect.element(exportRow.getByRole("button", { name: "Show in folder" })).not.toBeInTheDocument();
+  await exportRow.getByRole("button", { name: "Export" }).click();
+  const saved = "C:/Users/Tenno/Downloads/hexdesk-diagnostics-2026-11-18-150312.zip";
+  await expect.element(exportRow.getByRole("status")).toHaveTextContent(`Saved to ${saved}`);
+  await exportRow.getByRole("button", { name: "Show in folder" }).click();
+  await vi.waitFor(() => {
+    expect(find("show_diagnostics_export").map((c) => c.args)).toEqual([{ path: saved }]);
+  });
+});
+
+it("shows why an export failed", async () => {
+  const { client } = setup({}, { export_diagnostics: () => Promise.reject(new Error("the zip file could not be created")) });
+  await mount(client);
+  await row("Diagnostics export").getByRole("button", { name: "Export" }).click();
+  await expect.element(row("Diagnostics export").getByRole("status")).toHaveTextContent("Export failed: the zip file could not be created");
 });
 
 it("saves the relic capture switch, off by default", async () => {

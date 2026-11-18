@@ -851,3 +851,27 @@ pub fn run_windows_ocr(bmp: Vec<u8>, img_w: u32, img_h: u32) -> Result<OcrResult
 
     winrt_result
 }
+
+/// Language tags of the Windows OCR language packs that are installed, for
+/// the diagnostics export. Empty when none are installed or WinRT fails.
+pub fn ocr_languages() -> Vec<String> {
+    // Same apartment set-up as `run_windows_ocr`; the return value is safe to
+    // ignore for the same reasons.
+    unsafe {
+        windows_sys::Win32::System::Com::CoInitializeEx(
+            std::ptr::null(),
+            windows_sys::Win32::System::Com::COINIT_MULTITHREADED
+                .try_into()
+                .unwrap_or(0),
+        );
+    }
+    let Ok(langs) = windows::Media::Ocr::OcrEngine::AvailableRecognizerLanguages() else {
+        return Vec::new();
+    };
+    let count = langs.Size().unwrap_or(0);
+    (0..count)
+        .filter_map(|i| langs.GetAt(i).ok())
+        .filter_map(|lang| lang.LanguageTag().ok())
+        .map(|tag| tag.to_string())
+        .collect()
+}

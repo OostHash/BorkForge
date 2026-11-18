@@ -45,6 +45,7 @@
 mod collector;
 mod entry;
 mod error;
+mod export;
 mod layer;
 mod macros;
 pub mod redact;
@@ -53,6 +54,7 @@ mod source;
 pub use collector::{Collector, Config};
 pub use entry::{Entry, Level, Repeat};
 pub use error::{DiagError, OptionExt, ResultExt};
+pub use export::Bundle;
 pub use layer::DiagLayer;
 pub use source::{sources, Kind, Source};
 

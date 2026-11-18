@@ -9,7 +9,8 @@
 //!    `key=value` pairs (for example in URLs).
 //! 3. Values the app knows to be personal at runtime, such as the player name
 //!    or a session token, are registered with [`register_secret`] and removed
-//!    wherever they appear.
+//!    wherever they appear. The user's home folder is registered with
+//!    [`register_replacement`] so paths stay readable as `%USERPROFILE%\...`.
 
 use std::sync::RwLock;
 
@@ -39,7 +40,8 @@ const SENSITIVE_KEYS: &[&str] = &[
 /// strings would mangle unrelated text.
 const MIN_SECRET_LEN: usize = 3;
 
-static SECRETS: RwLock<Vec<String>> = RwLock::new(Vec::new());
+/// `(value, replacement)` pairs, longest value first.
+static SECRETS: RwLock<Vec<(String, String)>> = RwLock::new(Vec::new());
 
 /// Whether a field with this name must never show its value.
 pub fn is_sensitive_key(key: &str) -> bool {
@@ -50,15 +52,21 @@ pub fn is_sensitive_key(key: &str) -> bool {
 /// Registers a value that must be removed from all text from now on, for
 /// example the player name once it is known.
 pub fn register_secret(value: &str) {
+    register_replacement(value, REDACTED);
+}
+
+/// Like [`register_secret`], but replaces `value` with `replacement` instead
+/// of [`REDACTED`], for example the home folder with `%USERPROFILE%`.
+pub fn register_replacement(value: &str, replacement: &str) {
     let value = value.trim();
     if value.chars().count() < MIN_SECRET_LEN {
         return;
     }
     let mut secrets = SECRETS.write().unwrap_or_else(|e| e.into_inner());
-    if !secrets.iter().any(|s| s == value) {
-        secrets.push(value.to_string());
+    if !secrets.iter().any(|(s, _)| s == value) {
+        secrets.push((value.to_string(), replacement.to_string()));
         // Longest first, so a secret that contains another is replaced whole.
-        secrets.sort_by_key(|s| std::cmp::Reverse(s.len()));
+        secrets.sort_by_key(|(s, _)| std::cmp::Reverse(s.len()));
     }
 }
 
@@ -84,9 +92,9 @@ pub fn text(input: &str) -> String {
     let mut out = input.to_string();
     {
         let secrets = SECRETS.read().unwrap_or_else(|e| e.into_inner());
-        for secret in secrets.iter() {
+        for (secret, replacement) in secrets.iter() {
             if out.contains(secret.as_str()) {
-                out = out.replace(secret.as_str(), REDACTED);
+                out = out.replace(secret.as_str(), replacement);
             }
         }
     }
@@ -294,8 +302,12 @@ mod tests {
         assert_eq!(text("pattern a@b"), "pattern a@b");
     }
 
+    /// Registered secrets are global; tests that touch them run one at a time.
+    static SECRETS_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
     #[test]
     fn registered_secrets_are_redacted_everywhere() {
+        let _lock = SECRETS_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         register_secret("TenoPlayer");
         register_secret("xy"); // too short, ignored
         assert_eq!(
@@ -306,6 +318,17 @@ mod tests {
         assert_eq!(
             field("detail", "TenoPlayer opened relic"),
             "[redacted] opened relic"
+        );
+        clear_secrets();
+    }
+
+    #[test]
+    fn the_home_folder_becomes_a_placeholder() {
+        let _lock = SECRETS_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        register_replacement(r"C:\Users\SomeUser", "%USERPROFILE%");
+        assert_eq!(
+            text(r"log_dir=C:\Users\SomeUser\AppData\Local\x"),
+            r"log_dir=%USERPROFILE%\AppData\Local\x"
         );
         clear_secrets();
     }

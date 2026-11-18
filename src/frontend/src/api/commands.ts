@@ -217,6 +217,10 @@ export interface CommandMap {
   /** Appends "[FE] msg" to the overlay session log (Settings → Debugging → Overlay log). */
   log_relic_fe: { args: { msg: string }; result: null };
   // ── Debug and diagnostics (Settings → Debugging, vault debugging.md) ──
+  /** Writes the diagnostics zip (logs, system facts, settings; redacted) and returns its path. */
+  export_diagnostics: { args: undefined; result: string };
+  /** Opens Explorer with an exported diagnostics zip selected. */
+  show_diagnostics_export: { args: { path: string }; result: null };
   open_debug_folder: { args: { which: DebugFolder }; result: null };
   /** Bytes in a debug folder or file. */
   get_debug_data_size: { args: { which: SizedFolder }; result: number };

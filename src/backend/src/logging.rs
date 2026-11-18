@@ -44,6 +44,13 @@ pub fn init() {
     *guard_slot = Some(guard);
     drop(guard_slot);
 
+    // Windows paths carry the account name; show them as %USERPROFILE%.
+    if let Some(home) = dirs::home_dir() {
+        let home = home.to_string_lossy();
+        hexdesk_diag::redact::register_replacement(&home, "%USERPROFILE%");
+        hexdesk_diag::redact::register_replacement(&home.replace('\\', "/"), "%USERPROFILE%");
+    }
+
     let collector = hexdesk_diag::Collector::new(hexdesk_diag::Config::default()).with_sink(writer);
     let diag_layer = hexdesk_diag::install(collector)
         .with_filter(filter("warn,hexdesk=debug,hexdesk_backend=debug"));
