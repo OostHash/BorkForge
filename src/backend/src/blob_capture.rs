@@ -3,8 +3,8 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{Receiver, Sender};
 use std::sync::{Arc, Mutex};
 
+use hexdesk_diag::{debug, info, DiagError, Kind, Level, Source};
 use tauri::{Emitter, Manager};
-use tracing::{debug, error, info, warn};
 
 use crate::app_state::AppState;
 use crate::cache::atomic_write;
@@ -85,7 +85,13 @@ pub(crate) fn spawn_blob_capture_thread(deps: BlobCaptureDeps, catalog: monitor:
         let conn = match rusqlite::Connection::open(&db_path) {
             Ok(c) => c,
             Err(e) => {
-                error!(error = %e, "monitor DB open failed");
+                let _ = DiagError::new(
+                    Source::Scanner,
+                    Kind::Io,
+                    "Inventory scanning stopped: the inventory database could not be opened",
+                )
+                .caused_by(&e)
+                .log_at(Level::Error);
                 return;
             }
         };
@@ -197,7 +203,13 @@ pub(crate) fn spawn_blob_capture_thread(deps: BlobCaptureDeps, catalog: monitor:
             while let Ok(blob) = blob_rx.try_recv() {
                 match section_baseline.evaluate(&blob.sections) {
                     Err(missing) => {
-                        warn!(?missing, "blob rejected: sections present in last good blob are missing - truncated capture");
+                        let _ = DiagError::new(
+                            Source::Scanner,
+                            Kind::Invalid,
+                            "Account blob rejected: sections that the last accepted blob had are missing",
+                        )
+                        .with("missing", missing.join(","))
+                        .log();
                         continue;
                     }
                     Ok(true) => {
@@ -209,7 +221,7 @@ pub(crate) fn spawn_blob_capture_thread(deps: BlobCaptureDeps, catalog: monitor:
                 }
 
                 if blob.content_hash != 0 && Some(blob.content_hash) == last_applied_hash {
-                    debug!("blob unchanged since last apply - skipping");
+                    debug!(scanner, "Account blob unchanged since the last one");
                     continue;
                 }
 
@@ -276,13 +288,20 @@ pub(crate) fn spawn_blob_capture_thread(deps: BlobCaptureDeps, catalog: monitor:
                     }
                 }
                 if current_pid != last_pid {
-                    if current_pid.is_some() {
-                        info!(
-                            ?last_pid,
-                            ?current_pid,
-                            "Warframe PID changed, clearing blob region cache"
-                        );
-                        memory_scanner::reset_last_blob_region();
+                    match current_pid {
+                        Some(pid) => {
+                            info!(
+                                scanner,
+                                pid,
+                                previous_pid = ?last_pid,
+                                hexdesk_elevated = memory_scanner::elevated_text(),
+                                "Warframe process found"
+                            );
+                            memory_scanner::reset_last_blob_region();
+                        }
+                        None => {
+                            info!(scanner, previous_pid = ?last_pid, "Warframe process no longer running");
+                        }
                     }
                     last_pid = current_pid;
                 }
@@ -357,7 +376,6 @@ pub(crate) fn spawn_blob_capture_thread(deps: BlobCaptureDeps, catalog: monitor:
                             detail: "Reading Warframe memory\u{2026}".into(),
                         },
                     );
-                    debug!(save, "blob capture starting");
                     std::thread::spawn(move || {
                         struct ClearOnDrop(Arc<AtomicBool>);
                         impl Drop for ClearOnDrop {
@@ -366,8 +384,16 @@ pub(crate) fn spawn_blob_capture_thread(deps: BlobCaptureDeps, catalog: monitor:
                             }
                         }
                         let _guard = ClearOnDrop(active);
-                        let count = memory_scanner::capture_all_blobs(&dir, &ts, tx, save);
-                        debug!(files_saved = count, save_flag = save, ts = %ts, "blob capture finished");
+                        let _op = hexdesk_diag::op!(scanner, "Inventory scan").entered();
+                        match memory_scanner::capture_all_blobs(&dir, &ts, tx, save) {
+                            Ok(files_saved) if save => {
+                                debug!(scanner, files_saved, "Blob files saved");
+                            }
+                            Ok(_) => {}
+                            Err(e) => {
+                                let _ = e.log();
+                            }
+                        }
                     });
                 }
                 prev_game_running = true;
@@ -516,10 +542,13 @@ fn process_blob(
     // defence against incomplete blobs that slipped through parsing.
     let prev_unique_count = confirmed_unique.len();
     if blob.unique_items.is_empty() && prev_unique_count > 0 {
-        warn!(
-            "blob rejected at commit: 0 unique items vs {} previously — incomplete blob",
-            prev_unique_count
-        );
+        let _ = DiagError::new(
+            Source::Scanner,
+            Kind::Invalid,
+            "Account blob rejected: it has no Warframes or weapons, the previous one had some",
+        )
+        .with("previous_unique", prev_unique_count)
+        .log();
         return false;
     }
 
@@ -633,7 +662,14 @@ fn process_blob(
         blob.mods.len(),
         blob.flavour_items.len()
     );
-    info!(detail = %detail, "blob applied");
+    info!(
+        scanner,
+        unique = blob.unique_items.len(),
+        resources = blob.stackable_items.len(),
+        mods = blob.mods.len(),
+        flavour = blob.flavour_items.len(),
+        "Inventory updated from account blob"
+    );
     let _ = app.emit(
         events::BLOB_STATUS,
         BlobStatusPayload {

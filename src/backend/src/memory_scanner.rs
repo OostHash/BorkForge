@@ -1,6 +1,6 @@
+use hexdesk_diag::{debug, info, warn, DiagError, Kind, OptionExt, Source};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use tracing::{debug, info, warn};
 
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
 pub struct ModCount {
@@ -297,6 +297,16 @@ pub fn scan_steam_id(data: &[u8]) -> Option<String> {
 
 // ─── Public helpers ──────────────────────────────────────────────────────────
 
+/// `true`, `false` or `unknown`: whether HexDesk runs as administrator.
+pub fn elevated_text() -> &'static str {
+    use crate::platform::{Platform, ProcessAccess};
+    match Platform::is_elevated() {
+        Some(true) => "true",
+        Some(false) => "false",
+        None => "unknown",
+    }
+}
+
 pub fn find_warframe_pid_pub() -> Option<u32> {
     use crate::platform::{Platform, ProcessAccess};
     Platform::find_warframe_pid()
@@ -308,7 +318,7 @@ pub fn find_warframe_pid_pub() -> Option<u32> {
 // of a set of known strings.  Capped at max_hits total.  Used to reverse-engineer
 // the actual JSON format for inventory items without any parsing assumptions.
 
-#[tracing::instrument(level = "info", skip_all, fields(max_hits = max_hits))]
+#[tracing::instrument(target = "hexdesk::scanner", level = "info", skip_all, fields(max_hits = max_hits))]
 pub fn dump_inventory_regions(max_hits: usize) -> Vec<String> {
     use crate::platform::{Platform, ProcessAccess};
 
@@ -675,16 +685,50 @@ pub fn extract_blob_json_ref(raw: &[u8]) -> Option<std::borrow::Cow<'_, [u8]>> {
 
 /// `raw` must span from the JSON opening `{` (or from `"SubscribedToEmails"`) through
 /// `"DeathSquadable":`. Returns `None` if neither start can be located or JSON is malformed.
-#[tracing::instrument(level = "debug", skip_all)]
 pub fn parse_full_account_blob(raw: &[u8]) -> Option<BlobInventory> {
-    let end_pos = find_blob_end(raw)?;
+    parse_full_account_blob_checked(raw).ok()
+}
+
+/// Why a candidate blob was not accepted. Logged as the cause when no
+/// candidate in a capture pass could be read.
+#[derive(Debug, Clone, PartialEq)]
+pub enum BlobReject {
+    NoEnd,
+    TooSmall { bytes: usize, min: usize },
+    MissingSection(&'static str),
+    NoJsonStart,
+    Json(String),
+    NoItems,
+}
+
+impl std::fmt::Display for BlobReject {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            BlobReject::NoEnd => f.write_str("no end marker"),
+            BlobReject::TooSmall { bytes, min } => {
+                write!(f, "{bytes} bytes, below the {min}-byte minimum")
+            }
+            BlobReject::MissingSection(s) => write!(f, "required section {s} is missing"),
+            BlobReject::NoJsonStart => f.write_str("no JSON start found"),
+            BlobReject::Json(e) => write!(f, "JSON could not be read: {e}"),
+            BlobReject::NoItems => f.write_str("no Warframes or weapons in the blob"),
+        }
+    }
+}
+
+/// Like [`parse_full_account_blob`], but says why a blob was rejected.
+#[tracing::instrument(target = "hexdesk::scanner", level = "debug", skip_all)]
+pub fn parse_full_account_blob_checked(raw: &[u8]) -> Result<BlobInventory, BlobReject> {
+    let end_pos = find_blob_end(raw).ok_or(BlobReject::NoEnd)?;
 
     // Real FULL_ACCOUNT blobs are several hundred KB — anything smaller is a
     // small false-positive fragment that matched the end marker by coincidence.
     const MIN_PARSE_BYTES: usize = 50_000;
     if end_pos < MIN_PARSE_BYTES {
-        debug!(target: "hexdesk::blob_parse", end_pos, min = MIN_PARSE_BYTES, "too small — skipping");
-        return None;
+        return Err(BlobReject::TooSmall {
+            bytes: end_pos,
+            min: MIN_PARSE_BYTES,
+        });
     }
 
     // Section completeness check: field order varies per account, so the true
@@ -708,32 +752,16 @@ pub fn parse_full_account_blob(raw: &[u8]) -> Option<BlobInventory> {
     let search_range = &raw[..end_pos.min(raw.len())];
     for required in CORE_SECTIONS {
         if memchr::memmem::find(search_range, required).is_none() {
-            debug!(
-                target: "hexdesk::blob_parse",
-                missing = %std::str::from_utf8(required).unwrap_or("?"),
-                "incomplete blob — missing required section, skipping"
-            );
-            return None;
+            let name = std::str::from_utf8(required).unwrap_or("?");
+            return Err(BlobReject::MissingSection(name.trim_end_matches(':')));
         }
     }
 
-    let json_bytes = extract_blob_json(raw)?;
+    let json_bytes = extract_blob_json(raw).ok_or(BlobReject::NoJsonStart)?;
 
-    let json: serde_json::Value = serde_json::from_slice(&json_bytes)
-        .map_err(|e| {
-            let head: String = json_bytes[..json_bytes.len().min(48)]
-                .iter()
-                .map(|&b| {
-                    if (0x20..0x7f).contains(&b) {
-                        b as char
-                    } else {
-                        '.'
-                    }
-                })
-                .collect();
-            debug!(target: "hexdesk::blob_parse", error = %e, head = ?head, "JSON error");
-        })
-        .ok()?;
+    // The serde error names line and column only, never blob content.
+    let json: serde_json::Value =
+        serde_json::from_slice(&json_bytes).map_err(|e| BlobReject::Json(e.to_string()))?;
 
     // Scalars
     let credits = json["RegularCredits"].as_i64().unwrap_or(0);
@@ -1052,8 +1080,7 @@ pub fn parse_full_account_blob(raw: &[u8]) -> Option<BlobInventory> {
     // An empty unique_items means we captured an incomplete blob (game is mid-write,
     // returning from mission, or the blob sections were partially stitched out of order).
     if unique_items.is_empty() {
-        debug!(target: "hexdesk::blob_parse", "blob has no warframes/weapons — incomplete blob, rejecting");
-        return None;
+        return Err(BlobReject::NoItems);
     }
 
     let sections: Vec<String> = json
@@ -1080,7 +1107,7 @@ pub fn parse_full_account_blob(raw: &[u8]) -> Option<BlobInventory> {
         content_hash: 0,
     };
     inv.content_hash = inv.compute_content_hash();
-    Some(inv)
+    Ok(inv)
 }
 
 /// Consecutive rejected blobs after which a missing section is accepted as
@@ -1219,22 +1246,24 @@ const ANCHORS: &[&[u8]] = &[
 ///   5. Drop any scan that grows past MAX_SCAN_BYTES without finding the end.
 ///
 /// When `save=true` also writes the raw text to `blob_dir` for debugging.
-/// Returns the number of files written (always 0 when `save=false`).
-#[tracing::instrument(level = "debug", skip_all, fields(save = save))]
+/// Returns the number of files written (always 0 when `save=false`), or why
+/// no blob was found.
 pub fn capture_all_blobs(
     blob_dir: &std::path::Path,
     ts: &str,
     blob_tx: std::sync::mpsc::Sender<BlobInventory>,
     save: bool,
-) -> usize {
+) -> Result<usize, DiagError> {
     use crate::mem_regions;
     const MIN_REGION: usize = 64_000;
 
-    let pid = match find_warframe_pid_pub() {
-        Some(p) => p,
-        None => return 0,
-    };
-    let mut src = match mem_regions::open_region_source(
+    let pid = find_warframe_pid_pub().or_diag(
+        Source::Scanner,
+        Kind::NotFound,
+        "Warframe process not found",
+    )?;
+    debug!(scanner, pid, save, "Reading Warframe memory");
+    let mut src = mem_regions::open_region_source(
         pid,
         MIN_REGION,
         MAX_READ,
@@ -1246,26 +1275,85 @@ pub fn capture_all_blobs(
             // anchor check). Only anonymous heap/stack memory is useful.
             !r.is_executable && r.backing != crate::platform::RegionBacking::File
         })),
-    ) {
-        Some(s) => s,
-        None => return 0,
-    };
+    )
+    .map_err(|e| {
+        DiagError::new(
+            Source::Scanner,
+            Kind::Denied,
+            "Warframe memory could not be opened",
+        )
+        .with("pid", pid)
+        .with("hexdesk_elevated", elevated_text())
+        .caused_by_text(e)
+    })?;
 
     let cached_addr = LAST_BLOB_REGION.load(std::sync::atomic::Ordering::Relaxed) as usize;
     if !save && cached_addr != 0 && try_cached_blob(&*src, cached_addr, &blob_tx) {
-        return 0;
+        return Ok(0);
     }
 
-    let saved = stitch_blobs(&mut *src, blob_dir, ts, blob_tx, save);
+    let report = stitch_blobs(&mut *src, blob_dir, ts, blob_tx, save);
     let stats = src.stats();
     debug!(
-        target: "hexdesk::blob_capture",
+        scanner,
+        regions_read = report.regions_read,
         regions_skipped = stats.regions_skipped,
-        vquery_ms = stats.enumerate_ms,
-        read_ms = stats.read_ms,
-        "source stats"
+        starts_found = report.starts_found,
+        candidates = report.candidates,
+        bytes_mb = report.bytes_read / 1_000_000,
+        vquery_ms = stats.enumerate_ms as u64,
+        read_ms = stats.read_ms as u64,
+        "Memory walk done"
     );
-    saved
+    report.into_result()
+}
+
+/// What one walk over Warframe's memory found.
+#[derive(Debug, Default)]
+struct StitchReport {
+    saved: usize,
+    regions_read: usize,
+    starts_found: usize,
+    /// Candidates that parsed into an inventory.
+    candidates: usize,
+    /// Candidates dropped for growing past the size limit without an end.
+    too_large: usize,
+    /// Candidates that had an end but were rejected, with the reason.
+    rejected: Vec<(usize, BlobReject)>,
+    bytes_read: u64,
+}
+
+impl StitchReport {
+    fn into_result(self) -> Result<usize, DiagError> {
+        if self.candidates > 0 || self.saved > 0 {
+            return Ok(self.saved);
+        }
+        if self.starts_found == 0 {
+            return Err(DiagError::new(
+                Source::Scanner,
+                Kind::NotFound,
+                "Account blob not found: no start marker in any readable memory region",
+            )
+            .with("regions_read", self.regions_read)
+            .with("bytes_mb", self.bytes_read / 1_000_000));
+        }
+        let unresolved = self
+            .starts_found
+            .saturating_sub(self.too_large + self.rejected.len());
+        let mut err = DiagError::new(
+            Source::Scanner,
+            Kind::Parse,
+            "Account blob not found: no candidate could be read",
+        )
+        .with("candidates", self.starts_found)
+        .with("too_large", self.too_large)
+        .with("rejected", self.rejected.len())
+        .with("no_end", unresolved);
+        for (id, reason) in &self.rejected {
+            err = err.caused_by_text(format!("candidate {id}: {reason}"));
+        }
+        Err(err)
+    }
 }
 
 /// Fast path: re-read the cached address from the last successful scan.
@@ -1281,8 +1369,9 @@ fn try_cached_blob(
         Some(r) if r.is_committed && r.is_readable => {}
         _ => {
             debug!(
+                scanner,
                 addr = format_args!("0x{cached_addr:012x}"),
-                "fast-path miss — region gone or unmapped"
+                "Cached blob address no longer mapped"
             );
             return false;
         }
@@ -1292,16 +1381,18 @@ fn try_cached_blob(
         Some(r) => r,
         None => {
             debug!(
+                scanner,
                 addr = format_args!("0x{cached_addr:012x}"),
-                "fast-path miss — read failed"
+                "Cached blob address could not be read"
             );
             return false;
         }
     };
     if first_bytes.len() < 8 {
         debug!(
+            scanner,
             addr = format_args!("0x{cached_addr:012x}"),
-            "fast-path miss — unreadable"
+            "Cached blob address returned fewer than 8 bytes"
         );
         return false;
     }
@@ -1314,8 +1405,9 @@ fn try_cached_blob(
 
     if is_mission || (!has_anchor && !has_lotus) || !first_bytes.starts_with(b"{\"") {
         debug!(
+            scanner,
             addr = format_args!("0x{cached_addr:012x}"),
-            "fast-path miss — falling through to cold walk"
+            "No blob at the cached address, walking all memory"
         );
         return false;
     }
@@ -1338,10 +1430,11 @@ fn try_cached_blob(
     if memchr::memmem::find(&stitched, START_MARKER).is_some() {
         if let Some(inv) = parse_full_account_blob(&stitched) {
             info!(
+                scanner,
                 addr = format_args!("0x{cached_addr:012x}"),
                 unique = inv.unique_items.len(),
                 stackable = inv.stackable_items.len(),
-                "fast-path hit"
+                "Account blob found at the cached address"
             );
             blob_tx.send(inv).ok();
             return true;
@@ -1349,21 +1442,23 @@ fn try_cached_blob(
     }
 
     debug!(
+        scanner,
         addr = format_args!("0x{cached_addr:012x}"),
-        "fast-path miss — falling through to cold walk"
+        "No blob at the cached address, walking all memory"
     );
     false
 }
 
 /// Walk all memory regions via `src`, stitch blobs, parse and send them.
-/// Returns the number of blob files saved (always 0 when `save=false`).
+/// Returns what the walk found, including the number of blob files saved
+/// (always 0 when `save=false`).
 fn stitch_blobs(
     src: &mut dyn crate::mem_regions::RegionSource,
     blob_dir: &std::path::Path,
     ts: &str,
     blob_tx: std::sync::mpsc::Sender<BlobInventory>,
     save: bool,
-) -> usize {
+) -> StitchReport {
     const MAX_BLOBS: usize = 25;
     // Outside save mode: cap on how many distinct candidate seeds (start-marker
     // occurrences) we'll open scans for, and how much further (in bytes read)
@@ -1424,6 +1519,8 @@ fn stitch_blobs(
     // the EXTRA_SEED_BUDGET window below (see also MAX_CANDIDATE_SEEDS above).
     let mut candidate_at_bytes: Option<u64> = None;
     let mut completed: Vec<(usize, BlobInventory)> = Vec::new();
+    let mut too_large = 0usize;
+    let mut rejected: Vec<(usize, BlobReject)> = Vec::new();
 
     loop {
         if saved >= MAX_BLOBS {
@@ -1467,11 +1564,13 @@ fn stitch_blobs(
             scan.search_from = scan.data.len().saturating_sub(END_MARKER_MAX_LEN - 1);
             scan.data.extend_from_slice(chunk);
             if scan.data.len() > MAX_SCAN {
-                warn!(
-                    scan_id = scan.id,
+                debug!(
+                    scanner,
+                    candidate = scan.id,
                     max_mb = MAX_SCAN / 1024 / 1024,
-                    "scan exceeded size limit without end — dropped"
+                    "Candidate dropped: no end marker within the size limit"
                 );
+                too_large += 1;
                 return false; // drop oversized scan
             }
             // Only search the newly-added window, not the full buffer.
@@ -1480,15 +1579,16 @@ fn stitch_blobs(
                 .iter()
                 .any(|m| memchr::memmem::find(window, m).is_some());
             if has_end && find_blob_end(&scan.data).is_some() {
-                match parse_full_account_blob(&scan.data) {
-                    Some(inv) => {
-                        info!(
-                            scan_id = scan.id,
-                            addr = format_args!("0x{:012x}", scan.seed_addr),
+                match parse_full_account_blob_checked(&scan.data) {
+                    Ok(inv) => {
+                        debug!(
+                            scanner,
+                            candidate = scan.id,
+                            addr = %format_args!("0x{:012x}", scan.seed_addr),
                             unique = inv.unique_items.len(),
                             stackable = inv.stackable_items.len(),
                             mods = inv.mods.len(),
-                            "scan SUCCESS"
+                            "Candidate read"
                         );
                         if save {
                             LAST_BLOB_REGION
@@ -1514,12 +1614,15 @@ fn stitch_blobs(
                             completed.push((scan.seed_addr, inv));
                         }
                     }
-                    None => {
-                        warn!(
-                            scan_id = scan.id,
-                            addr = format_args!("0x{:012x}", scan.seed_addr),
-                            "end marker found but JSON parse failed — dropped"
+                    Err(reason) => {
+                        debug!(
+                            scanner,
+                            candidate = scan.id,
+                            addr = %format_args!("0x{:012x}", scan.seed_addr),
+                            reason = %reason,
+                            "Candidate rejected"
                         );
+                        rejected.push((scan.id, reason));
                     }
                 }
                 false // remove completed (or failed) scan
@@ -1617,26 +1720,28 @@ fn stitch_blobs(
             starts_found += 1;
             let pre_bytes = combined.len() - n;
             debug!(
-                scan_id = id,
-                addr = format_args!("0x{region_addr:012x}"),
+                scanner,
+                candidate = id,
+                addr = %format_args!("0x{region_addr:012x}"),
                 start_off,
                 json_open,
-                seed = format_args!("0x{seed_addr:012x}"),
+                seed = %format_args!("0x{seed_addr:012x}"),
                 pre_bytes,
-                "scan started"
+                "Candidate found"
             );
             let seed = combined[json_open..].to_vec();
 
             let seed_ends = find_blob_end(&seed).is_some();
             if seed_ends {
-                match parse_full_account_blob(&seed) {
-                    Some(inv) => {
-                        info!(
-                            scan_id = id,
-                            addr = format_args!("0x{region_addr:012x}"),
+                match parse_full_account_blob_checked(&seed) {
+                    Ok(inv) => {
+                        debug!(
+                            scanner,
+                            candidate = id,
+                            addr = %format_args!("0x{region_addr:012x}"),
                             unique = inv.unique_items.len(),
                             stackable = inv.stackable_items.len(),
-                            "scan immediate SUCCESS"
+                            "Candidate read"
                         );
                         if save {
                             LAST_BLOB_REGION
@@ -1661,12 +1766,15 @@ fn stitch_blobs(
                             completed.push((seed_addr, inv));
                         }
                     }
-                    None => {
-                        warn!(
-                            scan_id = id,
-                            addr = format_args!("0x{seed_addr:012x}"),
-                            "immediate end found but parse failed — dropped"
+                    Err(reason) => {
+                        debug!(
+                            scanner,
+                            candidate = id,
+                            addr = %format_args!("0x{seed_addr:012x}"),
+                            reason = %reason,
+                            "Candidate rejected"
                         );
+                        rejected.push((id, reason));
                     }
                 }
             } else {
@@ -1694,30 +1802,31 @@ fn stitch_blobs(
     {
         LAST_BLOB_REGION.store(seed_addr as u64, std::sync::atomic::Ordering::Relaxed);
         info!(
-            addr = format_args!("0x{seed_addr:012x}"),
+            scanner,
+            addr = %format_args!("0x{seed_addr:012x}"),
             candidates,
             unique = inv.unique_items.len(),
             stackable = inv.stackable_items.len(),
             mods = inv.mods.len(),
-            "picked most-complete candidate of this capture pass"
+            "Account blob found"
         );
         blob_tx.send(inv).ok();
     }
 
     debug!(
-        target: "hexdesk::blob_capture",
+        scanner,
+        search_ms = t_search.as_millis() as u64,
+        "Marker search time"
+    );
+    StitchReport {
+        saved,
         regions_read,
         starts_found,
-        saved,
         candidates,
-        bytes_mb = bytes_read / 1_000_000,
-        search_ms = t_search.as_secs_f64() * 1000.0,
-        "capture done"
-    );
-    if starts_found == 0 {
-        warn!(target: "hexdesk::blob_capture", "no start-marker found — FULL_ACCOUNT not in memory (game in mission, on login screen, or Arsenal not open?)");
+        too_large,
+        rejected,
+        bytes_read,
     }
-    saved
 }
 
 // ─── Continuous raw memory string dump ───────────────────────────────────────
@@ -2243,5 +2352,112 @@ mod section_baseline_tests {
         }
         assert_eq!(b.evaluate(&keys(&["B"])), Ok(true));
         assert_eq!(b.keys(), vec!["B"]);
+    }
+}
+
+#[cfg(test)]
+mod failure_reason_tests {
+    //! A failed capture must say why in the log, without a raw capture.
+
+    use super::{parse_full_account_blob_checked, stitch_blobs, BlobReject, StitchReport};
+    use crate::mem_regions::RecordedRegions;
+
+    fn account_blob(extra: &str, suits: &str) -> String {
+        let padding = "x".repeat(60_000);
+        format!(
+            r#"{{"SubscribedToEmails":0,"RegularCredits":5,"PlayerLevel":3,"XPInfo":[],
+"Suits":[{suits}],"MiscItems":[],"RawUpgrades":[],{extra}
+"_pad":"{padding}","DeathSquadable":false}}"#
+        )
+    }
+
+    const SUIT: &str = r#"{"ItemType":"/Lotus/Powersuits/Test/Test"}"#;
+
+    fn walk(regions: Vec<(usize, Vec<u8>)>) -> StitchReport {
+        let mut src = RecordedRegions::new(regions);
+        let (tx, _rx) = std::sync::mpsc::channel();
+        stitch_blobs(&mut src, &std::env::temp_dir(), "test", tx, false)
+    }
+
+    #[test]
+    fn parser_names_the_reason_for_each_rejection() {
+        assert_eq!(
+            parse_full_account_blob_checked(b"{\"a\":1}").unwrap_err(),
+            BlobReject::NoEnd
+        );
+        assert!(matches!(
+            parse_full_account_blob_checked(br#"{"SubscribedToEmails":0,"DeathSquadable":false}"#),
+            Err(BlobReject::TooSmall { min: 50_000, .. })
+        ));
+        let no_misc = account_blob("", SUIT).replace("\"MiscItems\":[],", "");
+        assert_eq!(
+            parse_full_account_blob_checked(no_misc.as_bytes()).unwrap_err(),
+            BlobReject::MissingSection("\"MiscItems\"")
+        );
+        let no_suits = account_blob("", "");
+        assert_eq!(
+            parse_full_account_blob_checked(no_suits.as_bytes()).unwrap_err(),
+            BlobReject::NoItems
+        );
+        let broken = account_blob(r#""Broken":[1,,2],"#, SUIT);
+        assert!(matches!(
+            parse_full_account_blob_checked(broken.as_bytes()),
+            Err(BlobReject::Json(_))
+        ));
+    }
+
+    #[test]
+    fn rejection_reasons_contain_no_blob_content() {
+        let broken = account_blob(r#""Secret":"abc"x,"#, SUIT);
+        let reason = parse_full_account_blob_checked(broken.as_bytes())
+            .unwrap_err()
+            .to_string();
+        assert!(reason.starts_with("JSON could not be read:"), "{reason}");
+        assert!(!reason.contains("abc"), "{reason}");
+    }
+
+    #[test]
+    fn memory_without_a_start_marker_reports_not_found() {
+        let report = walk(vec![
+            (0x1000, vec![b'x'; 100_000]),
+            (0x30000, vec![b'y'; 100_000]),
+        ]);
+        let err = report.into_result().unwrap_err();
+        assert_eq!(err.code(), "scanner.not_found");
+        assert_eq!(
+            err.message(),
+            "Account blob not found: no start marker in any readable memory region"
+        );
+        assert!(err
+            .fields()
+            .iter()
+            .any(|(k, v)| k == "regions_read" && v == "2"));
+    }
+
+    #[test]
+    fn rejected_candidates_report_each_reason() {
+        let no_misc = account_blob("", SUIT).replace("\"MiscItems\":[],", "");
+        let report = walk(vec![(0x1000, no_misc.into_bytes())]);
+        let err = report.into_result().unwrap_err();
+        assert_eq!(err.code(), "scanner.parse");
+        assert_eq!(
+            err.message(),
+            "Account blob not found: no candidate could be read"
+        );
+        assert_eq!(
+            err.causes(),
+            ["candidate 0: required section \"MiscItems\" is missing"]
+        );
+        assert!(err
+            .fields()
+            .iter()
+            .any(|(k, v)| k == "rejected" && v == "1"));
+    }
+
+    #[test]
+    fn a_readable_candidate_is_a_success() {
+        let report = walk(vec![(0x1000, account_blob("", SUIT).into_bytes())]);
+        assert_eq!(report.candidates, 1);
+        assert!(report.into_result().is_ok());
     }
 }
