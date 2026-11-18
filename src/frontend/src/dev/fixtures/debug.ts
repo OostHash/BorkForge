@@ -99,6 +99,4 @@ export const debugFixtures = {
     default: () => "C:/Users/Tenno/Downloads/hexdesk-diagnostics-2026-11-18-150312.zip",
   } satisfies Fixture<string>,
   show_diagnostics_export: noResult<{ path: string }>(),
-  wfm_debug_dump: { default: ({ path }) => `GET ${path} (mock)` } satisfies Fixture<string, { path: string }>,
-  wfm_get_riven_attributes: { default: () => ["critical_chance", "multishot"] } satisfies Fixture<string[]>,
 };

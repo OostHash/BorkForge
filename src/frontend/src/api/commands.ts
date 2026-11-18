@@ -222,8 +222,6 @@ export interface CommandMap {
   export_diagnostics: { args: undefined; result: string };
   /** Opens Explorer with an exported diagnostics zip selected. */
   show_diagnostics_export: { args: { path: string }; result: null };
-  wfm_debug_dump: { args: { path: string }; result: string };
-  wfm_get_riven_attributes: { args: undefined; result: string[] };
 }
 
 export type CommandName = keyof CommandMap;

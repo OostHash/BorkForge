@@ -800,18 +800,6 @@ impl Wfm {
         Ok(json["data"].clone())
     }
 
-    /// Raw authenticated GET, pretty-printed — for the debug console only.
-    pub fn debug_dump(&self, path: &str) -> Result<String, DiagError> {
-        let auth = self.auth()?;
-        self.wait();
-        let json: serde_json::Value = self
-            .call("GET", path, &auth)
-            .map_err(fail("Debug request failed"))?
-            .into_json()
-            .map_err(unreadable)?;
-        serde_json::to_string_pretty(&json).map_err(unreadable)
-    }
-
     /// Create a buy or sell order. `mod_rank` must be set for mods — WFM 400s without it.
     pub fn create_order(
         &self,
@@ -889,36 +877,6 @@ impl Wfm {
     }
 
     // ── Riven auctions (v1) ───────────────────────────────────────────────────
-
-    /// Known riven attribute url_names, scraped from live auction listings
-    /// (/v1/riven/attributes was removed by WFM).
-    pub fn riven_attributes(&self) -> Result<Vec<String>, DiagError> {
-        self.auction_wait();
-        let json: serde_json::Value = ureq::get(&format!("{}/v1/auctions/search", API_BASE))
-            .query("type", "riven")
-            .set("language", "en")
-            .set("platform", "pc")
-            .set("User-Agent", USER_AGENT)
-            .call()
-            .map_err(fail("Riven attributes could not be loaded"))?
-            .into_json()
-            .map_err(unreadable)?;
-        let mut seen = std::collections::HashSet::new();
-        if let Some(auctions) = json["payload"]["auctions"].as_array() {
-            for auction in auctions {
-                if let Some(attrs) = auction["item"]["attributes"].as_array() {
-                    for attr in attrs {
-                        if let Some(url) = attr["url_name"].as_str() {
-                            seen.insert(url.to_string());
-                        }
-                    }
-                }
-            }
-        }
-        let mut list: Vec<String> = seen.into_iter().collect();
-        list.sort();
-        Ok(list)
-    }
 
     /// Post a revealed riven as an auction. Returns the full response JSON; the
     /// caller extracts the new auction id for its own bookkeeping.

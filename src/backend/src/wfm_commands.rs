@@ -160,20 +160,6 @@ pub(crate) async fn wfm_set_status(
         .map_err(internal_error)?
 }
 
-/// Debug: return the raw JSON from any authenticated WFM endpoint.
-#[tauri::command]
-pub(crate) fn wfm_debug_dump(state: State<AppState>, path: String) -> Result<String, DiagError> {
-    state.wfm.debug_dump(&path)
-}
-
-/// Collect known riven attribute url_names by sampling real auction listings.
-/// /v1/riven/attributes was removed; this scrapes url_names from search results instead.
-/// Exposed so the browser console can call: window.__wfmAttrs()
-#[tauri::command]
-pub(crate) fn wfm_get_riven_attributes(state: State<AppState>) -> Result<Vec<String>, DiagError> {
-    state.wfm.riven_attributes()
-}
-
 /// Get the internal WFM item ID for a URL slug (needed to create orders).
 /// Also returns `modMaxRank` from the local WFCD item cache when the item is a mod,
 /// so the frontend never needs a second network request to detect this.

@@ -655,8 +655,6 @@ pub fn run() {
             rivens::reload_riven_database,
             rivens::analyze_riven,
             rivens::ocr_riven_screen,
-            wfm_commands::wfm_debug_dump,
-            wfm_commands::wfm_get_riven_attributes,
             wfm_commands::wfm_get_item_orders,
             wfm_commands::wfm_get_item_statistics,
             wfm_commands::wfm_refresh_token,

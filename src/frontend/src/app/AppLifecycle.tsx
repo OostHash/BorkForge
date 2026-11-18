@@ -9,7 +9,6 @@ import {
   setBlobStatus,
   setScanner,
 } from "../api/app";
-import { installWfmConsoleHelpers } from "../api/debug";
 import { isTauri } from "../api/env";
 import { onEvent } from "../api/events";
 import { invoke } from "../api/invoke";
@@ -54,7 +53,6 @@ export function AppLifecycle() {
   useEffect(() => {
     if (started.current) return;
     started.current = true;
-    installWfmConsoleHelpers();
     // A failure keeps the cached catalogue; Settings offers a manual refresh.
     refreshCatalogue(queryClient, false).catch(() => undefined);
     // Fills the backend top-items cache so Statistics opens at once.
