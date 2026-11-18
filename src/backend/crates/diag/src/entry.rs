@@ -115,7 +115,7 @@ impl Entry {
                     line.push_str(&format!(", last in #{op}"));
                 }
             }
-            None => line.push_str(&self.message),
+            None => line.push_str(&one_line(&self.message)),
         }
         if !self.fields.is_empty() {
             line.push(' ');
@@ -136,7 +136,7 @@ impl Entry {
             line.push('\n');
             line.push_str(&indent);
             line.push_str("caused by: ");
-            line.push_str(cause);
+            line.push_str(&one_line(cause));
         }
         line
     }
@@ -149,6 +149,18 @@ impl Entry {
             && self.code == other.code
             && self.message == other.message
             && self.causes == other.causes
+    }
+}
+
+/// Text that must stay on one line of the log: line breaks are written as
+/// `\n`, the way field values already are.
+fn one_line(text: &str) -> std::borrow::Cow<'_, str> {
+    if text.contains(['\n', '\r']) {
+        text.replace("\r\n", "\\n")
+            .replace(['\n', '\r'], "\\n")
+            .into()
+    } else {
+        text.into()
     }
 }
 
@@ -208,6 +220,16 @@ pub(crate) mod tests {
         let message_col = first.find("Account").unwrap();
         assert_eq!(second.find("caused by:"), Some(message_col));
         assert!(lines.next().is_none());
+    }
+
+    #[test]
+    fn line_breaks_in_messages_and_causes_stay_on_their_line() {
+        let mut e = entry("first\nsecond");
+        e.causes = vec!["a\r\nb".into()];
+        let line = e.to_line();
+        assert_eq!(line.lines().count(), 2);
+        assert!(line.contains(r"first\nsecond"));
+        assert!(line.ends_with(r"caused by: a\nb"));
     }
 
     #[test]

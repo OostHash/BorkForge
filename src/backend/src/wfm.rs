@@ -516,11 +516,12 @@ impl Wfm {
                 r.into_string().ok()?
             }
             Err(e) => {
+                // The token from the session is the fallback, so this is no warning.
                 let _ = market_error(
                     "CSRF token page could not be loaded, using the token from the session",
                     e,
                 )
-                .log();
+                .log_at(hexdesk_diag::Level::Info);
                 return jwt_payload_field(jwt, "csrf_token");
             }
         };
@@ -1527,8 +1528,7 @@ fn market_error(what: &str, e: ureq::Error) -> DiagError {
             if body.is_empty() {
                 err
             } else {
-                let cut: String = body.chars().take(MAX_BODY_IN_LOG).collect();
-                err.caused_by_text(format!("response: {cut}"))
+                err.caused_by_text(format!("response: {}", describe_body(body)))
             }
         }
         ureq::Error::Transport(t) => {
@@ -1550,6 +1550,30 @@ fn market_error(what: &str, e: ureq::Error) -> DiagError {
             err.caused_by_text(text)
         }
     }
+}
+
+/// A response body as one log-friendly line: an HTML page (a Cloudflare
+/// challenge, an error page) by its title and size, anything else with its
+/// whitespace collapsed and cut to [`MAX_BODY_IN_LOG`] characters.
+fn describe_body(body: &str) -> String {
+    if body.starts_with('<') {
+        let lower = body.to_ascii_lowercase();
+        let title = lower
+            .find("<title>")
+            .and_then(|start| {
+                let from = start + "<title>".len();
+                lower[from..]
+                    .find("</title>")
+                    .map(|end| body[from..from + end].trim())
+            })
+            .filter(|t| !t.is_empty());
+        return match title {
+            Some(title) => format!("HTML page \"{title}\" ({} bytes)", body.len()),
+            None => format!("HTML page ({} bytes)", body.len()),
+        };
+    }
+    let flat = body.split_whitespace().collect::<Vec<_>>().join(" ");
+    flat.chars().take(MAX_BODY_IN_LOG).collect()
 }
 
 /// `map_err` adapter: logs the failed request and returns the message the UI
@@ -1697,6 +1721,30 @@ mod tests {
         assert_eq!(kind(503), hexdesk_diag::Kind::Unavailable);
         assert_eq!(kind(400), hexdesk_diag::Kind::Invalid);
         assert!(market_error("x", status_error(500, "")).causes().is_empty());
+    }
+
+    #[test]
+    fn html_pages_are_named_by_their_title() {
+        let page = "<!DOCTYPE html><html><head><title>Just a moment...</title></head>
+<body>x</body></html>";
+        let err = market_error("x", status_error(403, page));
+        assert_eq!(
+            err.causes(),
+            [format!(
+                "response: HTML page \"Just a moment...\" ({} bytes)",
+                page.len()
+            )]
+        );
+        let err = market_error(
+            "x",
+            status_error(
+                400,
+                "{
+  \"error\": \"bad\"
+}",
+            ),
+        );
+        assert_eq!(err.causes(), [r#"response: { "error": "bad" }"#]);
     }
 
     #[test]

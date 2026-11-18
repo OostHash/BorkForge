@@ -105,4 +105,11 @@ describe("log lines", () => {
     const line = entryLine(entry(8, { repeat: { of: 7, count: 36, until: "2026-11-18T15:09:44+01:00", last_op: 78 } }));
     expect(line.endsWith("… repeated 36 times until 15:09:44, last in #78")).toBe(true);
   });
+
+  it("keeps a message or cause with line breaks on its own line", () => {
+    const line = entryLine(entry(9, { message: "first\nsecond", causes: ["a\r\nb"] }));
+    expect(line.split("\n")).toHaveLength(2);
+    expect(line).toContain(String.raw`first\nsecond`);
+    expect(line.endsWith(String.raw`caused by: a\nb`)).toBe(true);
+  });
 });

@@ -102,6 +102,9 @@ export function repeatText(repeat: LogRepeat): string {
   return `… repeated ${String(repeat.count)} ${times} until ${clockTime(repeat.until)}${last}`;
 }
 
+/** Line breaks written as `\n`, so a message or cause stays on its own line. */
+const oneLine = (text: string) => text.replace(/\r\n|\r|\n/g, "\\n");
+
 const quote = (value: string) => (value === "" || /[\s"=]/.test(value) ? JSON.stringify(value) : value);
 
 /**
@@ -111,11 +114,11 @@ const quote = (value: string) => (value === "" || /[\s"=]/.test(value) ? JSON.st
 export function entryLine(entry: LogEntry): string {
   const op = entry.op === null ? "" : `#${String(entry.op)}`;
   const prefix = `${logTime(entry.time)} ${entry.level.toUpperCase().padEnd(5)} ${entry.source.padEnd(10)} ${op.padEnd(6)} `;
-  let line = prefix + (entry.repeat ? repeatText(entry.repeat) : entry.message);
+  let line = prefix + (entry.repeat ? repeatText(entry.repeat) : oneLine(entry.message));
   const fields = Object.entries(entry.fields);
   if (fields.length > 0) line += " " + fields.map(([k, v]) => ` ${k}=${quote(v)}`).join("");
   if (entry.code !== null) line += ` [${entry.code}]`;
   const indent = " ".repeat(prefix.length);
-  for (const cause of entry.causes) line += `\n${indent}caused by: ${cause}`;
+  for (const cause of entry.causes) line += `\n${indent}caused by: ${oneLine(cause)}`;
   return line;
 }

@@ -36,6 +36,27 @@ const SENSITIVE_KEYS: &[&str] = &[
     "credential",
 ];
 
+/// Keys that hold a credential in `key: value` text (HTTP headers, config
+/// dumps). Prose such as "the session: warframe.market answered 403" also has
+/// a word before a colon, so this form is limited to these keys; `key=value`
+/// and JSON `"key":` use the wider [`SENSITIVE_KEYS`] rule.
+const COLON_KEYS: &[&str] = &[
+    "password",
+    "passwd",
+    "secret",
+    "authorization",
+    "cookie",
+    "set-cookie",
+    "api_key",
+    "apikey",
+    "jwt",
+];
+
+fn is_colon_credential_key(key: &str) -> bool {
+    let key = key.to_ascii_lowercase();
+    COLON_KEYS.contains(&key.as_str()) || key.ends_with("token") || key.ends_with("password")
+}
+
 /// Registered secrets shorter than this are ignored; replacing very short
 /// strings would mangle unrelated text.
 const MIN_SECRET_LEN: usize = 3;
@@ -170,6 +191,12 @@ fn redact_key_values(input: &str) -> String {
             .find(|(_, c)| !(c.is_ascii_alphanumeric() || *c == '_' || *c == '-'))
             .map_or(0, |(j, c)| j + c.len_utf8());
         let key = &input[key_start..key_end];
+        let json_key = key_end < sep;
+        let sensitive = if bytes[sep] == b':' && !json_key {
+            is_colon_credential_key(key)
+        } else {
+            is_sensitive_key(key)
+        };
         let mut value_start = sep + 1;
         while value_start < input.len() && bytes[value_start] == b' ' {
             value_start += 1;
@@ -202,7 +229,7 @@ fn redact_key_values(input: &str) -> String {
             (value_start, end)
         };
         let already = input[value_start..].starts_with(REDACTED);
-        if !key.is_empty() && is_sensitive_key(key) && value_end > value_start && !already {
+        if !key.is_empty() && sensitive && value_end > value_start && !already {
             out.push_str(&input[i..value_start]);
             out.push_str(REDACTED);
             i = value_end;
@@ -290,6 +317,17 @@ mod tests {
         );
         assert_eq!(text("item=ash_prime attempt=3"), "item=ash_prime attempt=3");
         assert_eq!(text("time 15:03:12"), "time 15:03:12");
+        // Prose with a colon after a sensitive-looking word is not a credential.
+        assert_eq!(
+            text("using the token from the session: warframe.market answered 403"),
+            "using the token from the session: warframe.market answered 403"
+        );
+        assert_eq!(text("x-csrftoken: abc123"), "x-csrftoken: [redacted]");
+        assert_eq!(
+            text(r#"{"sessionId":"abc"}"#),
+            r#"{"sessionId":"[redacted]"}"#
+        );
+        assert_eq!(text("session=abc&x=1"), "session=[redacted]&x=1");
     }
 
     #[test]
