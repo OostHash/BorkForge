@@ -1,5 +1,5 @@
 [workspace]
-members = ["src/backend"]
+members = ["src/backend", "src/backend/crates/*"]
 resolver = "2"
 
 [profile.dev]

@@ -1,7 +1,9 @@
-//! Subscriber setup: a compact daily-rolling file log plus a coloured console
-//! log, both fed from the same `tracing` events.
+//! Subscriber setup. Every `tracing` event goes through `hexdesk-diag`, which
+//! writes the daily-rolling log file and keeps recent entries in memory for
+//! the activity console and the diagnostics export. A coloured console log is
+//! kept for development.
 
-use std::sync::OnceLock;
+use std::sync::Mutex;
 
 use tracing_subscriber::{
     fmt,
@@ -12,13 +14,14 @@ use tracing_subscriber::{
 
 /// Dropping the `WorkerGuard` flushes the non-blocking writer's buffer, so it
 /// has to outlive every log call; otherwise the last events (including a
-/// panic) never reach disk.
-static FILE_GUARD: OnceLock<tracing_appender::non_blocking::WorkerGuard> = OnceLock::new();
+/// panic) never reach disk. [`shutdown`] takes and drops it.
+static FILE_GUARD: Mutex<Option<tracing_appender::non_blocking::WorkerGuard>> = Mutex::new(None);
 
 /// Installs the global subscriber, log-crate bridge and panic hook. Safe to
 /// call more than once; later calls do nothing.
 pub fn init() {
-    if FILE_GUARD.get().is_some() {
+    let mut guard_slot = FILE_GUARD.lock().unwrap_or_else(|e| e.into_inner());
+    if guard_slot.is_some() || hexdesk_diag::collector().is_some() {
         return;
     }
 
@@ -38,27 +41,22 @@ pub fn init() {
         .expect("log dir was just created");
     // Non-blocking so the scanner and OCR hot loops never stall on disk I/O.
     let (writer, guard) = tracing_appender::non_blocking(appender);
-    let _ = FILE_GUARD.set(guard);
+    *guard_slot = Some(guard);
+    drop(guard_slot);
 
-    let file_layer = fmt::layer()
-        .compact()
-        .with_ansi(false)
-        .with_target(true)
-        // Span-close events carry time.busy/time.idle, which is where the
-        // scanner and OCR timings surface.
-        .with_span_events(fmt::format::FmtSpan::CLOSE)
-        .with_writer(writer)
-        .with_filter(filter("warn,hexdesk_backend=debug"));
+    let collector = hexdesk_diag::Collector::new(hexdesk_diag::Config::default()).with_sink(writer);
+    let diag_layer = hexdesk_diag::install(collector)
+        .with_filter(filter("warn,hexdesk=debug,hexdesk_backend=debug"));
 
     let console_layer = fmt::layer()
         .compact()
         .with_ansi(true)
         .with_target(true)
         .with_writer(std::io::stderr)
-        .with_filter(filter("info,hexdesk_backend=info"));
+        .with_filter(filter("info,hexdesk=info,hexdesk_backend=info"));
 
     let _ = tracing_subscriber::registry()
-        .with(file_layer)
+        .with(diag_layer)
         .with(console_layer)
         .try_init();
 
@@ -74,9 +72,10 @@ pub fn init() {
             .unwrap_or("<non-string panic payload>");
         tracing::error!(
             location = %info.location().map_or_else(|| "unknown".to_string(), ToString::to_string),
-            message,
+            payload = message,
             "panic"
         );
+        hexdesk_diag::flush();
         previous(info);
     }));
 
@@ -87,6 +86,15 @@ pub fn init() {
         log_dir = %log_dir.display(),
         "HexDesk starting"
     );
+}
+
+/// Writes pending repeat counts and everything still buffered to the log
+/// file. Call right before the process exits.
+pub fn shutdown() {
+    tracing::info!("HexDesk stopping");
+    hexdesk_diag::flush();
+    let guard = FILE_GUARD.lock().unwrap_or_else(|e| e.into_inner()).take();
+    drop(guard);
 }
 
 fn filter(default: &str) -> EnvFilter {

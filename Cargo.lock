@@ -1650,6 +1650,7 @@ version = "1.0.1"
 dependencies = [
  "chrono",
  "dirs 5.0.1",
+ "hexdesk-diag",
  "lzma-rs",
  "memchr",
  "native-tls",
@@ -1675,6 +1676,17 @@ dependencies = [
  "whirlpool",
  "windows 0.58.0",
  "windows-sys 0.52.0",
+]
+
+[[package]]
+name = "hexdesk-diag"
+version = "1.0.1"
+dependencies = [
+ "chrono",
+ "serde",
+ "serde_json",
+ "tracing",
+ "tracing-subscriber",
 ]
 
 [[package]]

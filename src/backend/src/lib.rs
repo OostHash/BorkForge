@@ -798,6 +798,8 @@ pub fn run() {
                         // State is already saved on every Moved/Resized event.
                     }
                     tauri::WindowEvent::Destroyed if label == "main" => {
+                        // `exit` skips destructors, so write the log out first.
+                        logging::shutdown();
                         std::process::exit(0);
                     }
                     _ => {}

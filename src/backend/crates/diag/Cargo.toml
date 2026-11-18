@@ -1,0 +1,21 @@
+[package]
+name = "hexdesk-diag"
+version = "1.0.1"
+description = "HexDesk diagnostics: typed errors, structured log entries and redaction"
+authors = ["HexDesk contributors"]
+edition = "2021"
+license = "GPL-3.0-only"
+repository = "https://github.com/OostHash/HexDesk"
+publish = false
+
+[lib]
+name = "hexdesk_diag"
+
+# Same versions and features as the backend crate, so the lock file gains no
+# new packages.
+[dependencies]
+chrono = { version = "0.4", features = ["serde"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
