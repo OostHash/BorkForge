@@ -34,6 +34,7 @@ tungstenite = { version = "0.26", features = ["native-tls"] }
 native-tls = "0.2"
 whirlpool = "0.10"
 lzma-rs = "0.3"
+hexdesk-diag = { path = "crates/diag" }
 tracing = "0.1"
 tracing-appender = "0.2"
 tracing-log = "0.2"

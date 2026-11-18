@@ -10,7 +10,6 @@ use crate::wfm::Wfm;
 use crate::companion_api::ApiModCopy;
 use crate::monitor::CraftingJob;
 
-type OcrFrame = (Vec<u8>, u32, u32);
 type WorldstateCache = (
     std::time::Instant,
     Arc<serde_json::Value>,
@@ -90,12 +89,6 @@ pub struct AppState {
     /// Last-known crafting jobs from memory scans. Shared with monitor thread.
     pub current_crafting: Arc<Mutex<Vec<CraftingJob>>>,
     pub monitor_active: Arc<AtomicBool>,
-    /// Controls the raw memory string-dump background thread.
-    pub raw_scan_active: Arc<AtomicBool>,
-    pub raw_scan_path: PathBuf,
-    /// When true, save a timestamped inventory blob to blobs/ on each full scan pass.
-    pub blob_log_enabled: Arc<AtomicBool>,
-    pub blob_log_dir: PathBuf,
     /// When true, save the raw DE API response to api_logs/ on each fetch.
     pub api_log_enabled: Arc<AtomicBool>,
     pub api_log_dir: PathBuf,
@@ -120,9 +113,6 @@ pub struct AppState {
     pub api_quantities_cache: Arc<Mutex<HashMap<String, i64>>>,
     /// Companion API mod copies held in memory so the scanner includes them in cache writes.
     pub api_mod_copies_cache: Arc<Mutex<Vec<ApiModCopy>>>,
-    /// Most recent OCR frame (top ~48% of Warframe window, BGRA, width, height).
-    /// Stored by the OCR loop so auto-capture can write it without a second GPU readback.
-    pub last_ocr_frame: Arc<Mutex<Option<OcrFrame>>>,
     /// Local image cache directory — craftable item images downloaded here on first run.
     pub img_cache_dir: PathBuf,
     /// Port of the local HTTP image server (set in setup hook, 0 until started).
@@ -145,13 +135,6 @@ pub struct AppState {
     /// activation/expiry filtering stays anchored to the current time. Held
     /// behind `Arc` so serving a hit shares the ~1MB tree instead of cloning it.
     pub worldstate_cache: Mutex<Option<WorldstateCache>>,
-    /// When true, unmatched inventory paths are written to the Unmatched Paths debug folder.
-    pub debug_cat_enabled: Arc<AtomicBool>,
-    /// Subfolders under %LOCALAPPDATA%\warframe-companion\Debugging\
-    pub auto_capture_dir: PathBuf,
-    pub manual_capture_dir: PathBuf,
-    pub memory_probe_path: PathBuf,
-    pub unmatched_paths_dir: PathBuf,
     /// Merged bundled + user corrections: path → entry.
     /// Bundled file is embedded at compile time; user file from data dir overrides on a per-path basis.
     pub corrections: HashMap<String, CorrectionEntry>,

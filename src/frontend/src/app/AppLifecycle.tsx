@@ -9,7 +9,6 @@ import {
   setBlobStatus,
   setScanner,
 } from "../api/app";
-import { installWfmConsoleHelpers, syncLoggers } from "../api/debug";
 import { isTauri } from "../api/env";
 import { onEvent } from "../api/events";
 import { invoke } from "../api/invoke";
@@ -49,22 +48,11 @@ export function AppLifecycle() {
     });
   }, [queryClient, scannerEnabled, settingsLoaded]);
 
-  // ── Debug loggers follow the settings (vault debugging.md) ────────────────
-  const blobLog = settings?.blobLogEnabled === true;
-  const apiLog = settings?.apiLogEnabled === true;
-  useEffect(() => {
-    if (!settingsLoaded || !isTauri()) return;
-    syncLoggers(blobLog, apiLog).catch((error: unknown) => {
-      console.error("debug loggers: syncing failed", error);
-    });
-  }, [settingsLoaded, blobLog, apiLog]);
-
   // ── Once at start ─────────────────────────────────────────────────────────
   const started = useRef(false);
   useEffect(() => {
     if (started.current) return;
     started.current = true;
-    installWfmConsoleHelpers();
     // A failure keeps the cached catalogue; Settings offers a manual refresh.
     refreshCatalogue(queryClient, false).catch(() => undefined);
     // Fills the backend top-items cache so Statistics opens at once.

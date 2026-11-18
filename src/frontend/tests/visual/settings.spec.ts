@@ -65,25 +65,25 @@ test("overlays, offset by keyboard and previews", async ({ page }) => {
   await expect(page).toHaveScreenshot("settings-overlays.png");
 });
 
-test("debugging, results and the batch preview", async ({ page }) => {
+test("debugging", async ({ page }) => {
   await open(page);
   await tab(page, "Debugging").click();
-  const probe = page.getByRole("group", { name: "Memory probe", exact: true });
-  await probe.getByRole("button", { name: "Run" }).click();
-  await expect(probe.getByRole("status")).toHaveText("Probe done: 2 entries written.");
-  await expect(page.getByRole("group", { name: "Relic captures" }).getByRole("button", { name: "Clear (40.0 MB)" })).toBeEnabled();
+  await expect(page.getByRole("group", { name: "Diagnostics export", exact: true })).toBeVisible();
   await axe(page);
   await expect(page).toHaveScreenshot("settings-debugging.png");
+});
 
-  await page.getByRole("group", { name: "Incoming batch" }).getByRole("button", { name: "Preview" }).click();
-  const preview = page.getByRole("dialog", { name: "Incoming batch preview" });
-  await expect(preview.getByRole("article")).toHaveCount(4);
+test("console, an entry opened and the export", async ({ page }) => {
+  await open(page);
+  await tab(page, "Console").click();
+  const entries = page.getByRole("list", { name: "Log entries" });
+  const failure = entries.getByRole("button", { name: /Order could not be created/ });
+  await failure.click();
+  await expect(entries.getByText("market.denied")).toBeVisible();
+  await page.getByRole("button", { name: "Export", exact: true }).click();
+  await expect(page.getByText(/^Saved to .*hexdesk-diagnostics-.*\.zip$/)).toBeVisible();
+  await expect(page.getByRole("button", { name: "Show in folder" })).toBeVisible();
   await axe(page);
-  await expect(page).toHaveScreenshot("settings-batch-preview.png");
-  // Escape closes the preview only; Settings stays open.
-  await page.keyboard.press("Escape");
-  await expect(preview).toBeHidden();
-  await expect(page.getByRole("dialog", { name: "Settings" })).toBeVisible();
 });
 
 test("market, logged in", async ({ page }) => {

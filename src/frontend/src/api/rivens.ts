@@ -74,8 +74,6 @@ export function useRollActions() {
   return { save, rename, remove };
 }
 
-export const fetchSessionLog = () => invoke("get_riven_session_log").catch(() => "Log unavailable");
-
 export function useOwnedRivens() {
   return useQuery({ queryKey: rivenKeys.owned, queryFn: () => invoke("get_rivens") });
 }

@@ -7,7 +7,7 @@ import { expect, test, type Page } from "@playwright/test";
  */
 
 const SCREENS = ["Timers", "Foundry", "Relics", "Inventory", "Market", "Rivens"];
-const SETTINGS_TABS = ["General", "Overlays", "Market", "Filters", "Data", "Debugging"];
+const SETTINGS_TABS = ["General", "Overlays", "Market", "Filters", "Data", "Debugging", "Console"];
 
 /** Form fields without id and name, described for the failure message. */
 const anonymousFields = (page: Page) =>

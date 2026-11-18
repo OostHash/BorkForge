@@ -4,37 +4,14 @@ use tauri::{Emitter, Manager};
 use tracing::{info, warn};
 
 use crate::app_state::AppState;
-use crate::diagnostics::{append_to_diag, write_bmp};
 use crate::events;
 use crate::relic_pick::{build_relic_pick_payload, relic_pick_hide, relic_pick_show};
-use crate::{append_to_file, ocr, OcrParams};
+use crate::{ocr, OcrParams};
 
 pub(crate) type RewardOcrResult = (bool, bool, Vec<String>, Vec<f32>, String);
 
 // ── Reward-pipeline parameter groups ──────────────────────────────────────────
 // Grouped so the reward-session helpers stay within clippy's argument limit.
-
-/// One OCR attempt's identity: attempt counter, timestamp, card reads, diagnostics.
-pub(crate) struct RewardAttempt<'a> {
-    pub(crate) attempt: u32,
-    pub(crate) ts: &'a str,
-    pub(crate) items: &'a [String],
-    pub(crate) dbg: &'a str,
-}
-
-/// The session-log and last-result paths shared by the reward log helpers.
-pub(crate) struct RewardPaths<'a> {
-    pub(crate) session_log_path: &'a std::path::Path,
-    pub(crate) last_path: &'a std::path::Path,
-}
-
-/// The trigger line that opened a reward session plus its catalog prefilter summary.
-pub(crate) struct RewardTrigger<'a> {
-    pub(crate) timestamp: &'a str,
-    pub(crate) trigger_line: &'a str,
-    pub(crate) prefilter_log: &'a str,
-    pub(crate) catalog_len: usize,
-}
 
 /// Mutable reward-screen watch state owned by the EE.log reader loop.
 pub(crate) struct DismissState<'a> {
@@ -273,14 +250,10 @@ pub(crate) fn handle_riven_events(
         });
         if riven_active {
             *last_riven_fire = None;
-            let riven_log = std::env::temp_dir().join("hexdesk_riven_session.txt");
-            let ts = chrono::Local::now().format("%H:%M:%S%.3f").to_string();
-            let _ = append_to_file(
-                &riven_log,
-                &format!(
-                    "[STEP 4] CLOSE (DiegeticArtifactCards HudVis 0) — {}\n\n",
-                    ts
-                ),
+            hexdesk_diag::info!(
+                overlay,
+                ee_log_line = "DiegeticArtifactCards HudVis 0",
+                "Riven screen closed (EE.log)"
             );
             let _ = app.emit(events::RIVEN_SCREEN_CLOSE, ());
         }
@@ -297,14 +270,10 @@ pub(crate) fn handle_riven_events(
         });
         if riven_active {
             *last_riven_fire = None;
-            let riven_log = std::env::temp_dir().join("hexdesk_riven_session.txt");
-            let ts = chrono::Local::now().format("%H:%M:%S%.3f").to_string();
-            let _ = append_to_file(
-                &riven_log,
-                &format!(
-                    "[STEP 4] CLOSE (VolumetricFog render target = orbiter loaded) — {}\n\n",
-                    ts
-                ),
+            hexdesk_diag::info!(
+                overlay,
+                ee_log_line = "VolumetricFog render target (orbiter loaded)",
+                "Riven screen closed (EE.log)"
             );
             let _ = app.emit(events::RIVEN_SCREEN_CLOSE, ());
         }
@@ -321,13 +290,18 @@ pub(crate) fn handle_relic_pick_events(
     // ── Relic selection screen ───────────────────────────────────────
     // Trigger: relic grid fully loaded → OCR the era from top-left quarter.
     if lower.contains("themedprojectionmanager.lua: populateinventorygrid") {
-        info!("relic-pick: PopulateInventoryGrid detected — spawning OCR thread");
         let now = std::time::Instant::now();
         let state = app.state::<AppState>();
         let relic_pick_on = state.overlays_enabled.load(Ordering::SeqCst)
             && state.relic_pick_overlay_enabled.load(Ordering::SeqCst);
-        let should_trigger = relic_pick_on
-            && last_relic_pick_trigger.is_none_or(|t| now.duration_since(t).as_secs() >= 5);
+        let cooldown = last_relic_pick_trigger.is_some_and(|t| now.duration_since(t).as_secs() < 5);
+        let should_trigger = relic_pick_on && !cooldown;
+        hexdesk_diag::info!(
+            overlay,
+            overlay_on = relic_pick_on,
+            cooldown,
+            "Relic selection screen seen in EE.log"
+        );
         if should_trigger {
             *last_relic_pick_trigger = Some(now);
             let app_clone = app.clone();
@@ -340,8 +314,18 @@ pub(crate) fn handle_relic_pick_events(
                 {
                     return;
                 }
+                let started = std::time::Instant::now();
                 let era = crate::ocr::detect_fissure_era();
-                info!("relic-pick: OCR result = {:?}", era);
+                let ocr_ms = started.elapsed().as_millis() as u64;
+                if era.is_none() {
+                    let _ = hexdesk_diag::DiagError::new(
+                        hexdesk_diag::Source::Overlay,
+                        hexdesk_diag::Kind::NotFound,
+                        "Relic Pick overlay not shown: no fissure era read from the screen",
+                    )
+                    .with("ocr_ms", ocr_ms)
+                    .log();
+                }
                 if let Some(era) = era {
                     let payload = build_relic_pick_payload(&era, &app_clone);
                     let state = app_clone.state::<AppState>();
@@ -351,9 +335,12 @@ pub(crate) fn handle_relic_pick_events(
                         return;
                     }
                     let relic_count = payload["relics"].as_array().map_or(0, |a| a.len());
-                    info!(
-                        "relic-pick: emitting relic-pick-open era={} relics={}",
-                        era, relic_count
+                    hexdesk_diag::info!(
+                        overlay,
+                        era = %era,
+                        relics = relic_count,
+                        ocr_ms,
+                        "Fissure era read for the Relic Pick overlay"
                     );
                     // Show the overlay window from Rust — more reliable than
                     // calling win.show() from the WebView (avoids timing races).
@@ -369,8 +356,16 @@ pub(crate) fn handle_relic_pick_events(
                     let _ = app_clone.emit(events::RELIC_PICK_OPEN, payload);
                 }
             });
+        } else if !relic_pick_on {
+            hexdesk_diag::debug!(
+                overlay,
+                "Relic Pick overlay skipped: turned off in settings"
+            );
         } else {
-            info!("relic-pick: trigger suppressed by 5-second cooldown");
+            hexdesk_diag::debug!(
+                overlay,
+                "Relic Pick overlay skipped: the selection screen was seen less than 5 s ago"
+            );
         }
     }
     // Dismiss: solar map regains input focus (player cancelled or mission started).
@@ -384,7 +379,11 @@ pub(crate) fn handle_relic_pick_events(
         } else {
             "mapredux"
         };
-        info!("relic-pick: dismiss fired ({})", which);
+        hexdesk_diag::info!(
+            overlay,
+            ee_log_line = which,
+            "Relic Pick overlay closing: EE.log reports the selection screen closed"
+        );
         relic_pick_hide(app);
         let _ = app.emit(events::RELIC_PICK_CLOSE, ());
     }
@@ -446,6 +445,7 @@ pub(crate) fn parse_logged_in_name(
         if name.len() < 3 || !remainder.is_empty() {
             continue;
         }
+        hexdesk_diag::redact::register_secret(&name);
         if let Ok(mut g) = squad_names.lock() {
             if !g.iter().any(|n: &String| n == &name) {
                 g.push(name.clone());
@@ -505,6 +505,7 @@ pub(crate) fn seed_ee_log_names(
                         None
                     };
                 if let Some(name) = name {
+                    hexdesk_diag::redact::register_secret(name);
                     if let Ok(mut names) = squad_names.lock() {
                         if !names.iter().any(|existing| existing == name) {
                             names.push(name.to_string());
@@ -539,6 +540,7 @@ pub(crate) fn collect_ee_log_names(
             None
         };
         if let Some(name) = name {
+            hexdesk_diag::redact::register_secret(name);
             if let Ok(mut names) = squad_names.lock() {
                 if !names.iter().any(|existing| existing == name) {
                     names.push(name.to_string());
@@ -643,7 +645,6 @@ pub(crate) fn collect_void_projection_state(
     text: &str,
     state: &mut VoidProjectionState,
     squad_size: &std::sync::Arc<std::sync::Mutex<Option<usize>>>,
-    session_log_path: &std::path::Path,
 ) {
     for line in text.lines() {
         let lower = line.to_lowercase();
@@ -680,24 +681,14 @@ pub(crate) fn collect_void_projection_state(
                 }
                 state.in_sequence = false;
                 state.sequence_completed = true;
-                let _ = append_to_file(
-                    session_log_path,
-                    &format!(
-                        "[EE.log] VoidProjections squad\n\\
-                         ├─ Local item : {}\n\\
-                         ├─ Other players (unique IDs) : {}\n\\
-                         ├─ Null rewards (no card) : {}\n\\
-                         └─ Squad size : {} total ({} expected card(s))\n\n",
-                        if state.own_item.is_empty() {
-                            "(not found)"
-                        } else {
-                            &state.own_item
-                        },
-                        state.other_ids.len(),
-                        state.null_reward_ids.len(),
-                        squad_total,
-                        squad,
-                    ),
+                hexdesk_diag::debug!(
+                    overlay,
+                    own_item = %state.own_item,
+                    others_in_squad = state.other_ids.len(),
+                    null_rewards = state.null_reward_ids.len(),
+                    squad_total,
+                    expected_cards = squad,
+                    "Squad size read from EE.log"
                 );
             }
         }
@@ -705,11 +696,7 @@ pub(crate) fn collect_void_projection_state(
 }
 
 /// Apply the local player's EE.log reward before the next memory scan completes.
-pub(crate) fn apply_reward_inventory_update(
-    app: &tauri::AppHandle,
-    store_path: String,
-    session_log_path: &std::path::Path,
-) {
+pub(crate) fn apply_reward_inventory_update(app: &tauri::AppHandle, store_path: String) {
     let inv_path = crate::worldstate::store_to_unique(&store_path);
     let state: tauri::State<AppState> = app.state();
     let (old_qty, new_qty) = {
@@ -722,33 +709,16 @@ pub(crate) fn apply_reward_inventory_update(
         quantities.insert(inv_path.clone(), new);
         (old, new)
     };
-    let item_name = inv_path.split('/').next_back().unwrap_or("?").to_string();
-    let timestamp = chrono::Local::now().format("%Y-%m-%d %H:%M:%S");
-    if let Ok(mut file) = std::fs::OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(&state.changes_log_path)
-    {
-        use std::io::Write;
-        let _ = writeln!(
-            file,
-            "[{}] EE.log Reward | {} | {} → {} (gets reward)",
-            timestamp, item_name, old_qty, new_qty
-        );
-    }
     let _ = app.emit(
         events::INVENTORY_REWARD,
         serde_json::json!({ "path": inv_path, "qty": new_qty }),
     );
-    append_to_diag(
-        session_log_path,
-        &format!(
-            "[REWARD] Inventory updated from EE.log\n\\
-             ├─ Store path : {}\n\\
-             ├─ Inv path   : {}\n\\
-             └─ Qty        : {} → {}\n\n",
-            store_path, inv_path, old_qty, new_qty
-        ),
+    hexdesk_diag::info!(
+        scanner,
+        item = %inv_path,
+        old_qty,
+        new_qty,
+        "Inventory updated from a relic reward in EE.log"
     );
 }
 
@@ -756,8 +726,6 @@ pub(crate) fn apply_reward_inventory_update(
 pub(crate) fn dismiss_relic_rewards(
     app: &tauri::AppHandle,
     text: &str,
-    session_log_path: &std::path::Path,
-    diag_dir: &std::sync::Arc<std::sync::Mutex<Option<std::path::PathBuf>>>,
     reward_screen_active: &std::sync::Arc<std::sync::atomic::AtomicBool>,
     rewards_emitted_ms: &std::sync::Arc<std::sync::atomic::AtomicU64>,
     best_reward_payload: &std::sync::Arc<std::sync::Mutex<Option<serde_json::Value>>>,
@@ -787,26 +755,12 @@ pub(crate) fn dismiss_relic_rewards(
         })
         .unwrap_or("<unknown dismiss line>")
         .trim();
-    let elapsed = active_since.map(|time| time.elapsed().as_secs_f64());
-    append_to_diag(
-        session_log_path,
-        &format!(
-            "[STEP 4] DISMISS\n\\
-             ├─ Time     : {}\n\\
-             ├─ Line     : \"{}\"\n\\
-             └─ Open for : {}\n\n",
-            chrono::Local::now().format("%H:%M:%S%.3f"),
-            dismiss_line,
-            elapsed
-                .map(|seconds| format!("{seconds:.1}s"))
-                .unwrap_or_else(|| "(unknown)".to_string()),
-        ),
+    hexdesk_diag::info!(
+        overlay,
+        ee_log_line = %dismiss_line,
+        open_for_ms = active_since.map(|time| time.elapsed().as_millis() as u64),
+        "Relic reward screen closed (EE.log)"
     );
-    if let Ok(mut guard) = diag_dir.lock() {
-        if let Some(folder) = guard.take() {
-            let _ = std::fs::copy(session_log_path, folder.join("ocr_session_log.txt"));
-        }
-    }
     reward_screen_active.store(false, Ordering::SeqCst);
     *active_since = None;
     *last_dismiss_at = Some(std::time::Instant::now());
@@ -821,7 +775,7 @@ pub(crate) fn dismiss_relic_rewards(
         session_relics.clear();
     }
     if let Some(store_path) = projection_state.take_own_item() {
-        apply_reward_inventory_update(app, store_path, session_log_path);
+        apply_reward_inventory_update(app, store_path);
     }
 
     const MIN_DISPLAY_MS: u64 = 5_000;
@@ -845,9 +799,11 @@ pub(crate) fn dismiss_relic_rewards(
     };
     let delay_ms = if let Some(payload) = &late_payload {
         publish_relic_rewards(app, Some(payload));
-        append_to_diag(
-            session_log_path,
-            "[STEP 3] OVERLAY OPENED (published on dismiss — partial result)\n\n",
+        hexdesk_diag::info!(
+            overlay,
+            reason =
+                "the reward screen closed before a confirmed read; showing the best partial read",
+            "Relic reward overlay opened"
         );
         MIN_DISPLAY_MS
     } else if emitted_at > 0 {
@@ -879,8 +835,6 @@ pub(crate) fn dismiss_relic_rewards(
 /// Dismiss a reward overlay that remained active beyond its maximum window.
 pub(crate) fn auto_dismiss_relic_rewards(
     app: &tauri::AppHandle,
-    session_log_path: &std::path::Path,
-    diag_dir: &std::sync::Arc<std::sync::Mutex<Option<std::path::PathBuf>>>,
     reward_screen_active: &std::sync::Arc<std::sync::atomic::AtomicBool>,
     active_since: &mut Option<std::time::Instant>,
     last_dismiss_at: &mut Option<std::time::Instant>,
@@ -892,13 +846,11 @@ pub(crate) fn auto_dismiss_relic_rewards(
     }
     close_reward_overlay(
         app,
-        session_log_path,
-        diag_dir,
         reward_screen_active,
         active_since,
         last_dismiss_at,
         rewards_emitted_ms,
-        "AUTO-DISMISS (20s timeout)",
+        "no close line in EE.log within 20 s",
     );
 }
 
@@ -907,31 +859,18 @@ pub(crate) fn auto_dismiss_relic_rewards(
 /// its "shut down" line hasn't reached EE.log yet). Skips the 5 s minimum display.
 pub(crate) fn close_reward_overlay(
     app: &tauri::AppHandle,
-    session_log_path: &std::path::Path,
-    diag_dir: &std::sync::Arc<std::sync::Mutex<Option<std::path::PathBuf>>>,
     reward_screen_active: &std::sync::Arc<std::sync::atomic::AtomicBool>,
     active_since: &mut Option<std::time::Instant>,
     last_dismiss_at: &mut Option<std::time::Instant>,
     rewards_emitted_ms: &std::sync::Arc<std::sync::atomic::AtomicU64>,
     reason: &str,
 ) {
-    let open_for = active_since.map(|since| since.elapsed().as_secs_f64());
-    append_to_diag(
-        session_log_path,
-        &format!(
-            "[STEP 4] {}\n├─ Time     : {}\n└─ Open for : {}\n\n",
-            reason,
-            chrono::Local::now().format("%H:%M:%S%.3f"),
-            open_for
-                .map(|seconds| format!("{seconds:.1}s"))
-                .unwrap_or_else(|| "(unknown)".to_string()),
-        ),
+    hexdesk_diag::info!(
+        overlay,
+        reason,
+        open_for_ms = active_since.map(|since| since.elapsed().as_millis() as u64),
+        "Relic reward overlay hidden"
     );
-    if let Ok(mut guard) = diag_dir.lock() {
-        if let Some(folder) = guard.take() {
-            let _ = std::fs::copy(session_log_path, folder.join("ocr_session_log.txt"));
-        }
-    }
     reward_screen_active.store(false, Ordering::SeqCst);
     *active_since = None;
     *last_dismiss_at = Some(std::time::Instant::now());
@@ -1050,78 +989,6 @@ pub(crate) fn build_fallback_reward_catalog(
     (!catalog.is_empty()).then(|| std::sync::Arc::new(catalog))
 }
 
-/// Start the diagnostic files for a relic-reward OCR session. `auto_capture_dir`
-/// is `Some` only when the user switched captures on (setting `autoDiagEnabled`):
-/// without a folder the screenshot and log copies below are skipped.
-pub(crate) fn prepare_reward_session(
-    session_log_path: &std::path::Path,
-    squad_names: &std::sync::Arc<std::sync::Mutex<Vec<String>>>,
-    trigger: RewardTrigger<'_>,
-    auto_capture_dir: Option<&std::path::Path>,
-    diag_dir: &std::sync::Arc<std::sync::Mutex<Option<std::path::PathBuf>>>,
-    last_found_path: &std::path::Path,
-) {
-    let RewardTrigger {
-        timestamp,
-        trigger_line,
-        prefilter_log,
-        catalog_len,
-    } = trigger;
-    let names = squad_names
-        .lock()
-        .map(|names| names.clone())
-        .unwrap_or_default();
-    let known_names = if names.is_empty() {
-        "  (none — names not yet seen in EE.log)".to_string()
-    } else {
-        names
-            .iter()
-            .map(|name| format!("  • {name}"))
-            .collect::<Vec<_>>()
-            .join("\n")
-    };
-    if let Err(error) = std::fs::write(
-        session_log_path,
-        format!(
-            "══════════════════════════════════════════════\n\\
-             RELIC OVERLAY SESSION — {}\n\\
-             ═════════════════════════════════════════════\n\\
-             Log path  : {}\n\n\\
-             [KNOWN PLAYERS — OCR username filter]\n\\
-             {}\n\n\\
-             [STEP 1] EE.log TRIGGER\n\\
-             ├─ Time     : {}\n\\
-             ├─ Line     : \"{}\"\n\\
-             ├─ Prefilter: {}\n\\
-             └─ Catalog  : {} items\n\n",
-            timestamp,
-            session_log_path.display(),
-            known_names,
-            timestamp,
-            trigger_line,
-            prefilter_log,
-            catalog_len,
-        ),
-    ) {
-        warn!(error = %error, "session log write failed");
-    }
-    let run_dir = auto_capture_dir
-        .map(|dir| dir.join(chrono::Local::now().format("%Y-%m-%d_%H-%M-%S").to_string()));
-    if let Some(dir) = &run_dir {
-        let _ = std::fs::create_dir_all(dir);
-    }
-    if let Ok(mut guard) = diag_dir.lock() {
-        *guard = run_dir;
-    }
-    let _ = std::fs::write(
-        last_found_path,
-        format!(
-            "=== {} ===\nEE.log trigger fired\n{}\n",
-            timestamp, trigger_line
-        ),
-    );
-}
-
 /// Prepare OCR hints immediately when a relic reward screen is triggered.
 pub(crate) fn prepare_reward_trigger(
     app: &tauri::AppHandle,
@@ -1163,19 +1030,13 @@ pub(crate) async fn wait_for_squad_hint(
 
 /// Capture the reward area and run OCR after reading the latest EE.log hints.
 pub(crate) async fn capture_reward_items(
-    app: &tauri::AppHandle,
     catalog: std::sync::Arc<Vec<(String, String)>>,
     squad_size: std::sync::Arc<std::sync::Mutex<Option<usize>>>,
     squad_names: std::sync::Arc<std::sync::Mutex<Vec<String>>>,
 ) -> Option<RewardOcrResult> {
-    let frame = std::sync::Arc::clone(&app.state::<AppState>().last_ocr_frame);
     tauri::async_runtime::spawn_blocking(move || {
         let (pixels, width, capture_height, game_height, capture_info) =
             crate::ocr::capture_warframe_reward_area()?;
-        // Keep the source frame for diagnostics without another GPU readback.
-        if let Ok(mut cached) = frame.lock() {
-            *cached = Some((pixels.clone(), width, capture_height));
-        }
         let hint_squad_size = squad_size.lock().ok().and_then(|hint| *hint);
         let player_names = squad_names
             .lock()
@@ -1197,59 +1058,16 @@ pub(crate) async fn capture_reward_items(
     .flatten()
 }
 
-/// Save a desktop screenshot the instant the EE.log trigger fires, before any
-/// OCR capture/matching work begins. Call only after `prepare_reward_session`
-/// has populated `diag_dir` with this trigger's folder.
-///
-/// This is the ground-truth anchor for "was the trigger seen on time": the
-/// reward screen (and any on-screen match/mission timer) is already visible
-/// in-game by the time EE.log writes the trigger line, so this BMP shows
-/// exactly what the player saw at the moment HexDesk detected it — letting
-/// a late-looking overlay be diagnosed as a late *detection* (compare this
-/// screenshot's timer against when the trigger fired) vs. slow *OCR
-/// processing* (compare this screenshot against the later `screenshot.bmp`
-/// and the per-attempt timestamps in the session log).
-pub(crate) fn schedule_trigger_moment_capture(
-    diag_dir: std::sync::Arc<std::sync::Mutex<Option<std::path::PathBuf>>>,
-) {
-    let folder = diag_dir.lock().ok().and_then(|guard| guard.clone());
-    if let Some(folder) = folder {
-        tauri::async_runtime::spawn_blocking(move || {
-            if let Some((pixels, width, height)) = crate::ocr::capture_desktop_for_diag() {
-                let _ = write_bmp(&folder.join("trigger_moment.bmp"), &pixels, width, height);
-            }
-        });
-    }
-}
-
-/// Save a delayed desktop screenshot after the relic overlay has animated in.
-pub(crate) fn schedule_reward_diagnostic_capture(
-    diag_dir: std::sync::Arc<std::sync::Mutex<Option<std::path::PathBuf>>>,
-) {
-    let folder = diag_dir.lock().ok().and_then(|guard| guard.clone());
-    if let Some(folder) = folder {
-        tauri::async_runtime::spawn(async move {
-            tokio::time::sleep(std::time::Duration::from_millis(4000)).await;
-            tauri::async_runtime::spawn_blocking(move || {
-                if let Some((pixels, width, height)) = crate::ocr::capture_desktop_for_diag() {
-                    let _ = write_bmp(&folder.join("screenshot.bmp"), &pixels, width, height);
-                }
-            })
-            .await
-            .ok();
-        });
-    }
-}
-
 /// Schedule the final cleanup when the normal EE.log dismissal never arrives.
 pub(crate) fn schedule_reward_safety_cleanup(
     app: tauri::AppHandle,
-    session_log_path: std::path::PathBuf,
-    diag_dir: std::sync::Arc<std::sync::Mutex<Option<std::path::PathBuf>>>,
-    also_write_diagnostics: bool,
+    screen_active: std::sync::Arc<std::sync::atomic::AtomicBool>,
 ) {
     tauri::async_runtime::spawn(async move {
         tokio::time::sleep(std::time::Duration::from_secs(20)).await;
+        // The screen normally closes through EE.log well before this; then the
+        // hide below only repeats what the close already did.
+        let still_open = screen_active.load(Ordering::SeqCst);
         if let Ok(mut rewards) = app.state::<AppState>().pending_relic_rewards.lock() {
             *rewards = None;
         }
@@ -1260,21 +1078,12 @@ pub(crate) fn schedule_reward_safety_cleanup(
                 y: -3000,
             }));
         }
-        if also_write_diagnostics {
-            append_to_diag(
-                &session_log_path,
-                "[STEP 4] AUTO-DISMISS (20s safety fallback)\n\n",
+        if still_open {
+            hexdesk_diag::info!(
+                overlay,
+                reason = "no close line in EE.log within 20 s of opening",
+                "Relic reward overlay hidden"
             );
-        } else {
-            let _ = append_to_file(
-                &session_log_path,
-                "[STEP 4] AUTO-DISMISS (20s safety fallback)\n\n",
-            );
-        }
-        if let Ok(mut guard) = diag_dir.lock() {
-            if let Some(folder) = guard.take() {
-                let _ = std::fs::copy(&session_log_path, folder.join("ocr_session_log.txt"));
-            }
         }
     });
 }
@@ -1297,14 +1106,11 @@ pub(crate) fn publish_relic_rewards(app: &tauri::AppHandle, payload: Option<&ser
     let _ = app.emit(events::RELIC_REWARDS, payload);
 }
 
-/// Emit the best partial result after OCR timed out, hide the overlay, and
-/// persist the session log to the diagnostic folder.
+/// Emit the best partial result after OCR timed out and hide the overlay.
 pub(crate) fn finalize_reward_ocr_timeout(
     app: &tauri::AppHandle,
     best_payload: Option<serde_json::Value>,
     active: &std::sync::atomic::AtomicBool,
-    session_log_path: &std::path::Path,
-    diag_dir: &std::sync::Arc<std::sync::Mutex<Option<std::path::PathBuf>>>,
 ) {
     let emit_val = if active.load(Ordering::SeqCst) {
         best_payload.unwrap_or(serde_json::Value::Null)
@@ -1312,10 +1118,6 @@ pub(crate) fn finalize_reward_ocr_timeout(
         serde_json::Value::Null
     };
     publish_relic_rewards(app, Some(&emit_val));
-    let _ = append_to_file(
-        session_log_path,
-        "[STEP 2] OCR TIMEOUT — 45 seconds elapsed, emitting best result\n\n",
-    );
     if let Some(win) = app.get_webview_window("relic-overlay") {
         let _ = win.set_position(tauri::Position::Physical(tauri::PhysicalPosition {
             x: 0,
@@ -1323,249 +1125,47 @@ pub(crate) fn finalize_reward_ocr_timeout(
         }));
     }
     active.store(false, Ordering::SeqCst);
-    if let Ok(mut g) = diag_dir.lock() {
-        if let Some(folder) = g.take() {
-            let _ = std::fs::copy(session_log_path, folder.join("ocr_session_log.txt"));
-        }
-    }
-}
-
-/// Log that the OCR loop was stopped by an external dismiss signal.
-pub(crate) fn log_reward_ocr_stopped(session_log_path: &std::path::Path) {
-    let _ = append_to_file(
-        session_log_path,
-        "[STEP 2] OCR STOPPED — dismiss signal received\n\n",
-    );
 }
 
 // ── OCR retry-loop helpers ────────────────────────────────────────────────────
 
-pub(crate) fn log_reward_dark_frame(
-    app: &tauri::AppHandle,
-    attempt: u32,
-    ts: &str,
-    dbg: &str,
-    session_log_path: &std::path::Path,
-    last_path: &std::path::Path,
-) -> u64 {
-    let entry = format!(
-        "[STEP 2] OCR ATTEMPT #{}\n\
-         ├─ Time     : {}\n\
-         └─ RESULT   : {} → PrintWindow returned dark image\n\
-            Check %TEMP%\\hexdesk_capture_debug.bmp\n\
-            Fix: switch Warframe to Borderless Windowed mode\n\
-            Retrying in 100ms…\n\n",
-        attempt, ts, dbg
-    );
-    let _ = append_to_file(session_log_path, &entry);
-    let _ = std::fs::write(last_path, format!("=== {} ===\n{} — retrying\n", ts, dbg));
+/// A dark frame: show it in the status line, retry soon. Returns the wait in ms.
+pub(crate) fn retry_after_dark_frame(app: &tauri::AppHandle, dbg: &str) -> u64 {
     let _ = app.emit(events::FF_STATUS, format!("⬛ {}", dbg));
     100
 }
 
-pub(crate) fn log_reward_ocr_empty(
-    app: &tauri::AppHandle,
-    attempt: u32,
-    ts: &str,
-    dbg: &str,
-    session_log_path: &std::path::Path,
-    last_path: &std::path::Path,
-) -> u64 {
-    let entry = format!(
-        "[STEP 2] OCR ATTEMPT #{}\n\
-         ├─ Time     : {}\n\
-         └─ RESULT   : {} → image has content but OCR found no text\n\
-            Check %TEMP%\\hexdesk_capture_debug.bmp\n\
-            Retrying in 300ms…\n\n",
-        attempt, ts, dbg
-    );
-    let _ = append_to_file(session_log_path, &entry);
-    let _ = std::fs::write(last_path, format!("=== {} ===\n{} — retrying\n", ts, dbg));
+/// No text read: show it in the status line, retry. Returns the wait in ms.
+pub(crate) fn retry_after_ocr_empty(app: &tauri::AppHandle, dbg: &str) -> u64 {
     let _ = app.emit(events::FF_STATUS, format!("⬜ {}", dbg));
     300
 }
 
-pub(crate) fn log_reward_capture_failed(
-    app: &tauri::AppHandle,
-    attempt: u32,
-    ts: &str,
-    session_log_path: &std::path::Path,
-    last_path: &std::path::Path,
-) -> u64 {
-    let entry = format!(
-        "[STEP 2] OCR ATTEMPT #{}\n\
-         ├─ Time     : {}\n\
-         └─ RESULT   : capture failed — Warframe window not found\n\
-            Retrying in 500ms…\n\n",
-        attempt, ts
-    );
-    let _ = append_to_file(session_log_path, &entry);
-    let _ = std::fs::write(
-        last_path,
-        format!("=== {} ===\nCapture failed (window not found?)\n", ts),
-    );
+/// The game window was not captured: retry. Returns the wait in ms.
+pub(crate) fn retry_after_capture_failed(app: &tauri::AppHandle) -> u64 {
     let _ = app.emit(events::FF_STATUS, "⚠️ Capture failed");
     500
 }
 
-pub(crate) fn log_reward_no_match(
+/// Text read but no reward matched. After three misses in a row the catalogue
+/// widens from this session's relics to every reward. Returns the wait in ms.
+pub(crate) fn retry_after_no_match(
     app: &tauri::AppHandle,
-    attempt_info: RewardAttempt<'_>,
     no_match_streak: &mut u32,
     cat: &mut std::sync::Arc<Vec<(String, String)>>,
     fallback_cat: &std::sync::Arc<Vec<(String, String)>>,
-    paths: RewardPaths<'_>,
-    diag_dir: &std::sync::Arc<std::sync::Mutex<Option<std::path::PathBuf>>>,
 ) -> u64 {
-    let RewardAttempt {
-        attempt,
-        ts,
-        items,
-        dbg,
-    } = attempt_info;
-    let RewardPaths {
-        session_log_path,
-        last_path,
-    } = paths;
     *no_match_streak += 1;
-    let expanded = if *no_match_streak == 3 && cat.len() < fallback_cat.len() {
+    if *no_match_streak == 3 && cat.len() < fallback_cat.len() {
         *cat = std::sync::Arc::clone(fallback_cat);
-        true
-    } else {
-        false
-    };
-    let cur_cat_len = cat.len();
-    let expand_note = if expanded {
-        format!(" [expanded to full catalog: {}]", cur_cat_len)
-    } else {
-        String::new()
-    };
-    let entry = format!(
-        "[STEP 2] OCR ATTEMPT #{}\n\
-         ├─ Time     : {}\n\
-         {}\n\
-         └─ RESULT   : no catalog match (catalog={}){}\u{2192} retrying in 700ms\n\n",
-        attempt, ts, dbg, cur_cat_len, expand_note
-    );
-    let _ = append_to_file(session_log_path, &entry);
-    let _ = std::fs::write(
-        last_path,
-        format!(
-            "=== {} ===\nno match (catalog={}): {:?}\n{}\n",
-            ts, cur_cat_len, items, dbg
-        ),
-    );
-    let _ = app.emit(events::FF_STATUS, "❌ No catalog match, retrying...");
-    if attempt == 1 {
-        let frame = app
-            .state::<AppState>()
-            .last_ocr_frame
-            .lock()
-            .ok()
-            .and_then(|g| g.clone());
-        let diag_snap = diag_dir.lock().ok().and_then(|g| g.clone());
-        if let (Some((px, w, h)), Some(folder)) = (frame, diag_snap) {
-            let _ = write_bmp(&folder.join("screenshot.bmp"), &px, w, h);
-        }
+        hexdesk_diag::info!(
+            overlay,
+            catalog = cat.len(),
+            "Reward catalogue widened to every reward after 3 reads without a match"
+        );
     }
+    let _ = app.emit(events::FF_STATUS, "❌ No catalog match, retrying...");
     700
-}
-
-pub(crate) fn log_reward_best_result(
-    attempt_info: RewardAttempt<'_>,
-    complete: bool,
-    confirm_ready: bool,
-    paths: RewardPaths<'_>,
-) {
-    let RewardAttempt {
-        attempt,
-        ts,
-        items,
-        dbg,
-    } = attempt_info;
-    let RewardPaths {
-        session_log_path,
-        last_path,
-    } = paths;
-    let label = if complete && confirm_ready {
-        "✅"
-    } else {
-        "⚡"
-    };
-    let status_label = if complete && confirm_ready {
-        "locked"
-    } else if complete {
-        "soft-complete, waiting for EE hint"
-    } else {
-        "waiting"
-    };
-    let _ = crate::append_to_file(
-        session_log_path,
-        &format!("{} {} items ({})", label, items.len(), status_label),
-    );
-    let result_label = if complete && confirm_ready {
-        "LOCKED & emitting"
-    } else if complete {
-        "soft-complete, retrying (waiting for EE hint)"
-    } else {
-        "saved, retrying"
-    };
-    let session_entry = format!(
-        "[STEP 2] OCR ATTEMPT #{}\n\
-         ├─ Time     : {}\n\
-         {}\n\
-         └─ RESULT   : {} items found \u{2192} {}\n\
-         \u{2514}\u{2500} Items    : {:?}\n\n",
-        attempt,
-        ts,
-        dbg,
-        items.len(),
-        result_label,
-        items,
-    );
-    let _ = append_to_file(session_log_path, &session_entry);
-    let _ = std::fs::write(
-        last_path,
-        format!("=== {} ===\nItems: {:?}\n{}\n", ts, items, dbg),
-    );
-}
-
-pub(crate) fn log_reward_partial_no_improvement(
-    attempt: u32,
-    ts: &str,
-    items: &[String],
-    dbg: &str,
-    session_log_path: &std::path::Path,
-) {
-    let _ = crate::append_to_file(
-        session_log_path,
-        &format!(
-            "[STEP 2] OCR ATTEMPT #{}\n\
-             \u{251c}\u{2500} Time     : {}\n\
-             {}\n\
-             \u{2514}\u{2500} RESULT   : {} items found (no improvement over best) \u{2192} retrying in 400ms\n\n",
-            attempt, ts, dbg, items.len()
-        ),
-    );
-}
-
-pub(crate) fn log_reward_confirm_no_improvement(
-    attempt: u32,
-    ts: &str,
-    items: &[String],
-    session_log_path: &std::path::Path,
-) {
-    let _ = crate::append_to_file(
-        session_log_path,
-        &format!(
-            "[STEP 2] OCR ATTEMPT #{} (confirm)\n\
-             \u{251c}\u{2500} Time     : {}\n\
-             \u{2514}\u{2500} {} items \u{2014} same as before, confirmed\n\n",
-            attempt,
-            ts,
-            items.len()
-        ),
-    );
 }
 
 // ── WFM whisper parsing ──────────────────────────────────────────────────────

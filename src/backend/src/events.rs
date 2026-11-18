@@ -35,6 +35,8 @@ pub const BULK_PRICES_UPDATED: &str = "bulk-prices-updated";
 pub const TRADE_COMPLETED: &str = "trade-completed";
 
 pub const BLOB_STATUS: &str = "blob-status";
+/// One new log entry for the activity console (main window only).
+pub const DIAG_ENTRY: &str = "diag-entry";
 pub const CACHE_STATUS: &str = "cache-status";
 pub const CONSOLE_LOGIN_SUCCESS: &str = "console-login-success";
 pub const FF_STATUS: &str = "ff-status";

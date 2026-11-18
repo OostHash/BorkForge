@@ -47,6 +47,8 @@ pub(crate) async fn factory_reset(
 /// is unreliable (e.g. after a Promise.race timeout on a hanging WFM API call).
 #[tauri::command]
 pub(crate) fn force_quit() {
+    // `exit` skips destructors, so write the log out first.
+    crate::logging::shutdown();
     std::process::exit(0);
 }
 

@@ -6,9 +6,7 @@ import { FoundryScreen } from "../screens/foundry/FoundryScreen";
 import { ItemWindowHost } from "../screens/market/ItemWindow";
 import { MarketScreen } from "../screens/market/MarketScreen";
 import { RivensScreen } from "../screens/rivens/RivensScreen";
-import { BatchPreviewDialog } from "../screens/inventory/BatchPreviewDialog";
 import { SettingsDialog, type SettingsTab } from "../screens/settings/SettingsDialog";
-import { setBatchPreviewOpen, useBatchPreviewOpen } from "../state/batchPreview";
 import { InventoryScreen } from "../screens/inventory/InventoryScreen";
 import { RelicsScreen } from "../screens/relics/RelicsScreen";
 import { TimersScreen } from "../screens/timers/TimersScreen";
@@ -44,7 +42,6 @@ export function AppShell() {
   const [screen, setScreen] = useState("inventory");
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsTab, setSettingsTab] = useState<SettingsTab>("general");
-  const batchPreviewOpen = useBatchPreviewOpen();
   const current = SCREENS.find((s) => s.id === screen) ?? SCREENS[0];
   // Stable: the changelog dock listens for the pop-out's requests with it.
   const openInventory = useCallback(() => {
@@ -141,13 +138,6 @@ export function AppShell() {
         onTabChange={setSettingsTab}
         onClose={() => {
           setSettingsOpen(false);
-        }}
-      />
-      {/* Opened from Settings → Debugging; on top of Settings. */}
-      <BatchPreviewDialog
-        open={batchPreviewOpen}
-        onClose={() => {
-          setBatchPreviewOpen(false);
         }}
       />
     </div>

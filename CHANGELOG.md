@@ -7,6 +7,42 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added
+
+- An activity console in Settings → Console shows what HexDesk does in the
+  background as it happens. Filter by level and by source, open an entry to
+  see its details and the reason it failed, follow one inventory scan or
+  overlay from start to end, and copy lines for a bug report.
+- A one-click diagnostics export in Settings → Debugging and in the console
+  saves a single zip with the logs, your settings and facts about your system
+  to your Downloads folder, ready to attach to a bug report. Passwords,
+  tokens, e-mail addresses and player names are removed from it.
+
+### Changed
+
+- The logs now say why something failed instead of only that it failed, for
+  example when Warframe's memory could not be read, no inventory was found,
+  warframe.market refused a request, or a relic overlay took long to appear.
+  Repeated identical lines are collapsed into one line with a count.
+- Error messages for warframe.market actions now name what failed and how
+  warframe.market answered.
+- Your Windows user name and player names no longer appear in log files.
+- Settings → Debugging now only holds the diagnostics export. What the old
+  tools wrote to separate files is in the log and the activity console.
+
+### Removed
+
+- The old debugging tools from Settings → Debugging: the overlay log, relic
+  captures, manual capture, inventory snapshots, memory probe, raw memory
+  record, memory relic debug, the relic pick OCR and overlay tests, the EE.log
+  tail, unmatched paths and the incoming batch preview. Inventory items the
+  catalogue cannot place are now listed in the log instead.
+- The Session log button on the Rivens screen; riven reads are in the
+  activity console.
+- The separate session and debug files HexDesk wrote to your temporary folder.
+  Debug files that earlier versions left behind, such as inventory snapshots,
+  memory dumps, captures and session logs, are deleted when HexDesk starts.
+
 ## [1.0.1] - 2026-11-17
 
 ### Fixed

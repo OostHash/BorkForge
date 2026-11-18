@@ -2,9 +2,9 @@ import type { InvokeArgs } from "@tauri-apps/api/core";
 import type { SyndicateStore, WeaponItem } from "../domain/completionist";
 import type { FoundryItem, RecipeComponent } from "../domain/foundry";
 import type { CacheStatuses } from "../domain/cache";
+import type { LogEntry } from "../domain/console";
 import type { RelicRewards } from "./events";
 import type { OcrRiven } from "../domain/rivenOverlay";
-import type { DebugFolder, SizedFolder } from "../domain/debug";
 import type { ChangeEntry } from "../domain/inventory";
 import type { WfmItemInfo, WfmItemOrders, WfmStatPoint } from "../domain/market";
 import type { CatalogItem } from "../domain/relics";
@@ -104,7 +104,6 @@ export interface CommandMap {
   save_riven_roll: { args: { weapon: string; label: string; statsJson: string; verdict: string; score: number }; result: string };
   delete_saved_riven_roll: { args: { id: string }; result: null };
   rename_saved_riven_roll: { args: { id: string; label: string }; result: null };
-  get_riven_session_log: { args: undefined; result: string };
   /** Rivens from the inventory blob. */
   get_rivens: { args: undefined; result: OwnedRiven[] };
   /** Weapon uniqueName → riven disposition (omega). */
@@ -217,33 +216,12 @@ export interface CommandMap {
   /** Appends "[FE] msg" to the overlay session log (Settings → Debugging → Overlay log). */
   log_relic_fe: { args: { msg: string }; result: null };
   // ── Debug and diagnostics (Settings → Debugging, vault debugging.md) ──
-  open_debug_folder: { args: { which: DebugFolder }; result: null };
-  /** Bytes in a debug folder or file. */
-  get_debug_data_size: { args: { which: SizedFolder }; result: number };
-  clear_debug_data: { args: { which: SizedFolder }; result: null };
-  /** Bytes in the relic captures folder. */
-  get_diag_folder_size: { args: undefined; result: number };
-  /** Empties the relic captures folder; returns the bytes left (0). */
-  clear_diag_folder: { args: undefined; result: number };
-  set_blob_log: { args: { enabled: boolean }; result: null };
-  set_api_log: { args: { enabled: boolean }; result: null };
-  get_overlay_session_log: { args: undefined; result: string };
-  /** Screenshot + scan log now; returns the folder. */
-  capture_diagnostics: { args: undefined; result: string };
-  /** Inventory strings from memory, one per line. */
-  dump_memory_probe: { args: undefined; result: string };
-  /** "started" or "stopped". */
-  toggle_raw_scan: { args: undefined; result: string };
-  /** Returns the log path; fails when it already runs. */
-  start_memory_relic_debug: { args: undefined; result: string };
-  stop_memory_relic_debug: { args: undefined; result: null };
-  debug_detect_fissure_era: { args: undefined; result: string };
-  test_relic_pick_overlay: { args: { era: string }; result: string };
-  debug_ee_log_tail: { args: undefined; result: string };
-  /** Returns the new state. */
-  toggle_debug_categorization: { args: undefined; result: boolean };
-  wfm_debug_dump: { args: { path: string }; result: string };
-  wfm_get_riven_attributes: { args: undefined; result: string[] };
+  /** The most recent log entries, oldest first (activity console); new ones follow as diag-entry events. */
+  get_recent_logs: { args: { limit?: number }; result: LogEntry[] };
+  /** Writes the diagnostics zip (logs, system facts, settings; redacted) and returns its path. */
+  export_diagnostics: { args: undefined; result: string };
+  /** Opens Explorer with an exported diagnostics zip selected. */
+  show_diagnostics_export: { args: { path: string }; result: null };
 }
 
 export type CommandName = keyof CommandMap;

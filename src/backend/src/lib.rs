@@ -1,7 +1,6 @@
 // ─── Imports ──────────────────────────────────────────────────────────────────
 
 use std::collections::HashMap;
-use std::io::Write;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
@@ -127,14 +126,6 @@ fn sanitize_chat_item_name(s: &str) -> String {
     } else {
         clean
     }
-}
-
-pub(crate) fn append_to_file(path: &std::path::Path, text: &str) -> std::io::Result<()> {
-    let mut f = std::fs::OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(path)?;
-    f.write_all(text.as_bytes())
 }
 
 // ─── State initialisation ─────────────────────────────────────────────────────
@@ -298,6 +289,8 @@ fn setup_app(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     use tauri::Manager;
 
     logging::init();
+    diagnostics::forward_entries_to(app.handle().clone());
+    diagnostics::remove_old_debug_files(&paths::cache_dir(), &std::env::temp_dir());
 
     match paths::root() {
         Some(root) => info!("app root: {} (dev)", root.display()),
@@ -361,7 +354,6 @@ fn setup_app(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
             app: app.handle().clone(),
             flag: state.monitor_active.clone(),
             relic_rewards: relic_rewards_map,
-            auto_capture_dir: state.auto_capture_dir.clone(),
         });
     }
 
@@ -446,10 +438,6 @@ async fn start_monitor(app: tauri::AppHandle, state: State<'_, AppState>) -> Res
             shared_unique: state.unique_quantities.clone(),
             shared_mods: state.current_mods.clone(),
             shared_crafting: state.current_crafting.clone(),
-            blob_log_enabled: state.blob_log_enabled.clone(),
-            blob_log_dir: state.blob_log_dir.clone(),
-            debug_cat_enabled: state.debug_cat_enabled.clone(),
-            unmatched_paths_dir: state.unmatched_paths_dir.clone(),
             force_pid_check: state.force_pid_check.clone(),
             blob_rx,
             blob_tx,
@@ -457,13 +445,8 @@ async fn start_monitor(app: tauri::AppHandle, state: State<'_, AppState>) -> Res
         catalog,
     );
 
-    // The EE.log tailer itself runs unconditionally from app startup (see `setup_app`) —
-    // only the relic-reward OCR trigger and this scan-only legacy worker are tied to
-    // the memory scanner's on/off state.
-    let debug_path = std::env::temp_dir().join("hexdesk_reward_debug.txt");
-    let last_found_path = std::env::temp_dir().join("hexdesk_last_reward.txt");
-    monitor::start_legacy_reward_worker(flag, debug_path, last_found_path);
-
+    // The EE.log tailer runs unconditionally from app startup (see `setup_app`);
+    // only its relic-reward OCR trigger follows the memory scanner's on/off state.
     Ok(())
 }
 
@@ -496,27 +479,8 @@ pub fn run() {
     let changes_log_path = cache_dir.join("inventory_changes.txt");
 
     let debug_root = cache_dir.join("Debugging");
-    let blob_log_dir = debug_root.join("Inventory Snapshots");
+    // Only the Companion API log is left here; it goes with that code (#23).
     let api_log_dir = debug_root.join("Api Responses");
-    let auto_capture_dir = debug_root.join("Auto-Capture");
-    let manual_capture_dir = debug_root.join("Manual Capture");
-    let memory_probe_dir = debug_root.join("Memory Probe");
-    let raw_scan_dir = debug_root.join("Raw Memory Record");
-    let unmatched_paths_dir = debug_root.join("Unmatched Paths");
-    let raw_scan_path = raw_scan_dir.join("raw_scan.txt");
-    let memory_probe_path = memory_probe_dir.join("memory_probe.txt");
-
-    for dir in &[
-        &blob_log_dir,
-        &api_log_dir,
-        &auto_capture_dir,
-        &manual_capture_dir,
-        &memory_probe_dir,
-        &raw_scan_dir,
-        &unmatched_paths_dir,
-    ] {
-        let _ = std::fs::create_dir_all(dir);
-    }
 
     let wfm_top_cache_path = cache_dir.join("wfm_top_cache.json");
     let syndicate_catalog_path = cache_dir.join("syndicate_catalog.json");
@@ -613,13 +577,8 @@ pub fn run() {
             current_mods: Arc::new(Mutex::new(initial.mods)),
             api_quantities_cache: Arc::new(Mutex::new(HashMap::new())),
             api_mod_copies_cache: Arc::new(Mutex::new(Vec::new())),
-            last_ocr_frame: Arc::new(Mutex::new(None)),
             current_crafting: Arc::new(Mutex::new(vec![])),
             monitor_active: Arc::new(AtomicBool::new(false)),
-            raw_scan_active: Arc::new(AtomicBool::new(false)),
-            raw_scan_path,
-            blob_log_enabled: Arc::new(AtomicBool::new(false)),
-            blob_log_dir,
             api_log_enabled: Arc::new(AtomicBool::new(false)),
             api_log_dir,
             wfm: {
@@ -644,11 +603,6 @@ pub fn run() {
             relics_run_prices: Mutex::new(initial.relics_run_prices),
             relics_run_prices_cache_path,
             worldstate_cache: Mutex::new(None),
-            debug_cat_enabled: Arc::new(AtomicBool::new(false)),
-            auto_capture_dir,
-            manual_capture_dir,
-            memory_probe_path,
-            unmatched_paths_dir,
             corrections: initial.corrections,
             force_pid_check: Arc::new(AtomicBool::new(false)),
             relic_pick_overlay_enabled: Arc::new(AtomicBool::new(false)),
@@ -669,18 +623,13 @@ pub fn run() {
             stats::get_item_snapshots,
             trade_log::get_trades,
             trade_log::add_trade,
-            diagnostics::clear_cache,
+            monitor::clear_cache,
             settings::load_settings,
             settings::save_settings,
             companion_api::log_api_changes,
-            diagnostics::dump_memory_probe,
-            diagnostics::toggle_raw_scan,
-            diagnostics::set_blob_log,
-            diagnostics::set_api_log,
             settings::force_quit,
             catalogue::get_weapon_catalog,
             catalogue::get_craftable_items,
-            diagnostics::toggle_debug_categorization,
             catalogue::get_recipe,
             catalogue::get_recipes_bulk,
             catalogue::get_relic_drops,
@@ -706,9 +655,6 @@ pub fn run() {
             rivens::reload_riven_database,
             rivens::analyze_riven,
             rivens::ocr_riven_screen,
-            diagnostics::get_riven_session_log,
-            wfm_commands::wfm_debug_dump,
-            wfm_commands::wfm_get_riven_attributes,
             wfm_commands::wfm_get_item_orders,
             wfm_commands::wfm_get_item_statistics,
             wfm_commands::wfm_refresh_token,
@@ -744,20 +690,16 @@ pub fn run() {
             syndicates::get_syndicate_stores,
             syndicates::get_research_lab_stores,
             worldstate::fetch_worldstate,
-            diagnostics::get_warframe_window_rect,
-            diagnostics::get_overlay_session_log,
+            relic_pick::get_warframe_window_rect,
             relic_pick::get_pending_relic_rewards,
             diagnostics::log_relic_fe,
             relic_pick::show_overlay_window,
             relic_pick::move_overlay_offscreen,
-            diagnostics::get_diag_folder_size,
-            diagnostics::clear_diag_folder,
-            diagnostics::capture_diagnostics,
             image_cache::get_img_cache_dir,
             image_cache::prewarm_image_cache,
-            diagnostics::open_debug_folder,
-            diagnostics::clear_debug_data,
-            diagnostics::get_debug_data_size,
+            diagnostics::export_diagnostics,
+            diagnostics::show_diagnostics_export,
+            diagnostics::get_recent_logs,
             start_monitor,
             monitor::stop_monitor,
             monitor::poke_scan,
@@ -766,17 +708,12 @@ pub fn run() {
             monitor::get_monitor_status,
             platform::get_system_locale,
             catalogue::get_current_crafting,
-            relic_pick::debug_detect_fissure_era,
-            relic_pick::test_relic_pick_overlay,
             relic_pick::hide_relic_pick_overlay,
             relic_pick::show_relic_pick_window,
-            relic_pick::debug_ee_log_tail,
             console_login::open_console_login,
             wfcd::get_drop_data,
             pricing::get_cache_statuses,
             pricing::refresh_all_caches,
-            diagnostics::start_memory_relic_debug,
-            diagnostics::stop_memory_relic_debug,
         ])
         .on_window_event(|window, event| {
             let label = window.label().to_string();
@@ -798,6 +735,8 @@ pub fn run() {
                         // State is already saved on every Moved/Resized event.
                     }
                     tauri::WindowEvent::Destroyed if label == "main" => {
+                        // `exit` skips destructors, so write the log out first.
+                        logging::shutdown();
                         std::process::exit(0);
                     }
                     _ => {}

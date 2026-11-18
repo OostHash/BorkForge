@@ -1,9 +1,8 @@
 use std::collections::HashMap;
-use tauri::{Emitter, Manager, State};
+use tauri::{Manager, State};
 use tracing::{debug, info};
 
 use crate::app_state::AppState;
-use crate::events;
 
 // ── Relic pick overlay ────────────────────────────────────────────────────────
 
@@ -31,6 +30,12 @@ fn saved_offset(app: &tauri::AppHandle, prefix: &str) -> (f64, f64) {
 pub(crate) fn relic_pick_show(app: &tauri::AppHandle) {
     use tauri::Manager;
     let Some(win) = app.get_webview_window("relic-pick-overlay") else {
+        let _ = hexdesk_diag::DiagError::new(
+            hexdesk_diag::Source::Overlay,
+            hexdesk_diag::Kind::NotFound,
+            "Relic Pick overlay could not be shown: its window does not exist",
+        )
+        .log();
         return;
     };
     // Position: right edge of the primary monitor, 20px from top.
@@ -50,38 +55,41 @@ pub(crate) fn relic_pick_show(app: &tauri::AppHandle) {
         x: x + off_x,
         y: 20.0 + off_y,
     }));
-    let _ = win.show();
+    match win.show() {
+        Ok(()) => hexdesk_diag::info!(overlay, "Relic Pick overlay shown"),
+        Err(e) => {
+            let _ = hexdesk_diag::DiagError::new(
+                hexdesk_diag::Source::Overlay,
+                hexdesk_diag::Kind::Internal,
+                "Relic Pick overlay could not be shown",
+            )
+            .caused_by(&e)
+            .log();
+        }
+    }
 }
 
 pub(crate) fn relic_pick_hide(app: &tauri::AppHandle) {
     use tauri::Manager;
     let Some(win) = app.get_webview_window("relic-pick-overlay") else {
+        hexdesk_diag::debug!(
+            overlay,
+            "Relic Pick overlay not hidden: its window does not exist"
+        );
         return;
     };
-    let _ = win.hide();
-}
-
-/// Debug: run OCR on the top-left quarter of the Warframe window and report the detected era.
-#[tauri::command]
-pub(crate) fn debug_detect_fissure_era() -> String {
-    match crate::ocr::detect_fissure_era() {
-        Some(era) => format!("Detected era: {}", era),
-        None => "No era detected — OCR found no known fissure era label in the top-left quarter."
-            .to_string(),
+    match win.hide() {
+        Ok(()) => hexdesk_diag::info!(overlay, "Relic Pick overlay hidden"),
+        Err(e) => {
+            let _ = hexdesk_diag::DiagError::new(
+                hexdesk_diag::Source::Overlay,
+                hexdesk_diag::Kind::Internal,
+                "Relic Pick overlay could not be hidden",
+            )
+            .caused_by(&e)
+            .log();
+        }
     }
-}
-
-/// Debug: manually fire the relic pick overlay for a given era.
-#[tauri::command]
-pub(crate) fn test_relic_pick_overlay(era: String, app: tauri::AppHandle) -> String {
-    let payload = build_relic_pick_payload(&era, &app);
-    let relic_count = payload["relics"].as_array().map_or(0, |a| a.len());
-    relic_pick_show(&app);
-    let _ = app.emit(events::RELIC_PICK_OPEN, &payload);
-    format!(
-        "Emitted relic-pick-open: era={}, {} relics in inventory",
-        era, relic_count
-    )
 }
 
 /// Debug/preview: hide the relic pick overlay again (pairs with test_relic_pick_overlay).
@@ -90,40 +98,20 @@ pub(crate) fn hide_relic_pick_overlay(app: tauri::AppHandle) {
     relic_pick_hide(&app);
 }
 
+/// Returns the Warframe game CLIENT AREA as [x, y, width, height] in screen pixels.
+/// Uses GetClientRect + ClientToScreen so the rect matches what the OCR captures —
+/// both exclude the window title bar and borders in windowed mode.
+#[tauri::command]
+pub(crate) fn get_warframe_window_rect() -> Result<[i32; 4], String> {
+    use crate::platform::{Platform, WindowManager};
+    Platform::get_warframe_window_rect()
+}
+
 /// Position and show the pick window without emitting a payload — used by the
 /// outline toggle and by live offset changes, which only need the placement.
 #[tauri::command]
 pub(crate) fn show_relic_pick_window(app: tauri::AppHandle) {
     relic_pick_show(&app);
-}
-
-/// Debug: return the last ~4 KB of EE.log so we can see what strings appear when
-/// opening the relic selection screen. Call this immediately after opening the screen.
-#[tauri::command]
-pub(crate) fn debug_ee_log_tail() -> String {
-    use std::io::{Read, Seek, SeekFrom};
-    let log_path = match dirs::data_local_dir() {
-        Some(d) => d.join("Warframe").join("EE.log"),
-        None => return "Cannot find LocalAppData".to_string(),
-    };
-    let mut f = match std::fs::File::open(&log_path) {
-        Ok(f) => f,
-        Err(e) => return format!("Cannot open EE.log: {}", e),
-    };
-    let len = f.seek(SeekFrom::End(0)).unwrap_or(0);
-    let start = len.saturating_sub(4096);
-    if f.seek(SeekFrom::Start(start)).is_err() {
-        return "Seek failed".to_string();
-    }
-    let mut buf = String::new();
-    let _ = f.read_to_string(&mut buf);
-    // Skip partial first line if we started mid-file
-    let tail = if start > 0 {
-        buf.find('\n').map(|i| &buf[i + 1..]).unwrap_or(&buf)
-    } else {
-        &buf
-    };
-    tail.to_string()
 }
 
 #[derive(serde::Serialize, Clone)]
