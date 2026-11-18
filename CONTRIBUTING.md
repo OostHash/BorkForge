@@ -48,7 +48,7 @@ pnpm desktop:dev
 | `master`         | Released code only. Every commit here is a released version. |
 | `release/x.y`    | Development of the next minor version. One at a time.      |
 | `hotfix/x.y.z`   | Urgent patch on top of a release, branched from `master`.  |
-| `feat/…`, `fix/…`| Short-lived topic branches for a single issue.             |
+| `feat/…`, `fix/…`| Short-lived topic branches for an issue or a group of related issues. |
 
 - Topic branches start from the active `release/x.y` branch and are merged
   back into it through a pull request.
@@ -57,6 +57,10 @@ pnpm desktop:dev
   lost.
 - Name topic branches after the issue: `feat/12-collapsible-navigation`,
   `fix/31-stale-prices`.
+- Related issues that build on each other may share one topic branch and one
+  pull request that closes all of them (`Closes #1, #2, #3`). Name the branch
+  after the shared topic, for example `feat/diagnostics`. Supporting work that
+  the issues need does not get its own issue; describe it in the pull request.
 
 ## Commits
 
