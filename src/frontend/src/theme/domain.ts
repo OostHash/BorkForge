@@ -1,7 +1,7 @@
 /**
  * Layer 3: domain colours (rarity, relics, syndicates, transactions, ...).
  * Not UI roles: never used for chrome, only passed to a primitive as
- * --ff-tone (plan 6.7). Not exposed as Tailwind colours. Values come from the
+ * --ff-tone. Not exposed as Tailwind colours. Values come from the
  * current app and stay equal across themes until fase 7 decides otherwise.
  */
 export const domainColors = {
@@ -96,7 +96,7 @@ export type DomainColor = keyof typeof domainColors;
 
 /**
  * data-cvd="on": domain colours whose meaning rests on green versus red
- * (gain/loss, owned/vaulted) move to blue/orange (plan 6.7).
+ * (gain/loss, owned/vaulted) move to blue/orange.
  */
 export const cvdDomainColors = {
   "txn-sale": "#56b4e9",

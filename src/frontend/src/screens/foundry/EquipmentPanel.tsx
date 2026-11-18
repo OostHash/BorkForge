@@ -62,7 +62,7 @@ const CHIP_GROUPS: ReadonlyArray<{ label: string; chips: readonly ChipDef[] }> =
     label: "Ownership",
     chips: [
       { key: "filterOwned", label: "Owned" },
-      // Treats Forma and Kuva as always owned when filtering, like the current app.
+      // Treats Forma and Kuva as always owned when filtering.
       { key: "ignoreFormaKuva", label: "Count Forma/Kuva as owned" },
     ],
   },

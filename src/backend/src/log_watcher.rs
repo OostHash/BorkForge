@@ -235,7 +235,7 @@ pub(crate) fn handle_riven_events(
     {
         *last_riven_fire = Some(std::time::Instant::now());
         let _ = app.emit(events::RIVEN_SCREEN_OPEN, ());
-        let _ = app.emit(events::FF_STATUS, "🎲 Riven screen detected");
+        let _ = app.emit(events::STATUS_LINE, "🎲 Riven screen detected");
     }
 
     // ── Riven screen close — card UI hidden (primary) ─────────────────
@@ -1131,19 +1131,19 @@ pub(crate) fn finalize_reward_ocr_timeout(
 
 /// A dark frame: show it in the status line, retry soon. Returns the wait in ms.
 pub(crate) fn retry_after_dark_frame(app: &tauri::AppHandle, dbg: &str) -> u64 {
-    let _ = app.emit(events::FF_STATUS, format!("⬛ {}", dbg));
+    let _ = app.emit(events::STATUS_LINE, format!("⬛ {}", dbg));
     100
 }
 
 /// No text read: show it in the status line, retry. Returns the wait in ms.
 pub(crate) fn retry_after_ocr_empty(app: &tauri::AppHandle, dbg: &str) -> u64 {
-    let _ = app.emit(events::FF_STATUS, format!("⬜ {}", dbg));
+    let _ = app.emit(events::STATUS_LINE, format!("⬜ {}", dbg));
     300
 }
 
 /// The game window was not captured: retry. Returns the wait in ms.
 pub(crate) fn retry_after_capture_failed(app: &tauri::AppHandle) -> u64 {
-    let _ = app.emit(events::FF_STATUS, "⚠️ Capture failed");
+    let _ = app.emit(events::STATUS_LINE, "⚠️ Capture failed");
     500
 }
 
@@ -1164,7 +1164,7 @@ pub(crate) fn retry_after_no_match(
             "Reward catalogue widened to every reward after 3 reads without a match"
         );
     }
-    let _ = app.emit(events::FF_STATUS, "❌ No catalog match, retrying...");
+    let _ = app.emit(events::STATUS_LINE, "❌ No catalog match, retrying...");
     700
 }
 

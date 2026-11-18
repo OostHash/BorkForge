@@ -208,14 +208,13 @@ export interface CommandMap {
   set_relic_pick_enabled: { args: { enabled: boolean }; result: null };
   /** Places and shows the relic pick window (no payload): previews and offset changes. */
   show_relic_pick_window: { args: undefined; result: null };
-  hide_relic_pick_overlay: { args: undefined; result: null };
   /** Reads the riven card on screen (OCR). */
   ocr_riven_screen: { args: undefined; result: OcrRiven };
   /** Appends a line to the riven session log. */
   ocr_riven_log_error: { args: { error: string }; result: null };
   /** Appends "[FE] msg" to the overlay session log (Settings → Debugging → Overlay log). */
   log_relic_fe: { args: { msg: string }; result: null };
-  // ── Debug and diagnostics (Settings → Debugging, vault debugging.md) ──
+  // ── Diagnostics (Settings → Debugging, Settings → Console) ──
   /** The most recent log entries, oldest first (activity console); new ones follow as diag-entry events. */
   get_recent_logs: { args: { limit?: number }; result: LogEntry[] };
   /** Writes the diagnostics zip (logs, system facts, settings; redacted) and returns its path. */

@@ -4,8 +4,8 @@ import type { CatalogItem } from "./relics.ts";
 import { matchesTerms, splitSearchTerms } from "./relics.ts";
 
 /**
- * Inventory logic, same rules as the current app (vault/frontend-ports/inventory.md).
- * Filters keep the current app's shape, so saved presets stay compatible.
+ * Inventory logic.
+ * Filters keep a stable shape, so saved presets stay compatible.
  */
 
 export const CATEGORIES: ReadonlyArray<{ id: string; label: string }> = [
@@ -241,7 +241,7 @@ export function recentDelta(changes: readonly ChangeEntry[], uniqueName: string,
 
 const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
 
-/** Same validation and legacy migration as the current app (types/filterPresets.ts). */
+/** (types/filterPresets.ts). */
 export const inventoryPresetCodec: PresetCodec<InventoryFilters> = {
   module: "inventory",
   decode: (v) => {

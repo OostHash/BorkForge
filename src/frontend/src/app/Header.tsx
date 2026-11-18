@@ -24,7 +24,7 @@ import { Button, IconButton } from "../primitives/actions";
 import { Badge } from "../primitives/display";
 import { Popover } from "../primitives/overlay";
 
-/** Stays a little after "Refresh all data", like the current app. */
+/** Stays a little after "Refresh all data". */
 const REFRESH_FEEDBACK_MS = 2000;
 
 type Props = {
@@ -34,7 +34,7 @@ type Props = {
   onOpenSettings: () => void;
 };
 
-/** Top bar of the main window: account, update and status chips (vault header.md). */
+/** Top bar of the main window: account, update and status chips. */
 export function Header({ onOpenScreen, onOpenSettings }: Props) {
   return (
     <header className="flex shrink-0 flex-wrap items-center gap-2 border-b border-border bg-surface px-4 py-2">
@@ -74,7 +74,7 @@ function Account() {
   );
 }
 
-/** Backend status line (ff-status), shown for a few seconds. */
+/** Backend status line (status-line), shown for a few seconds. */
 function OverlayStatus() {
   const text = useOverlayStatus();
   // display: contents — the live region takes no space (or flex gap) while empty.

@@ -25,7 +25,7 @@ const DENSITY_OPTIONS = DENSITY_CHOICES.map((value) => ({ value, label: DENSITY_
 
 const percent = (scale: number) => `${String(Math.round(scale * 100))}%`;
 
-/** Theme, contrast, colours, density, text size and clock (vault settings.md, theming-7a.md). */
+/** Theme, contrast, colours, density, text size and clock. */
 function AppearanceGroup() {
   const { settings, set } = useSettingsFile();
   const prefs = usePreferences();

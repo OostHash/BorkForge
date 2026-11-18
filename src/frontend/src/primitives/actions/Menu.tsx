@@ -37,9 +37,8 @@ type Props = {
 };
 
 /**
- * Action menu built on React Aria (plan 7.3): role="menu", roving focus,
+ * Action menu built on React Aria: role="menu", roving focus,
  * arrow keys, typeahead, Escape and focus restore to the trigger.
- * Replaces the mouse-only CtxMenu of the current app.
  */
 export function Menu({
   trigger,

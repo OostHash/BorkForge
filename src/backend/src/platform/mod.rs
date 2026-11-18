@@ -45,17 +45,6 @@ pub trait ProcessHandle {
     /// so the count is the whole answer: there is no "try again for the rest".
     fn read_into(&self, addr: usize, buf: &mut [u8]) -> usize;
 
-    /// Reads `len` bytes, allocating a fresh buffer. Prefer `read_into` in
-    /// hot loops; this is a convenience wrapper for one-off reads.
-    fn read(&self, addr: usize, len: usize) -> Option<Vec<u8>> {
-        let mut buf = vec![0u8; len];
-        let n = self.read_into(addr, &mut buf);
-        (n > 0).then(|| {
-            buf.truncate(n);
-            buf
-        })
-    }
-
     /// Maps regions at or after `from`, in ascending address order.
     /// Yields one region per step, as the OS queries it.
     fn regions_from(&self, from: usize) -> Box<dyn Iterator<Item = MemoryRegionInfo> + '_>;

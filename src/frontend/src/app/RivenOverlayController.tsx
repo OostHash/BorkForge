@@ -8,7 +8,7 @@ import { getPreferences } from "../state/preferences";
 
 /**
  * Main window: runs the riven check (OCR, then analysis) and owns the riven
- * overlay window (vault overlay-riven.md). It keeps the latest view, so a
+ * overlay window. It keeps the latest view, so a
  * window that just opened asks for it (riven-window-ready) instead of
  * racing the result.
  */

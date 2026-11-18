@@ -92,12 +92,6 @@ pub(crate) fn relic_pick_hide(app: &tauri::AppHandle) {
     }
 }
 
-/// Debug/preview: hide the relic pick overlay again (pairs with test_relic_pick_overlay).
-#[tauri::command]
-pub(crate) fn hide_relic_pick_overlay(app: tauri::AppHandle) {
-    relic_pick_hide(&app);
-}
-
 /// Returns the Warframe game CLIENT AREA as [x, y, width, height] in screen pixels.
 /// Uses GetClientRect + ClientToScreen so the rect matches what the OCR captures —
 /// both exclude the window title bar and borders in windowed mode.

@@ -1,7 +1,7 @@
 import type { RecipeComponent } from "./foundry";
 import type { CatalogItem } from "./relics";
 
-/** Relic reward overlay rules (vault overlay-relic-reward.md). Pure functions. */
+/** Relic reward overlay rules. Pure functions. */
 
 export const OVERLAY_PRIORITIES = ["completion", "setPlat", "plat", "ducat"] as const;
 export type OverlayPriority = (typeof OVERLAY_PRIORITIES)[number];
@@ -273,7 +273,7 @@ export function stripBounds(
 
 // ── Preview ─────────────────────────────────────────────────────────────────
 
-/** What Settings → Overlays → Show draws: the current app's example cards. */
+/** What Settings → Overlays → Show draws: example cards. */
 export const PREVIEW_CARDS: readonly RewardCard[] = [
   {
     key: "preview-0",

@@ -24,7 +24,7 @@ import { WindowTitleBar } from "./WindowTitleBar";
 
 type ScreenDef = { id: string; label: string; icon: LucideIcon; Screen: ComponentType };
 
-/** Ported screens. Grows as screens move over (vault plan, port ledger). */
+/** Ported screens. Grows as screens move over. */
 const SCREENS: readonly ScreenDef[] = [
   { id: "inventory", label: "Inventory", icon: Backpack, Screen: InventoryScreen },
   { id: "foundry", label: "Foundry", icon: Hammer, Screen: FoundryScreen },

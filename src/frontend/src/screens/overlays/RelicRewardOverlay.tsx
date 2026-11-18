@@ -121,8 +121,8 @@ export function nextSession(prev: Session, rewards: RelicRewards): Session {
 
 /**
  * The relic reward overlay window (relic-overlay, ?overlay): a card per reward
- * slot with prices and set progress, and an arrow over the best pick
- * (vault overlay-relic-reward.md). Transparent around the cards.
+ * slot with prices and set progress, and an arrow over the best pick.
+ * Transparent around the cards.
  */
 export function RelicRewardOverlay() {
   const [session, setSession] = useState<Session>(IDLE);

@@ -128,7 +128,7 @@ export function useOwnership(): { ownership: Ownership; isPending: boolean; isEr
 }
 
 /**
- * Writes an inventory-update event into the cache, like the current app:
+ * Writes an inventory-update event into the cache:
  * quantities are replaced, mastery is merged, consumed suits only replace
  * the cache when the scanner reported any.
  */

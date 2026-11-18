@@ -12,7 +12,7 @@ import { offsetsFrom, type OverlayOffsets } from "../domain/overlayOffsets";
 import { worthAnalysing, type OcrRiven, type OverlayAnalysis } from "../domain/rivenOverlay";
 import { useCrafting, useQuantities } from "./inventory";
 
-/** Overlay switches and choices from the shared settings file (vault overlay-relic-reward.md). */
+/** Overlay switches and choices from the shared settings file. */
 export type OverlayPrefs = {
   /** All overlays (default on). */
   overlaysEnabled: boolean;
@@ -98,7 +98,7 @@ export async function hideRewardPreview(): Promise<void> {
   await emitEvent("relic-reward-preview-close");
 }
 
-// ── Backend status line (ff-status) ─────────────────────────────────────────
+// ── Backend status line (status-line) ─────────────────────────────────────────
 
 const statusKey = ["overlay", "status"] as const;
 

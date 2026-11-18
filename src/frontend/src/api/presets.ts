@@ -18,7 +18,7 @@ import { useSaveSettings, useSettings } from "./settings";
 /**
  * Filter presets of one screen, stored in the shared settings file
  * (`filterPresets`). Applying a pinned preset twice restores the filters
- * from before it when the user enabled that option, like the current app.
+ * from before it when the user enabled that option.
  */
 export function useFilterPresets<F>(codec: PresetCodec<F>, filters: F, setFilters: (f: F) => void, defaults: F) {
   const { data } = useSettings();

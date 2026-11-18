@@ -82,7 +82,7 @@ export function RelicOverlayController() {
     keep(onEvent("relic-screen", hide));
     keep(onEvent("overlays-disabled", hide));
     keep(
-      onEvent("ff-status", (text) => {
+      onEvent("status-line", (text) => {
         setOverlayStatus(queryClient, text);
         window.clearTimeout(statusTimer);
         statusTimer = window.setTimeout(() => {

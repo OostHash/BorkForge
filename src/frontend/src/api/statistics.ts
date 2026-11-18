@@ -100,7 +100,7 @@ export function useTrackActions() {
 
 const ORDER_KEY = "ff-item-report-order";
 
-/** Card order, shared with the current app. */
+/** Card order. */
 export function useCardOrder(): [string[], (order: string[]) => void] {
   const [order, setOrder] = useState<string[]>(() => {
     try {

@@ -22,8 +22,6 @@ mod app_state;
 mod blob_capture;
 mod cache;
 mod catalogue;
-mod companion_api;
-mod console_login; // [console-login feature] remove this line to drop the feature
 mod credentials;
 mod db;
 mod diagnostics;
@@ -36,8 +34,6 @@ mod mem_regions;
 mod memory_scanner;
 mod monitor;
 mod ocr;
-#[cfg(test)]
-mod ocr_bench;
 mod ocr_fallback;
 mod paths;
 mod platform;
@@ -105,10 +101,6 @@ struct InitialState {
 }
 
 // ─── Helper functions ─────────────────────────────────────────────────────────
-
-pub(crate) fn truncate_chars(s: &str, n: usize) -> String {
-    s.chars().take(n).collect()
-}
 
 fn sanitize_chat_item_name(s: &str) -> String {
     let rank = s
@@ -475,12 +467,6 @@ pub fn run() {
     let quantities_cache_path = cache_dir.join("quantities_cache.json");
     let inventory_state_cache_path = cache_dir.join("inventory_state_cache.json");
     let settings_path = config_dir.join("settings.json");
-    let log_path = cache_dir.join("scan_log.txt");
-    let changes_log_path = cache_dir.join("inventory_changes.txt");
-
-    let debug_root = cache_dir.join("Debugging");
-    // Only the Companion API log is left here; it goes with that code (#23).
-    let api_log_dir = debug_root.join("Api Responses");
 
     let wfm_top_cache_path = cache_dir.join("wfm_top_cache.json");
     let syndicate_catalog_path = cache_dir.join("syndicate_catalog.json");
@@ -542,9 +528,6 @@ pub fn run() {
 
     // ── Tauri builder ──────────────────────────────────────────────────────
     tauri::Builder::default()
-        .register_uri_scheme_protocol("ffauth", |ctx, req| {
-            console_login::handle_ffauth(ctx.app_handle(), &req)
-        })
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
@@ -562,8 +545,6 @@ pub fn run() {
             quantities_cache_path,
             inventory_state_cache_path,
             settings_path,
-            log_path,
-            changes_log_path,
             conn: Mutex::new(conn),
             wfcd_items: Mutex::new(initial.items),
             recipes: Mutex::new(initial.recipes),
@@ -575,12 +556,8 @@ pub fn run() {
             current_quantities: Arc::new(Mutex::new(initial.quantities)),
             unique_quantities: Arc::new(Mutex::new(initial.unique)),
             current_mods: Arc::new(Mutex::new(initial.mods)),
-            api_quantities_cache: Arc::new(Mutex::new(HashMap::new())),
-            api_mod_copies_cache: Arc::new(Mutex::new(Vec::new())),
             current_crafting: Arc::new(Mutex::new(vec![])),
             monitor_active: Arc::new(AtomicBool::new(false)),
-            api_log_enabled: Arc::new(AtomicBool::new(false)),
-            api_log_dir,
             wfm: {
                 let w = Arc::new(Wfm::new());
                 for (slug, price) in initial.wfm_prices {
@@ -626,11 +603,9 @@ pub fn run() {
             monitor::clear_cache,
             settings::load_settings,
             settings::save_settings,
-            companion_api::log_api_changes,
             settings::force_quit,
             catalogue::get_weapon_catalog,
             catalogue::get_craftable_items,
-            catalogue::get_recipe,
             catalogue::get_recipes_bulk,
             catalogue::get_relic_drops,
             wfm_commands::fetch_wfm_items,
@@ -678,15 +653,9 @@ pub fn run() {
             wfm_commands::wfm_delete_auction,
             wfm_commands::wfm_update_auction,
             wfm_commands::wfm_set_auction_visible,
-            companion_api::scan_warframe_credentials,
-            companion_api::scan_warframe_api_urls,
-            companion_api::warframe_login,
-            companion_api::fetch_warframe_inventory,
-            companion_api::save_mastery_data,
-            companion_api::get_saved_inventory,
-            companion_api::get_rivens,
+            monitor::get_saved_inventory,
+            monitor::get_rivens,
             rivens::get_weapon_dispositions,
-            companion_api::save_api_inventory,
             syndicates::get_syndicate_stores,
             syndicates::get_research_lab_stores,
             worldstate::fetch_worldstate,
@@ -708,9 +677,7 @@ pub fn run() {
             monitor::get_monitor_status,
             platform::get_system_locale,
             catalogue::get_current_crafting,
-            relic_pick::hide_relic_pick_overlay,
             relic_pick::show_relic_pick_window,
-            console_login::open_console_login,
             wfcd::get_drop_data,
             pricing::get_cache_statuses,
             pricing::refresh_all_caches,
@@ -745,18 +712,4 @@ pub fn run() {
         })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
-}
-
-// ─── Tests ────────────────────────────────────────────────────────────────────
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn truncate_chars_splits_on_characters_not_bytes() {
-        assert_eq!(truncate_chars("éé", 3), "éé");
-        assert_eq!(truncate_chars("éé", 1), "é");
-        assert_eq!(truncate_chars("abc", 2), "ab");
-    }
 }

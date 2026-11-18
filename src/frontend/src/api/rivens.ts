@@ -45,7 +45,7 @@ export function useSavedRolls() {
   return useQuery({ queryKey: rivenKeys.saved, queryFn: () => invoke("get_saved_riven_rolls"), staleTime: Infinity });
 }
 
-/** Save, update (delete + save, like the current app), rename and delete saved rolls. */
+/** Save, update (delete + save), rename and delete saved rolls. */
 export function useRollActions() {
   const queryClient = useQueryClient();
   const refresh = () => queryClient.invalidateQueries({ queryKey: rivenKeys.saved });

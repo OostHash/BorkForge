@@ -9,7 +9,7 @@ import { GeneralTab } from "./GeneralTab";
 import { MarketTab } from "./MarketTab";
 import { OverlaysTab } from "./OverlaysTab";
 
-/** Every tab (vault settings.md, overlay-settings.md, debugging.md; Console is the activity console). */
+/** Every tab. */
 export const SETTINGS_TABS = [
   { id: "general", label: "General", Panel: GeneralTab },
   { id: "overlays", label: "Overlays", Panel: OverlaysTab },

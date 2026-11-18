@@ -373,7 +373,7 @@ pub(crate) fn spawn_reward_watcher_thread(deps: RewardWatcherDeps) {
                     });
                     if overlays_on {
                         let _ =
-                            ee_ocr_app.emit(events::FF_STATUS, "🔍 Relic reward screen detected");
+                            ee_ocr_app.emit(events::STATUS_LINE, "🔍 Relic reward screen detected");
                         // Tell App.tsx to pre-create the overlay window NOW, before OCR finishes.
                         // Window creation takes 1-2 s; pre-creating shaves that off the visible delay.
                         let _ = ee_ocr_app.emit(events::RELIC_TRIGGER, ());
@@ -449,7 +449,7 @@ pub(crate) fn spawn_reward_watcher_thread(deps: RewardWatcherDeps) {
                                     cat = fallback;
                                 }
                             }
-                            let _ = app.emit(events::FF_STATUS, "📷 OCR scanning...");
+                            let _ = app.emit(events::STATUS_LINE, "📷 OCR scanning...");
                             let result = log_watcher::capture_reward_items(
                                 Arc::clone(&cat),
                                 Arc::clone(&squad_arc),

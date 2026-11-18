@@ -6,8 +6,7 @@ import type { CatalogItem } from "./relics.ts";
 import { matchesTerms, splitSearchTerms } from "./relics.ts";
 
 /**
- * Market logic (part 1: Prime Sets, Mods & Arcanes, item window), same rules
- * as the current app (vault/frontend-ports/market.md).
+ * Market logic (part 1: Prime Sets, Mods & Arcanes, item window).
  */
 
 // ── warframe.market names ───────────────────────────────────────────────────
@@ -35,7 +34,7 @@ export function buildWfmLookup(items: readonly WfmItem[]): Map<string, string> {
   return map;
 }
 
-/** Slug for a name; falls back to the normalised name like the current app. */
+/** Slug for a name; falls back to the normalised name. */
 export const slugFor = (lookup: ReadonlyMap<string, string>, name: string) => lookup.get(normalizeForWfm(name)) ?? normalizeForWfm(name);
 
 export type LivePrice = { sell_median: number | null; tradeable?: boolean };
@@ -56,7 +55,7 @@ export const partLabel = (itemName: string, set: string) => (itemName.startsWith
 
 export type PrimeSet = { name: string; parent: CatalogItem | null; parts: CatalogItem[] };
 
-/** Same five steps as the current app (dedupe, blueprints over built parts, inherited ducats, drop exalted). */
+/** Five steps: dedupe, blueprints over built parts, inherited ducats, drop exalted. */
 export function buildSets(catalog: readonly CatalogItem[]): PrimeSet[] {
   const ducatsByName = new Map<string, number>();
   const parents = new Map<string, CatalogItem>();
@@ -354,7 +353,7 @@ export function prefillPrice(side: "sell" | "buy", orders: WfmItemOrders | undef
 const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
 const isList = (v: unknown, allowed: readonly string[]) => Array.isArray(v) && v.every((x) => typeof x === "string" && allowed.includes(x));
 
-/** Same validation as the current app; the open tab is not part of a preset. */
+/**; the open tab is not part of a preset. */
 export function marketPresetCodec(activeMarketTab: MarketFilters["activeMarketTab"]): PresetCodec<MarketFilters> {
   return {
     module: "market",

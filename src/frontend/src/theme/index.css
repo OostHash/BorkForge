@@ -6,7 +6,7 @@
 @import "./generated/domain.css";
 
 /*
- * Tailwind's default colour palette is off (plan 6.5): bg-white/6,
+ * Tailwind's default colour palette is off: bg-white/6,
  * text-gray-400 and bg-black/60 simply do not exist here. Spacing, radius,
  * typography and motion stay on Tailwind's standard scales.
  */
@@ -17,7 +17,7 @@
 /*
  * Semantic roles as Tailwind colours. `inline` makes utilities reference
  * var(--ff-*) directly, so data-theme / data-density switch them at runtime.
- * Domain colours are deliberately not exposed here (plan 6.7).
+ * Domain colours are deliberately not exposed here.
  */
 @theme inline {
   --color-bg: var(--ff-bg);
@@ -49,7 +49,7 @@
   --shadow-2: var(--ff-shadow-2);
   --shadow-3: var(--ff-shadow-3);
 
-  /* Density-sensitive exceptions (plan 6.8): h-control-md, px-cell-x, text-list. */
+  /* Density-sensitive exceptions: h-control-md, px-cell-x, text-list. */
   --spacing-control-sm: var(--ff-control-sm);
   --spacing-control-md: var(--ff-control-md);
   --spacing-control-lg: var(--ff-control-lg);
@@ -83,7 +83,7 @@
     overflow: hidden;
   }
 
-  /* Scroll lock while a modal <dialog> is open (plan 7.8). */
+  /* Scroll lock while a modal <dialog> is open. */
   html:has(dialog:modal) {
     overflow: hidden;
   }
@@ -101,7 +101,7 @@
   }
 
   /*
-   * Windows High Contrast (vault theming-7a.md): Windows picks the colours and
+   * Windows High Contrast: Windows picks the colours and
    * drops backgrounds, so states that only had a background get system colours.
    */
   @media (forced-colors: active) {

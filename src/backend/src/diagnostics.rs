@@ -58,7 +58,12 @@ pub(crate) fn forward_entries_to(app: tauri::AppHandle) {
 /// files in the temporary folder. Some of it holds account snapshots, memory
 /// dumps, screenshots and player names, so it is removed at startup.
 const OLD_DEBUG_DIRS: &[&str] = &["Debugging"];
-const OLD_DEBUG_FILES: &[&str] = &["scan_log.txt", "inventory_changes.txt"];
+const OLD_DEBUG_FILES: &[&str] = &[
+    "scan_log.txt",
+    "inventory_changes.txt",
+    "inventory_hints.json",
+    "mod_hints.json",
+];
 const OLD_TEMP_DIRS: &[&str] = &["hexdesk/diagnostics"];
 const OLD_TEMP_FILES: &[&str] = &[
     "hexdesk_overlay_session.txt",

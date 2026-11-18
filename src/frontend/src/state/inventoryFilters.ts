@@ -2,8 +2,8 @@ import { useSyncExternalStore } from "react";
 import { DEFAULT_INVENTORY_FILTERS, type InventoryFilters } from "../domain/inventory";
 
 /**
- * Inventory filters for the whole window. They outlive the Inventory screen
- * (the current app kept it mounted), and the changelog dock sets them when
+ * Inventory filters for the whole window. They outlive the Inventory screen,
+ * and the changelog dock sets them when
  * it opens Inventory on an item or category.
  */
 let current: InventoryFilters = DEFAULT_INVENTORY_FILTERS;

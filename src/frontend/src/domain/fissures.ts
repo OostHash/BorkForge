@@ -46,7 +46,7 @@ export const MISSION_TYPES_BY_VARIANT: Readonly<Record<FissureWatch["variant"], 
 };
 
 /**
- * Whether a fissure matches a watch. Same rules as the current app:
+ * Whether a fissure matches a watch.
  * variant first; tier with bidirectional Omnia (an Omnia watch matches every
  * tier except Requiem, an Omnia fissure matches every watch except Requiem);
  * then mission type.

@@ -7,7 +7,7 @@ import { applyInventoryUpdate, quantitiesKeys } from "../../api/inventory";
 import { applyPriceUpdate } from "../../api/market";
 
 /**
- * Which cached queries a backend event makes stale (plan 5.4). Queries that
+ * Which cached queries a backend event makes stale. Queries that
  * do not exist yet are simply not affected; keys are added as screens are
  * ported.
  */

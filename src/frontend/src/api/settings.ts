@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { invoke } from "./invoke";
 
 /**
- * The settings file, shared with the current app. Only the keys a ported
+ * The settings file. Only the keys a ported
  * screen owns are typed here; everything else is kept as-is. The backend
  * merges saved keys into the file, so a save never touches other settings.
  */

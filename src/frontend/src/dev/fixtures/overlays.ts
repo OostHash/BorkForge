@@ -86,5 +86,4 @@ export const overlayFixtures = {
   ocr_riven_log_error: noResult<{ error: string }>(),
   log_relic_fe: noResult<{ msg: string }>(),
   show_relic_pick_window: noResult(),
-  hide_relic_pick_overlay: noResult(),
 };

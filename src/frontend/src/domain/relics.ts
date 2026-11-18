@@ -2,7 +2,7 @@ import type { Ownership } from "./completionist.ts";
 import type { PresetCodec } from "./filterPresets.ts";
 
 /**
- * Relic logic, same rules as the current app (vault/frontend-ports/relics.md),
+ * Relic logic
  * plus a working "Avg Plat" sort.
  */
 
@@ -360,7 +360,7 @@ export function plannerRows(drops: readonly RelicDrop[], o: PlannerOptions, ctx:
 const isStringList = (v: unknown, allowed: readonly string[]): v is string[] =>
   Array.isArray(v) && v.every((x) => typeof x === "string" && allowed.includes(x));
 
-/** Stored in the current app's field names (tiers, sortMode) so presets are shared. */
+/** Stored with stable field names (tiers, sortMode) so saved presets keep working. */
 export const relicPresetCodec: PresetCodec<RelicFilters> = {
   module: "relics",
   decode: (v) => {

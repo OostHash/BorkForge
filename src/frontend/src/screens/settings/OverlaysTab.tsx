@@ -150,7 +150,7 @@ function OffsetRow({
   );
 }
 
-/** Settings → Overlays (vault overlay-settings.md). */
+/** Settings → Overlays. */
 export function OverlaysTab() {
   const { settings, set } = useSettingsFile();
   const { mutateAsync } = useSaveSettings();

@@ -147,7 +147,7 @@ export async function goInvisible(queryClient: QueryClient): Promise<boolean> {
 
 /**
  * The 2-minute poll: warframe.market sometimes drops you to offline; then
- * the status you chose is set again, like the current app.
+ * the status you chose is set again.
  */
 export async function syncStatus(queryClient: QueryClient): Promise<void> {
   const session = queryClient.getQueryData<[string, string] | null>(marketKeys.session);
