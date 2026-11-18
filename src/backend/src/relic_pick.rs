@@ -31,6 +31,12 @@ fn saved_offset(app: &tauri::AppHandle, prefix: &str) -> (f64, f64) {
 pub(crate) fn relic_pick_show(app: &tauri::AppHandle) {
     use tauri::Manager;
     let Some(win) = app.get_webview_window("relic-pick-overlay") else {
+        let _ = hexdesk_diag::DiagError::new(
+            hexdesk_diag::Source::Overlay,
+            hexdesk_diag::Kind::NotFound,
+            "Relic Pick overlay could not be shown: its window does not exist",
+        )
+        .log();
         return;
     };
     // Position: right edge of the primary monitor, 20px from top.
@@ -50,15 +56,41 @@ pub(crate) fn relic_pick_show(app: &tauri::AppHandle) {
         x: x + off_x,
         y: 20.0 + off_y,
     }));
-    let _ = win.show();
+    match win.show() {
+        Ok(()) => hexdesk_diag::info!(overlay, "Relic Pick overlay shown"),
+        Err(e) => {
+            let _ = hexdesk_diag::DiagError::new(
+                hexdesk_diag::Source::Overlay,
+                hexdesk_diag::Kind::Internal,
+                "Relic Pick overlay could not be shown",
+            )
+            .caused_by(&e)
+            .log();
+        }
+    }
 }
 
 pub(crate) fn relic_pick_hide(app: &tauri::AppHandle) {
     use tauri::Manager;
     let Some(win) = app.get_webview_window("relic-pick-overlay") else {
+        hexdesk_diag::debug!(
+            overlay,
+            "Relic Pick overlay not hidden: its window does not exist"
+        );
         return;
     };
-    let _ = win.hide();
+    match win.hide() {
+        Ok(()) => hexdesk_diag::info!(overlay, "Relic Pick overlay hidden"),
+        Err(e) => {
+            let _ = hexdesk_diag::DiagError::new(
+                hexdesk_diag::Source::Overlay,
+                hexdesk_diag::Kind::Internal,
+                "Relic Pick overlay could not be hidden",
+            )
+            .caused_by(&e)
+            .log();
+        }
+    }
 }
 
 /// Debug: run OCR on the top-left quarter of the Warframe window and report the detected era.

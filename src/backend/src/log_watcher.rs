@@ -321,13 +321,18 @@ pub(crate) fn handle_relic_pick_events(
     // ── Relic selection screen ───────────────────────────────────────
     // Trigger: relic grid fully loaded → OCR the era from top-left quarter.
     if lower.contains("themedprojectionmanager.lua: populateinventorygrid") {
-        info!("relic-pick: PopulateInventoryGrid detected — spawning OCR thread");
         let now = std::time::Instant::now();
         let state = app.state::<AppState>();
         let relic_pick_on = state.overlays_enabled.load(Ordering::SeqCst)
             && state.relic_pick_overlay_enabled.load(Ordering::SeqCst);
-        let should_trigger = relic_pick_on
-            && last_relic_pick_trigger.is_none_or(|t| now.duration_since(t).as_secs() >= 5);
+        let cooldown = last_relic_pick_trigger.is_some_and(|t| now.duration_since(t).as_secs() < 5);
+        let should_trigger = relic_pick_on && !cooldown;
+        hexdesk_diag::info!(
+            overlay,
+            overlay_on = relic_pick_on,
+            cooldown,
+            "Relic selection screen seen in EE.log"
+        );
         if should_trigger {
             *last_relic_pick_trigger = Some(now);
             let app_clone = app.clone();
@@ -340,8 +345,18 @@ pub(crate) fn handle_relic_pick_events(
                 {
                     return;
                 }
+                let started = std::time::Instant::now();
                 let era = crate::ocr::detect_fissure_era();
-                info!("relic-pick: OCR result = {:?}", era);
+                let ocr_ms = started.elapsed().as_millis() as u64;
+                if era.is_none() {
+                    let _ = hexdesk_diag::DiagError::new(
+                        hexdesk_diag::Source::Overlay,
+                        hexdesk_diag::Kind::NotFound,
+                        "Relic Pick overlay not shown: no fissure era read from the screen",
+                    )
+                    .with("ocr_ms", ocr_ms)
+                    .log();
+                }
                 if let Some(era) = era {
                     let payload = build_relic_pick_payload(&era, &app_clone);
                     let state = app_clone.state::<AppState>();
@@ -351,9 +366,12 @@ pub(crate) fn handle_relic_pick_events(
                         return;
                     }
                     let relic_count = payload["relics"].as_array().map_or(0, |a| a.len());
-                    info!(
-                        "relic-pick: emitting relic-pick-open era={} relics={}",
-                        era, relic_count
+                    hexdesk_diag::info!(
+                        overlay,
+                        era = %era,
+                        relics = relic_count,
+                        ocr_ms,
+                        "Fissure era read for the Relic Pick overlay"
                     );
                     // Show the overlay window from Rust — more reliable than
                     // calling win.show() from the WebView (avoids timing races).
@@ -369,8 +387,16 @@ pub(crate) fn handle_relic_pick_events(
                     let _ = app_clone.emit(events::RELIC_PICK_OPEN, payload);
                 }
             });
+        } else if !relic_pick_on {
+            hexdesk_diag::debug!(
+                overlay,
+                "Relic Pick overlay skipped: turned off in settings"
+            );
         } else {
-            info!("relic-pick: trigger suppressed by 5-second cooldown");
+            hexdesk_diag::debug!(
+                overlay,
+                "Relic Pick overlay skipped: the selection screen was seen less than 5 s ago"
+            );
         }
     }
     // Dismiss: solar map regains input focus (player cancelled or mission started).
@@ -384,7 +410,11 @@ pub(crate) fn handle_relic_pick_events(
         } else {
             "mapredux"
         };
-        info!("relic-pick: dismiss fired ({})", which);
+        hexdesk_diag::info!(
+            overlay,
+            ee_log_line = which,
+            "Relic Pick overlay closing: EE.log reports the selection screen closed"
+        );
         relic_pick_hide(app);
         let _ = app.emit(events::RELIC_PICK_CLOSE, ());
     }

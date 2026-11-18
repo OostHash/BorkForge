@@ -1,7 +1,7 @@
+use hexdesk_diag::debug;
 use std::collections::HashMap;
 use std::sync::atomic::Ordering;
 use tauri::{Emitter, State};
-use tracing::warn;
 
 use crate::app_state::AppState;
 use crate::cache::atomic_write;
@@ -115,7 +115,8 @@ pub(crate) fn start_wfm_queue(
             let price = match wfm.price_with_fallback(&slug) {
                 Ok(p) => p,
                 Err(e) => {
-                    warn!(slug = %slug, error = %e, "price lookup failed, skipping");
+                    // The request failure itself is already logged.
+                    debug!(market, slug = %slug, error = %e, "Price lookup skipped");
                     continue;
                 }
             };

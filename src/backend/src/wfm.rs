@@ -17,7 +17,7 @@ use std::collections::VecDeque;
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
-use tracing::{debug, warn};
+use hexdesk_diag::{debug, DiagError, Kind, Source};
 
 const API_BASE: &str = "https://api.warframe.market";
 const USER_AGENT: &str = concat!("HexDesk/", env!("CARGO_PKG_VERSION"));
@@ -219,24 +219,29 @@ impl Wfm {
             .set("User-Agent", USER_AGENT)
     }
 
-    #[tracing::instrument(level = "debug", skip_all, fields(method = %method, path = %path))]
-    fn call(&self, method: &str, path: &str, auth_header: &str) -> Result<ureq::Response, String> {
-        self.request(method, path, auth_header)
-            .call()
-            .map_err(|e| e.to_string())
+    fn call(
+        &self,
+        method: &str,
+        path: &str,
+        auth_header: &str,
+    ) -> Result<ureq::Response, ureq::Error> {
+        let started = Instant::now();
+        let result = self.request(method, path, auth_header).call();
+        log_request(method, path, started, &result);
+        result
     }
 
-    #[tracing::instrument(level = "debug", skip_all, fields(method = %method, path = %path))]
     fn send_json(
         &self,
         method: &str,
         path: &str,
         auth_header: &str,
         body: impl serde::Serialize,
-    ) -> Result<ureq::Response, String> {
-        self.request(method, path, auth_header)
-            .send_json(body)
-            .map_err(|e| e.to_string())
+    ) -> Result<ureq::Response, ureq::Error> {
+        let started = Instant::now();
+        let result = self.request(method, path, auth_header).send_json(body);
+        log_request(method, path, started, &result);
+        result
     }
 
     // ── Auth derivation (internal) ────────────────────────────────────────────
@@ -335,7 +340,7 @@ impl Wfm {
     /// callers that validate a token *before* it lives in the session can't route
     /// through `self.call` (which reads the token from the session), so they share
     /// this instead. `err_ctx` prefixes the failure string each caller wants.
-    fn me(&self, access_token: &str, err_ctx: &str) -> Result<serde_json::Value, String> {
+    fn me(&self, access_token: &str, err_ctx: &'static str) -> Result<serde_json::Value, String> {
         self.wait();
         ureq::get(&format!("{}/v2/me", API_BASE))
             .set("Authorization", &format!("Bearer {}", access_token))
@@ -343,9 +348,9 @@ impl Wfm {
             .set("platform", "pc")
             .set("User-Agent", USER_AGENT)
             .call()
-            .map_err(|e| format!("{}: {}", err_ctx, e))?
+            .map_err(fail(err_ctx))?
             .into_json()
-            .map_err(|e| format!("Parse: {}", e))
+            .map_err(unreadable)
     }
 
     /// Restore a session from a saved token JSON string, validating via /v2/me.
@@ -361,7 +366,7 @@ impl Wfm {
         let v1_jwt = data["v1Jwt"].as_str().unwrap_or("").to_string();
         let mut csrf_token = data["csrfToken"].as_str().unwrap_or("").to_string();
 
-        let json = self.me(&access_token, "401")?;
+        let json = self.me(&access_token, "Saved session could not be restored")?;
         let username = json["data"]["ingameName"]
             .as_str()
             .unwrap_or("Tenno")
@@ -372,9 +377,13 @@ impl Wfm {
             .to_string();
 
         if csrf_token.is_empty() && !v1_jwt.is_empty() {
-            debug!("restore: no saved token, fetching from site");
+            debug!(market, "Saved session has no CSRF token, fetching one");
             csrf_token = self.fetch_csrf(&v1_jwt).unwrap_or_default();
-            debug!(len = csrf_token.len(), "restore: csrf_token fetched");
+            debug!(
+                market,
+                found = !csrf_token.is_empty(),
+                "CSRF token fetch done"
+            );
         }
         self.set_session(WfmSession {
             access_token,
@@ -400,7 +409,7 @@ impl Wfm {
             .set("Authorization", "JWT")
             .set("User-Agent", USER_AGENT)
             .send_string(&body.to_string())
-            .map_err(|e| format!("Login failed: {}", e))?;
+            .map_err(fail("Sign-in failed"))?;
 
         let token = resp
             .header("set-cookie")
@@ -409,7 +418,7 @@ impl Wfm {
             .map(|s| s.to_string())
             .ok_or("No JWT token in response cookies")?;
 
-        let json: serde_json::Value = resp.into_json().map_err(|e| format!("Parse: {}", e))?;
+        let json: serde_json::Value = resp.into_json().map_err(unreadable)?;
         let username = json["payload"]["user"]["ingame_name"]
             .as_str()
             .unwrap_or("Tenno")
@@ -457,9 +466,9 @@ impl Wfm {
             .set("Content-Type", "application/json")
             .set("User-Agent", USER_AGENT)
             .send_string(&body.to_string())
-            .map_err(|e| format!("Refresh: {}", e))?
+            .map_err(fail("Session could not be refreshed"))?
             .into_json()
-            .map_err(|e| format!("Parse: {}", e))?;
+            .map_err(unreadable)?;
         let new_access = json["data"]["accessToken"]
             .as_str()
             .ok_or("No accessToken")?
@@ -479,7 +488,7 @@ impl Wfm {
     /// Fetch the CSRF token by loading the authenticated warframe.market page and
     /// scraping the `<meta name="csrf-token">` tag, falling back to the token
     /// embedded in the JWT payload when the page fetch or parse fails.
-    #[tracing::instrument(level = "debug", skip_all)]
+    #[tracing::instrument(target = "hexdesk::market", level = "debug", skip_all)]
     fn fetch_csrf(&self, jwt: &str) -> Option<String> {
         if jwt.is_empty() {
             return None;
@@ -491,21 +500,30 @@ impl Wfm {
             .call();
         let html = match resp {
             Ok(r) => {
-                debug!("site fetch status=200");
+                debug!(
+                    market,
+                    status = r.status(),
+                    "warframe.market page loaded for the CSRF token"
+                );
                 r.into_string().ok()?
             }
             Err(e) => {
-                warn!(error = %e, "site fetch failed, trying JWT payload fallback");
+                let _ = market_error(
+                    "CSRF token page could not be loaded, using the token from the session",
+                    e,
+                )
+                .log();
                 return jwt_payload_field(jwt, "csrf_token");
             }
         };
         if let Some(token) = parse_csrf_from_html(&html) {
-            debug!(len = token.len(), "found meta token");
+            debug!(market, "CSRF token found in the page");
             return Some(token);
         }
-        warn!(
-            len = html.len(),
-            "meta tag not found in HTML, trying JWT payload fallback"
+        hexdesk_diag::warn!(
+            market,
+            html_bytes = html.len(),
+            "CSRF token not in the warframe.market page, using the token from the session"
         );
         jwt_payload_field(jwt, "csrf_token")
     }
@@ -514,7 +532,7 @@ impl Wfm {
     /// Returns one of: "online" | "ingame" | "invisible" | "offline".
     pub fn fetch_status(&self) -> Result<String, String> {
         let token = self.access_token()?;
-        let json = self.me(&token, "Status fetch")?;
+        let json = self.me(&token, "Status could not be loaded")?;
         Ok(json["data"]["status"]
             .as_str()
             .unwrap_or("offline")
@@ -545,23 +563,26 @@ impl Wfm {
                     .next()
                     .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::NotFound, "no addr"))
             })
-            .map_err(|e| format!("DNS: {}", e))?;
+            .map_err(fail_other("Status could not be set: DNS lookup failed"))?;
         let tcp = TcpStream::connect_timeout(&addr, Duration::from_secs(5))
-            .map_err(|e| format!("TCP connect: {}", e))?;
+            .map_err(fail_other("Status could not be set: connection failed"))?;
         tcp.set_read_timeout(Some(RW_TIMEOUT)).ok();
         tcp.set_write_timeout(Some(RW_TIMEOUT)).ok();
 
         let mut req = "wss://ws.warframe.market/socket"
             .into_client_request()
-            .map_err(|e| format!("WS request: {}", e))?;
+            .map_err(fail_other(
+                "Status could not be set: WebSocket request could not be built",
+            ))?;
         // ws.warframe.market rejects the upgrade with 403 when there is no
         // User-Agent, and tungstenite sends none by default.
         req.headers_mut().insert(
             "User-Agent",
             tungstenite::http::HeaderValue::from_static(USER_AGENT),
         );
-        let (mut ws, _) =
-            tungstenite::client_tls(req, tcp).map_err(|e| format!("WS connect: {}", e))?;
+        let (mut ws, _) = tungstenite::client_tls(req, tcp).map_err(fail_other(
+            "Status could not be set: WebSocket handshake failed",
+        ))?;
 
         match ws.get_ref() {
             MaybeTlsStream::Plain(s) => {
@@ -576,8 +597,9 @@ impl Wfm {
         let send = |ws: &mut tungstenite::WebSocket<_>, route: &str, payload: serde_json::Value| {
             let msg =
                 serde_json::json!({ "route": route, "payload": payload, "id": route }).to_string();
-            ws.send(Message::Text(msg.into()))
-                .map_err(|e| format!("WS send: {}", e))
+            ws.send(Message::Text(msg.into())).map_err(fail_other(
+                "Status could not be set: WebSocket message could not be sent",
+            ))
         };
 
         let wait_for = |ws: &mut tungstenite::WebSocket<_>,
@@ -594,14 +616,33 @@ impl Wfm {
                             return Ok(());
                         }
                         if route == err_route {
-                            return Err(format!("WFM error: {}", v["payload"]));
+                            return Err(DiagError::new(
+                                Source::Market,
+                                Kind::Invalid,
+                                "Status could not be set: warframe.market answered with an error",
+                            )
+                            .with("route", route)
+                            .caused_by_text(format!("payload: {}", v["payload"]))
+                            .log()
+                            .to_string());
                         }
                     }
-                    Err(e) => return Err(format!("WS read: {}", e)),
+                    Err(e) => {
+                        return Err(fail_other(
+                            "Status could not be set: WebSocket message could not be read",
+                        )(e))
+                    }
                     _ => {}
                 }
             }
-            Err("WS response timeout".into())
+            Err(DiagError::new(
+                Source::Market,
+                Kind::Timeout,
+                "Status could not be set: no answer from warframe.market within 20 messages",
+            )
+            .with("expected_route", ok_route)
+            .log()
+            .to_string())
         };
 
         send(
@@ -651,9 +692,9 @@ impl Wfm {
         }
         let json: serde_json::Value = req
             .call()
-            .map_err(|e| format!("orders: {}", e))?
+            .map_err(fail("Item orders could not be loaded"))?
             .into_json()
-            .map_err(|e| format!("parse: {}", e))?;
+            .map_err(unreadable)?;
 
         // Present orders best-first: ingame sellers before online before offline,
         // then cheapest sell / richest buy.
@@ -723,9 +764,9 @@ impl Wfm {
         }
         let json: serde_json::Value = req
             .call()
-            .map_err(|e| format!("stats: {}", e))?
+            .map_err(fail("Item statistics could not be loaded"))?
             .into_json()
-            .map_err(|e| format!("parse: {}", e))?;
+            .map_err(unreadable)?;
         Ok(json["payload"]["statistics_closed"]["90days"].clone())
     }
 
@@ -735,9 +776,9 @@ impl Wfm {
         let auth = self.auth_opt().unwrap_or_default();
         self.wait();
         self.call("GET", &format!("/v2/items/{}", url_name), &auth)
-            .map_err(|e| format!("Item info: {}", e))?
+            .map_err(fail("Item info could not be loaded"))?
             .into_json::<serde_json::Value>()
-            .map_err(|e| format!("Parse: {}", e))
+            .map_err(unreadable)
             .map(|j| j["data"].clone())
     }
 
@@ -747,9 +788,9 @@ impl Wfm {
         self.wait();
         let json: serde_json::Value = self
             .call("GET", "/v2/orders/my", &auth)
-            .map_err(|e| format!("Get orders: {}", e))?
+            .map_err(fail("Your orders could not be loaded"))?
             .into_json()
-            .map_err(|e| format!("Parse: {}", e))?;
+            .map_err(unreadable)?;
         Ok(json["data"].clone())
     }
 
@@ -759,9 +800,9 @@ impl Wfm {
         self.wait();
         let json: serde_json::Value = self
             .call("GET", path, &auth)
-            .map_err(|e| format!("Dump: {}", e))?
+            .map_err(fail("Debug request failed"))?
             .into_json()
-            .map_err(|e| format!("Parse: {}", e))?;
+            .map_err(unreadable)?;
         serde_json::to_string_pretty(&json).map_err(|e| e.to_string())
     }
 
@@ -785,9 +826,9 @@ impl Wfm {
         }
         self.wait();
         self.send_json("POST", "/v2/order", &auth, &body)
-            .map_err(|e| format!("Create order: {}", e))?
+            .map_err(fail("Order could not be created"))?
             .into_json::<serde_json::Value>()
-            .map_err(|e| format!("Parse: {}", e))
+            .map_err(unreadable)
             .map(|j| j["data"].clone())
     }
 
@@ -804,9 +845,9 @@ impl Wfm {
             serde_json::json!({ "platinum": platinum, "quantity": quantity, "visible": visible });
         self.wait();
         self.send_json("PATCH", &format!("/v2/order/{}", order_id), &auth, &body)
-            .map_err(|e| format!("Update order: {}", e))?
+            .map_err(fail("Order could not be updated"))?
             .into_json::<serde_json::Value>()
-            .map_err(|e| format!("Parse: {}", e))
+            .map_err(unreadable)
             .map(|j| j["data"].clone())
     }
 
@@ -815,7 +856,7 @@ impl Wfm {
         let auth = self.auth()?;
         self.wait();
         self.call("DELETE", &format!("/v2/order/{}", order_id), &auth)
-            .map_err(|e| format!("Delete order: {}", e))?;
+            .map_err(fail("Order could not be deleted"))?;
         Ok(())
     }
 
@@ -831,9 +872,9 @@ impl Wfm {
             &auth,
             &body,
         )
-        .map_err(|e| format!("Close order: {}", e))?
+        .map_err(fail("Order could not be closed"))?
         .into_json::<serde_json::Value>()
-        .map_err(|e| format!("Parse: {}", e))
+        .map_err(unreadable)
         .map(|json| json["data"].clone())
     }
 
@@ -849,9 +890,9 @@ impl Wfm {
             .set("platform", "pc")
             .set("User-Agent", USER_AGENT)
             .call()
-            .map_err(|e| format!("Search: {}", e))?
+            .map_err(fail("Riven attributes could not be loaded"))?
             .into_json()
-            .map_err(|e| format!("Parse: {}", e))?;
+            .map_err(unreadable)?;
         let mut seen = std::collections::HashSet::new();
         if let Some(auctions) = json["payload"]["auctions"].as_array() {
             for auction in auctions {
@@ -915,9 +956,8 @@ impl Wfm {
         self.auction_wait();
         let resp = self
             .send_json("POST", "/v1/auctions/create", &auth, payload)
-            .map_err(auction_error("Create riven auction"))?;
-        resp.into_json()
-            .map_err(|e| format!("Parse auction response: {}", e))
+            .map_err(fail("Riven auction could not be created"))?;
+        resp.into_json().map_err(unreadable)
     }
 
     /// Switch an auction between Auction and Direct Sale by close-and-recreate
@@ -938,9 +978,9 @@ impl Wfm {
         self.auction_wait();
         let entry: serde_json::Value = self
             .call("GET", &format!("/v1/auctions/entry/{}", auction_id), &auth)
-            .map_err(auction_error("Fetch auction"))?
+            .map_err(fail("Riven auction could not be loaded"))?
             .into_json()
-            .map_err(|e| format!("Parse auction entry: {}", e))?;
+            .map_err(unreadable)?;
 
         let auction = &entry["payload"]["auction"];
         let item = &auction["item"];
@@ -964,7 +1004,7 @@ impl Wfm {
             &format!("/v1/auctions/entry/{}/close", auction_id),
             &auth,
         )
-        .map_err(auction_error("Delete auction"))?;
+        .map_err(fail("Riven auction could not be deleted"))?;
 
         // Create the replacement with the chosen type.
         let mut payload = serde_json::json!({
@@ -980,9 +1020,8 @@ impl Wfm {
         self.auction_wait();
         let resp = self
             .send_json("POST", "/v1/auctions/create", &auth, payload)
-            .map_err(auction_error("Create riven auction"))?;
-        resp.into_json()
-            .map_err(|e| format!("Parse auction response: {}", e))
+            .map_err(fail("Riven auction could not be created"))?;
+        resp.into_json().map_err(unreadable)
     }
 
     /// Close (delete) a riven auction.
@@ -994,7 +1033,7 @@ impl Wfm {
             &format!("/v1/auctions/entry/{}/close", auction_id),
             &auth,
         )
-        .map_err(auction_error("Delete auction"))?;
+        .map_err(fail("Riven auction could not be deleted"))?;
         Ok(())
     }
 
@@ -1018,7 +1057,7 @@ impl Wfm {
             &auth,
             body,
         )
-        .map_err(auction_error("Update auction"))?;
+        .map_err(fail("Riven auction could not be updated"))?;
         Ok(())
     }
 
@@ -1032,7 +1071,7 @@ impl Wfm {
             &auth,
             serde_json::json!({ "visible": visible }),
         )
-        .map_err(auction_error("Set auction visibility"))?;
+        .map_err(fail("Riven auction visibility could not be changed"))?;
         Ok(())
     }
 
@@ -1053,9 +1092,9 @@ impl Wfm {
                 &format!("/v1/profile/{}/auctions", username),
                 &v1_auth,
             )
-            .map_err(|e| format!("Fetch auctions: {}", e))?
+            .map_err(fail("Your riven auctions could not be loaded"))?
             .into_json()
-            .map_err(|e| format!("Parse auctions: {}", e))?;
+            .map_err(unreadable)?;
 
         let mut auctions: Vec<serde_json::Value> = profile_resp["payload"]["auctions"]
             .as_array()
@@ -1100,9 +1139,9 @@ impl Wfm {
         self.wait();
         let json: serde_json::Value = ureq::get(&format!("{}/v2/items", API_BASE))
             .call()
-            .map_err(|e| format!("wfm items: {}", e))?
+            .map_err(fail("Item list could not be loaded"))?
             .into_json()
-            .map_err(|e| format!("wfm items parse: {}", e))?;
+            .map_err(unreadable)?;
         let items = json["data"]
             .as_array()
             .ok_or("no data array in v2 response")?
@@ -1129,9 +1168,7 @@ impl Wfm {
         let url = format!("{}/v1/items/{}/statistics", API_BASE, slug);
         match ureq::get(&url).call() {
             Ok(resp) => {
-                let json: serde_json::Value = resp
-                    .into_json()
-                    .map_err(|e| format!("wfm price parse: {}", e))?;
+                let json: serde_json::Value = resp.into_json().map_err(unreadable)?;
                 let h48 = json["payload"]["statistics_closed"]["48hours"].as_array();
                 let d90 = json["payload"]["statistics_closed"]["90days"].as_array();
                 let vol_48: f64 = h48
@@ -1448,10 +1485,132 @@ fn trimmed_median_from_stats(arr: &[serde_json::Value]) -> Option<u32> {
     Some(median.round() as u32)
 }
 
-/// Map a ureq auction error to the "<action>: HTTP <code>: <body>" message the
-/// v1 auction commands all report, reading the response body for the reason.
-fn auction_error(action: &'static str) -> impl Fn(String) -> String {
-    move |e| format!("{}: {}", action, e)
+// ==============================================================================
+// Failure reporting
+// ==============================================================================
+
+/// Longest response body kept as the cause of a failed request.
+const MAX_BODY_IN_LOG: usize = 300;
+
+/// Logs a request made through `call` / `send_json` at debug level.
+fn log_request(
+    method: &str,
+    path: &str,
+    started: Instant,
+    result: &Result<ureq::Response, ureq::Error>,
+) {
+    let elapsed_ms = started.elapsed().as_millis() as u64;
+    let path = strip_query(path);
+    match result {
+        Ok(resp) => debug!(
+            market,
+            method,
+            path,
+            status = resp.status(),
+            elapsed_ms,
+            "Request done"
+        ),
+        Err(ureq::Error::Status(code, _)) => {
+            debug!(
+                market,
+                method,
+                path,
+                status = *code,
+                elapsed_ms,
+                "Request done"
+            )
+        }
+        Err(ureq::Error::Transport(_)) => {
+            debug!(market, method, path, elapsed_ms, "Request got no answer")
+        }
+    }
+}
+
+/// The URL or path without its query string, which can carry tokens.
+fn strip_query(url: &str) -> &str {
+    url.split(['?', '#']).next().unwrap_or(url)
+}
+
+/// The error for a failed warframe.market request: the HTTP status and the
+/// start of the response body when the site answered, the transport error
+/// when it did not.
+fn market_error(what: &str, e: ureq::Error) -> DiagError {
+    match e {
+        ureq::Error::Status(code, resp) => {
+            let kind = match code {
+                401 | 403 => Kind::Denied,
+                404 => Kind::NotFound,
+                429 => Kind::Blocked,
+                500..=599 => Kind::Unavailable,
+                _ => Kind::Invalid,
+            };
+            let url = strip_query(resp.get_url()).to_string();
+            let body = resp.into_string().unwrap_or_default();
+            let body = body.trim();
+            // The UI text keeps "answered 401": the frontend refreshes the
+            // session when it sees that status.
+            let err = DiagError::new(
+                Source::Market,
+                kind,
+                format!("{what}: warframe.market answered {code}"),
+            )
+            .with("status", code)
+            .with("url", url);
+            if body.is_empty() {
+                err
+            } else {
+                let cut: String = body.chars().take(MAX_BODY_IN_LOG).collect();
+                err.caused_by_text(format!("response: {cut}"))
+            }
+        }
+        ureq::Error::Transport(t) => {
+            let text = t.to_string();
+            let kind = if text.contains("timed out") {
+                Kind::Timeout
+            } else {
+                Kind::Network
+            };
+            let mut err = DiagError::new(
+                Source::Market,
+                kind,
+                format!("{what}: no answer from warframe.market"),
+            )
+            .with("transport", format!("{:?}", t.kind()));
+            if let Some(url) = t.url() {
+                err = err.with("url", strip_query(url.as_str()));
+            }
+            err.caused_by_text(text)
+        }
+    }
+}
+
+/// `map_err` adapter: logs the failed request and returns the message the UI
+/// shows.
+fn fail(what: &'static str) -> impl FnOnce(ureq::Error) -> String {
+    move |e| market_error(what, e).log().to_string()
+}
+
+/// Like [`fail`] for steps that are not plain HTTP requests (DNS, TCP,
+/// WebSocket).
+fn fail_other<E: std::fmt::Display>(what: &'static str) -> impl FnOnce(E) -> String {
+    move |e| {
+        DiagError::new(Source::Market, Kind::Network, what)
+            .caused_by_text(e)
+            .log()
+            .to_string()
+    }
+}
+
+/// `map_err` adapter for a response body that could not be read or parsed.
+fn unreadable<E: std::fmt::Display>(e: E) -> String {
+    DiagError::new(
+        Source::Market,
+        Kind::Parse,
+        "warframe.market response could not be read",
+    )
+    .caused_by_text(e)
+    .log()
+    .to_string()
 }
 
 // ==============================================================================
@@ -1524,5 +1683,55 @@ mod tests {
         assert!(rl.try_acquire().is_none());
         // Fourth within the window must be told to wait.
         assert!(rl.try_acquire().is_some());
+    }
+
+    fn status_error(code: u16, body: &str) -> ureq::Error {
+        let resp = ureq::Response::new(code, "status", body).unwrap();
+        ureq::Error::Status(code, resp)
+    }
+
+    #[test]
+    fn a_rejected_request_keeps_the_status_for_the_session_refresh() {
+        // The frontend refreshes the session when the text contains "401".
+        let err = market_error(
+            "Order could not be created",
+            status_error(401, r#"{"error":"unauthorized"}"#),
+        );
+        assert_eq!(err.code(), "market.denied");
+        assert_eq!(
+            err.to_string(),
+            "Order could not be created: warframe.market answered 401"
+        );
+        assert!(err
+            .fields()
+            .iter()
+            .any(|(k, v)| k == "status" && v == "401"));
+        assert_eq!(err.causes(), [r#"response: {"error":"unauthorized"}"#]);
+    }
+
+    #[test]
+    fn statuses_map_to_kinds() {
+        let kind = |code| market_error("x", status_error(code, "")).kind();
+        assert_eq!(kind(404), hexdesk_diag::Kind::NotFound);
+        assert_eq!(kind(429), hexdesk_diag::Kind::Blocked);
+        assert_eq!(kind(503), hexdesk_diag::Kind::Unavailable);
+        assert_eq!(kind(400), hexdesk_diag::Kind::Invalid);
+        assert!(market_error("x", status_error(500, "")).causes().is_empty());
+    }
+
+    #[test]
+    fn long_response_bodies_are_cut() {
+        let body = "e".repeat(1000);
+        let err = market_error("x", status_error(400, &body));
+        assert_eq!(err.causes()[0].len(), "response: ".len() + MAX_BODY_IN_LOG);
+    }
+
+    #[test]
+    fn query_strings_are_left_out_of_logged_urls() {
+        assert_eq!(
+            strip_query("/v2/orders/item/ash?token=abc"),
+            "/v2/orders/item/ash"
+        );
+        assert_eq!(strip_query("/v2/me"), "/v2/me");
     }
 }

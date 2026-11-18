@@ -2,7 +2,9 @@ use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
+use hexdesk_diag::{debug, info};
 use tauri::{Emitter, Manager};
+use tracing::Instrument;
 
 use crate::app_state::AppState;
 use crate::append_to_file;
@@ -329,6 +331,18 @@ pub(crate) fn spawn_reward_watcher_thread(deps: RewardWatcherDeps) {
                     && last_dismiss_at.is_none_or(|t| t.elapsed().as_secs() >= 5)
                     && flag.load(Ordering::SeqCst)
                     && !has_requiem_relic;
+                if has_trigger && !trigger_allowed {
+                    debug!(
+                        overlay,
+                        dismiss_in_same_batch = has_dismiss,
+                        screen_already_active = active_since.is_some(),
+                        dismissed_less_than_5s_ago =
+                            last_dismiss_at.is_some_and(|t| t.elapsed().as_secs() < 5),
+                        scanner_off = !flag.load(Ordering::SeqCst),
+                        requiem_relic = has_requiem_relic,
+                        "Relic reward screen seen in EE.log, overlay not started"
+                    );
+                }
                 if has_trigger && trigger_allowed {
                     reward_screen_active2.store(true, Ordering::SeqCst);
                     active_since = Some(std::time::Instant::now());
@@ -384,11 +398,20 @@ pub(crate) fn spawn_reward_watcher_thread(deps: RewardWatcherDeps) {
                     // anchor for whether the trigger itself was seen on time.
                     log_watcher::schedule_trigger_moment_capture(Arc::clone(&diag_arc));
 
-                    if ee_ocr_app
+                    let overlays_on = ee_ocr_app
                         .state::<AppState>()
                         .overlays_enabled
-                        .load(Ordering::SeqCst)
-                    {
+                        .load(Ordering::SeqCst);
+                    let op = hexdesk_diag::op!(overlay, "Relic reward overlay");
+                    op.in_scope(|| {
+                        info!(
+                            overlay,
+                            catalog = filtered_cat.len(),
+                            overlays_on,
+                            "Relic reward screen seen in EE.log"
+                        )
+                    });
+                    if overlays_on {
                         let _ =
                             ee_ocr_app.emit(events::FF_STATUS, "🔍 Relic reward screen detected");
                         // Tell App.tsx to pre-create the overlay window NOW, before OCR finishes.
@@ -414,8 +437,11 @@ pub(crate) fn spawn_reward_watcher_thread(deps: RewardWatcherDeps) {
                             .overlays_enabled
                             .load(Ordering::SeqCst)
                         {
+                            debug!(overlay, "Relic reward overlay skipped: overlays are turned off");
                             return;
                         }
+                        let triggered_at = std::time::Instant::now();
+                        let since_trigger = || triggered_at.elapsed().as_millis() as u64;
                         let deadline =
                             std::time::Instant::now() + std::time::Duration::from_secs(45);
                         if let Ok(mut g) = shared_best.lock() {
@@ -476,6 +502,7 @@ pub(crate) fn spawn_reward_watcher_thread(deps: RewardWatcherDeps) {
                             .await;
                             // Re-read hint for confirm_ready logic below (same mutex, post-capture value).
                             let hint_squad = squad_arc.lock().ok().and_then(|g| *g);
+                            log_attempt(attempt, since_trigger(), &result);
 
                             let ts = chrono::Local::now().format("%H:%M:%S%.3f").to_string();
                             let sleep_ms = match &result {
@@ -577,6 +604,7 @@ pub(crate) fn spawn_reward_watcher_thread(deps: RewardWatcherDeps) {
                                         if confirm_ready {
                                             // Hard cutoff: if dismiss arrived while OCR was running, drop the result.
                                             if !active.load(Ordering::SeqCst) {
+                                                log_dropped(attempt, since_trigger());
                                                 break;
                                             }
                                             if !is_new_best {
@@ -587,6 +615,12 @@ pub(crate) fn spawn_reward_watcher_thread(deps: RewardWatcherDeps) {
                                             let _ = append_to_file(
                                                 &slog,
                                                 "[STEP 3] OVERLAY OPENED\n\n",
+                                            );
+                                            log_opened(
+                                                attempt,
+                                                since_trigger(),
+                                                best_item_count.max(n_confirmed),
+                                                "all expected cards confirmed",
                                             );
                                             let emit_val = if best_payload.is_some() {
                                                 &best_payload
@@ -627,8 +661,15 @@ pub(crate) fn spawn_reward_watcher_thread(deps: RewardWatcherDeps) {
                                         && n_confirmed <= soft_complete_count
                                     {
                                         if !active.load(Ordering::SeqCst) {
+                                            log_dropped(attempt, since_trigger());
                                             break;
                                         }
+                                        log_opened(
+                                            attempt,
+                                            since_trigger(),
+                                            best_item_count,
+                                            "no better read after the expected cards were first complete",
+                                        );
                                         let emit_val =
                                             best_payload.clone().unwrap_or(serde_json::Value::Null);
                                         log_watcher::publish_relic_rewards(&app, Some(&emit_val));
@@ -666,8 +707,15 @@ pub(crate) fn spawn_reward_watcher_thread(deps: RewardWatcherDeps) {
                                         // reads). Publish what we have instead of spinning until dismiss or
                                         // the 45s hard timeout with nothing ever shown to the player.
                                         if !active.load(Ordering::SeqCst) {
+                                            log_dropped(attempt, since_trigger());
                                             break;
                                         }
+                                        log_opened(
+                                            attempt,
+                                            since_trigger(),
+                                            best_item_count,
+                                            "same partial read for several attempts",
+                                        );
                                         let emit_val = best_payload
                                             .clone()
                                             .or_else(|| payload.clone())
@@ -738,6 +786,14 @@ pub(crate) fn spawn_reward_watcher_thread(deps: RewardWatcherDeps) {
                             };
 
                             if std::time::Instant::now() >= deadline {
+                                let _ = hexdesk_diag::DiagError::new(
+                                    hexdesk_diag::Source::Overlay,
+                                    hexdesk_diag::Kind::Timeout,
+                                    "Relic reward overlay: no confirmed read within 45 s",
+                                )
+                                .with("attempts", attempt)
+                                .with("best_cards", best_item_count)
+                                .log();
                                 log_watcher::finalize_reward_ocr_timeout(
                                     &app,
                                     best_payload,
@@ -748,12 +804,18 @@ pub(crate) fn spawn_reward_watcher_thread(deps: RewardWatcherDeps) {
                                 break;
                             }
                             if !active.load(Ordering::SeqCst) {
+                                info!(
+                                    overlay,
+                                    attempt,
+                                    since_trigger_ms = since_trigger(),
+                                    "Relic reward OCR stopped: the reward screen closed"
+                                );
                                 log_watcher::log_reward_ocr_stopped(&slog);
                                 break;
                             }
                             tokio::time::sleep(std::time::Duration::from_millis(sleep_ms)).await;
                         }
-                    });
+                    }.instrument(op));
                 } // end trigger block
 
                 log_watcher::auto_dismiss_relic_rewards(
@@ -770,6 +832,72 @@ pub(crate) fn spawn_reward_watcher_thread(deps: RewardWatcherDeps) {
     }
 }
 
+/// The result of one OCR attempt on the reward screen:
+/// `(complete, low_confidence, items, positions, debug)`.
+type RewardRead = Option<(bool, bool, Vec<String>, Vec<f32>, String)>;
+
+/// Logs what one OCR attempt on the reward screen read.
+fn log_attempt(attempt: u32, since_trigger_ms: u64, result: &RewardRead) {
+    match result {
+        Some((complete, low_confidence, items, _, _)) if !items.is_empty() => {
+            let confirmed = items.iter().filter(|s| !s.starts_with("?:")).count();
+            debug!(
+                overlay,
+                attempt,
+                since_trigger_ms,
+                confirmed,
+                unmatched = items.len() - confirmed,
+                complete = *complete,
+                low_confidence = *low_confidence,
+                "OCR attempt read reward cards"
+            );
+        }
+        Some((_, _, _, _, dbg)) if dbg.starts_with("dark-frame") => {
+            debug!(
+                overlay,
+                attempt, since_trigger_ms, "OCR attempt got a dark frame"
+            );
+        }
+        Some((_, _, _, _, dbg)) if dbg.starts_with("ocr-empty") => {
+            debug!(
+                overlay,
+                attempt, since_trigger_ms, "OCR attempt read no text"
+            );
+        }
+        Some(_) => {
+            debug!(
+                overlay,
+                attempt, since_trigger_ms, "OCR attempt read text that matched no reward"
+            );
+        }
+        None => {
+            let _ = hexdesk_diag::DiagError::new(
+                hexdesk_diag::Source::Overlay,
+                hexdesk_diag::Kind::NotFound,
+                "OCR attempt failed: Warframe window not found",
+            )
+            .with("attempt", attempt)
+            .log();
+        }
+    }
+}
+
+fn log_opened(attempt: u32, since_trigger_ms: u64, cards: usize, reason: &'static str) {
+    info!(
+        overlay,
+        attempt, since_trigger_ms, cards, reason, "Relic reward overlay opened"
+    );
+}
+
+fn log_dropped(attempt: u32, since_trigger_ms: u64) {
+    info!(
+        overlay,
+        attempt,
+        since_trigger_ms,
+        "Relic reward result dropped: the reward screen closed before it was confirmed"
+    );
+}
+
 /// Build the OCR catalog from relic rewards.
 /// Two keys per relic (uniqueName + display name); dedup by unique_name.
 fn build_relic_reward_catalog(
@@ -784,4 +912,55 @@ fn build_relic_reward_catalog(
     catalog_pairs.sort_by(|a, b| a.0.cmp(&b.0).then(a.1.cmp(&b.1)));
     catalog_pairs.dedup_by(|a, b| !a.0.is_empty() && a.0 == b.0);
     catalog_pairs
+}
+
+#[cfg(test)]
+mod tests {
+    use super::log_attempt;
+    use std::sync::Arc;
+    use tracing_subscriber::layer::SubscriberExt;
+
+    fn logged(f: impl FnOnce()) -> Vec<hexdesk_diag::Entry> {
+        let collector = Arc::new(hexdesk_diag::Collector::new(hexdesk_diag::Config::default()));
+        let subscriber =
+            tracing_subscriber::registry().with(hexdesk_diag::DiagLayer::new(collector.clone()));
+        tracing::subscriber::with_default(subscriber, f);
+        collector.recent(10)
+    }
+
+    #[test]
+    fn a_missing_game_window_is_logged_as_an_overlay_error() {
+        let entries = logged(|| log_attempt(3, 1200, &None));
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].code.as_deref(), Some("overlay.not_found"));
+        assert_eq!(
+            entries[0].message,
+            "OCR attempt failed: Warframe window not found"
+        );
+    }
+
+    #[test]
+    fn each_attempt_states_what_was_read_and_when() {
+        let read = Some((
+            false,
+            true,
+            vec!["Ash Prime Systems".to_string(), "?:smudge".to_string()],
+            vec![],
+            String::new(),
+        ));
+        let entries = logged(|| log_attempt(2, 850, &read));
+        let fields = &entries[0].fields;
+        let get = |k: &str| {
+            fields
+                .iter()
+                .find(|(key, _)| key == k)
+                .map(|(_, v)| v.as_str())
+        };
+        assert_eq!(entries[0].source, "overlay");
+        assert_eq!(entries[0].message, "OCR attempt read reward cards");
+        assert_eq!(get("since_trigger_ms"), Some("850"));
+        assert_eq!(get("confirmed"), Some("1"));
+        assert_eq!(get("unmatched"), Some("1"));
+        assert_eq!(get("low_confidence"), Some("true"));
+    }
 }

@@ -1,6 +1,6 @@
+use hexdesk_diag::{debug, info, warn, DiagError, Kind, Source};
 use std::collections::HashMap;
 use tauri::State;
-use tracing::warn;
 
 use crate::app_state::AppState;
 use crate::{append_to_file, ocr};
@@ -374,7 +374,7 @@ fn load_riven_csv_from_url() -> Result<HashMap<String, RivenEntry>, String> {
                 combined.extend(parse_riven_csv(&csv));
             }
             Err(e) => {
-                warn!(gid, error = %e, "failed to load riven sheet tab");
+                warn!(catalogue, gid, error = %e, "Riven database tab could not be loaded");
             }
         }
     }
@@ -619,6 +619,8 @@ fn parse_original_stats(text: Option<&str>) -> Vec<serde_json::Value> {
 /// Returns (weapon_name, positives, negatives).
 #[tauri::command]
 pub(crate) async fn ocr_riven_screen() -> Result<serde_json::Value, String> {
+    let started = std::time::Instant::now();
+    info!(overlay, "Riven OCR started");
     let riven_log = std::env::temp_dir().join("hexdesk_riven_session.txt");
     let ts1 = chrono::Local::now().format("%H:%M:%S%.3f").to_string();
 
@@ -655,7 +657,17 @@ pub(crate) async fn ocr_riven_screen() -> Result<serde_json::Value, String> {
         //     "FITS IN" / weapon label text can interfere with reading the card's bottom stats.
         let attempt_result = tokio::task::spawn_blocking(move || {
             let ts = chrono::Local::now().format("%H:%M:%S%.3f").to_string();
-            let px = ocr::capture_warframe_pixels().map_err(|e| format!("Capture: {}", e))?;
+            let px = ocr::capture_warframe_pixels().map_err(|e| {
+                DiagError::new(
+                    Source::Overlay,
+                    Kind::NotFound,
+                    "Riven OCR failed: the Warframe window could not be captured",
+                )
+                .with("attempt", attempt + 1)
+                .caused_by_text(e)
+                .log()
+                .to_string()
+            })?;
             let (pixels, w, h) = px;
             let full_text = ocr::ocr_pixels_rect(&pixels, w, h, 0.0, 1.0, 0.0, 0.82)
                 .unwrap_or_default();
@@ -668,7 +680,12 @@ pub(crate) async fn ocr_riven_screen() -> Result<serde_json::Value, String> {
                 attempt + 1, ts, full_text, panel_text, card_text
             ));
             Ok::<_, String>((full_text, panel_text, card_text))
-        }).await.map_err(|e| format!("Task: {}", e))??;
+        }).await.map_err(|e| {
+            DiagError::new(Source::Overlay, Kind::Internal, "Riven OCR failed: its worker task stopped")
+                .caused_by(&e)
+                .log()
+                .to_string()
+        })??;
 
         let (full_text, panel_text, card_text) = attempt_result;
         let lower = full_text.to_lowercase();
@@ -696,6 +713,14 @@ pub(crate) async fn ocr_riven_screen() -> Result<serde_json::Value, String> {
             })
             .count();
         let comparison_likely = stat_count >= 5;
+        debug!(
+            overlay,
+            attempt = attempt + 1,
+            header = has_header,
+            fits_in = has_fits_in,
+            stat_lines = stat_count,
+            "Riven OCR attempt"
+        );
 
         if (has_header && has_fits_in) || (has_header && comparison_likely) {
             text = card_text;
@@ -719,6 +744,11 @@ pub(crate) async fn ocr_riven_screen() -> Result<serde_json::Value, String> {
     }
 
     if !confirmed {
+        info!(
+            overlay,
+            attempts = MAX_ATTEMPTS,
+            "Riven screen markers not seen in any attempt, using the last read"
+        );
         let _ = append_to_file(&riven_log, "[STEP 2] Screen markers not confirmed after all attempts — proceeding with last OCR result anyway\n\n");
     }
 
@@ -762,6 +792,13 @@ pub(crate) async fn ocr_riven_screen() -> Result<serde_json::Value, String> {
                     (left, right)
                 }
                 Err(e) => {
+                    let _ = DiagError::new(
+                        Source::Overlay,
+                        Kind::NotFound,
+                        "Riven comparison columns not read: the Warframe window could not be captured",
+                    )
+                    .caused_by_text(&e)
+                    .log();
                     let _ = append_to_file(
                         &riven_log3,
                         &format!("[STEP 2] Column capture failed: {}\n", e),
@@ -771,7 +808,12 @@ pub(crate) async fn ocr_riven_screen() -> Result<serde_json::Value, String> {
             }
         })
         .await
-        .map_err(|e| format!("Task: {}", e))?;
+        .map_err(|e| {
+            DiagError::new(Source::Overlay, Kind::Internal, "Riven OCR failed: its worker task stopped")
+                .caused_by(&e)
+                .log()
+                .to_string()
+        })?;
         cols
     } else {
         (String::new(), String::new())
@@ -986,6 +1028,16 @@ pub(crate) async fn ocr_riven_screen() -> Result<serde_json::Value, String> {
         ),
     );
 
+    info!(
+        overlay,
+        weapon = %weapon,
+        positives = positives.len(),
+        negatives = negatives.len(),
+        comparison = is_comparison,
+        markers_seen = confirmed,
+        elapsed_ms = started.elapsed().as_millis() as u64,
+        "Riven read"
+    );
     Ok(serde_json::json!({
         "weapon": weapon,
         "positives": positives,
@@ -1000,6 +1052,7 @@ pub(crate) async fn ocr_riven_screen() -> Result<serde_json::Value, String> {
 /// Write an error into the riven session log (called from TypeScript when OCR command fails).
 #[tauri::command]
 pub(crate) fn ocr_riven_log_error(error: String) {
+    debug!(overlay, error = %error, "Riven OCR failure reported by the overlay window");
     let path = std::env::temp_dir().join("hexdesk_riven_session.txt");
     let ts = chrono::Local::now().format("%H:%M:%S%.3f").to_string();
     let _ = append_to_file(
