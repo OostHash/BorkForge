@@ -65,6 +65,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 - "Changed recently" in Inventory no longer shows everything that ever
   changed. By default it shows what changed since HexDesk started.
+- The main window is called HexDesk again in Alt+Tab, the taskbar and Task
+  Manager.
 
 ## [1.0.1] - 2026-11-17
 
