@@ -68,17 +68,20 @@ export function ModularDock() {
   if (prefs.collapsed) {
     return (
       <aside aria-label="Collapsed modular window" className="flex w-12 shrink-0 border-s border-border bg-surface">
-        {/* The whole rail is the target, and the vertical title says what it opens. */}
+        {/* The whole rail is the target and the vertical title says what it opens. The icon sits in a
+            bottom strip as high as the open panel's collapse strip, so it stays in the same place. */}
         <button
           type="button"
           aria-label="Expand modular window"
-          className="flex flex-1 flex-col items-center gap-3 py-2.5 text-muted hover:text-text"
+          className="flex flex-1 flex-col items-center pt-2.5 text-muted hover:text-text"
           onClick={() => {
             setCollapsed(false);
           }}
         >
-          <Icon icon={PanelRightOpen} size="md" />
           <span className="text-sm font-semibold tracking-wide whitespace-nowrap uppercase [writing-mode:vertical-rl]">Modular window</span>
+          <span className="mt-auto flex h-11 items-center">
+            <Icon icon={PanelRightOpen} size="md" />
+          </span>
         </button>
       </aside>
     );

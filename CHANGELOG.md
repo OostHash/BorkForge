@@ -27,7 +27,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - New navigation icons for Inventory, Foundry, Relics, Rivens, Timers and
   Market that match their screens, shown larger in the sidebar.
 - The collapsed modular window shows its name along the bar, and clicking
-  anywhere on the bar opens it again.
+  anywhere on the bar opens it again. The open modular window collapses from
+  the strip along its bottom, level with the changelog bar.
 - The changelog works as it did before the redesign: click the empty part
   of its bar to open or close it, click the text on the bar to see recent
   changes in Inventory, the collapsed feed shows the full change with
