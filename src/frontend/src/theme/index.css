@@ -58,6 +58,47 @@
   --text-list: var(--ff-font-size-list);
 }
 
+/*
+ * Changelog shadow and motion. feed-step lasts one feed step (FEED_STEP_MS in
+ * src/frontend/src/domain/changelog.ts): the row fades in, stays, fades out.
+ * Use with motion-safe: so reduced motion shows the rows without movement.
+ */
+@theme {
+  /* The open changelog lifts above the screen it covers. */
+  --shadow-dock-up: 0 -8px 24px rgb(0 0 0 / 0.18);
+  --animate-feed-step: feed-step 4.5s ease both;
+  --animate-row-arrive: row-arrive 160ms ease-out both;
+  --animate-fade-in: fade-in 180ms ease-out both;
+
+  @keyframes feed-step {
+    from {
+      opacity: 0;
+    }
+    4%,
+    96% {
+      opacity: 1;
+    }
+    to {
+      opacity: 0;
+    }
+  }
+  @keyframes row-arrive {
+    from {
+      max-height: 0;
+      opacity: 0;
+    }
+    to {
+      max-height: 3rem;
+      opacity: 1;
+    }
+  }
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+    }
+  }
+}
+
 @layer base {
   html {
     background: var(--ff-bg);

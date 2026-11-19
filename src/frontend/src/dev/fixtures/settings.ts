@@ -10,6 +10,8 @@ const INITIAL: Record<string, unknown> = {
   timerFavorites: ["cetus-cycle", "duviri-cycle"],
   fissureWatches: [{ id: "w1", tier: "Lith", missionType: "Capture", variant: "any" }],
   fissureNotifications: true,
+  // The fixture changelog is dated before the page loads; a fixed window keeps it "recent".
+  recentWindow: "day",
 };
 
 function read(): Record<string, unknown> {

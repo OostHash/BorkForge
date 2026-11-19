@@ -17,9 +17,30 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   saves a single zip with the logs, your settings and facts about your system
   to your Downloads folder, ready to attach to a bug report. Passwords,
   tokens, e-mail addresses and player names are removed from it.
+- The navigation sidebar can collapse to icons only. Click the empty space
+  between the screens and Report a bug to collapse or expand it; HexDesk
+  remembers your choice. When collapsed, hover or focus an icon to see its
+  name. HexDesk starts collapsed, and narrow windows always show icons only.
 
 ### Changed
 
+- New navigation icons for Inventory, Foundry, Relics, Rivens, Timers and
+  Market that match their screens, shown larger in the sidebar.
+- The collapsed modular window shows its name along the bar, and clicking
+  anywhere on the bar opens it again. The open modular window collapses from
+  the strip along its bottom, level with the changelog bar.
+- The changelog works as it did before the redesign: click the empty part
+  of its bar to open or close it, click the text on the bar to see recent
+  changes in Inventory, the collapsed feed shows the full change with
+  category and old and new quantity, new changes slide into the open list,
+  and a right-click on a change opens the wiki menu. Each change shows its
+  date as well as its time, and rows alternate in shade so each line is easy
+  to follow.
+- Choose what "Changed recently" counts in Settings → Filters: since HexDesk
+  started, the last hour, the last 24 hours, the last 7 days or everything in
+  the changelog. The filter, the recent sort and the change badge on items
+  all follow it, and the badge now shows how long ago in minutes, hours or
+  days instead of disappearing after five minutes.
 - The logs now say why something failed instead of only that it failed, for
   example when Warframe's memory could not be read, no inventory was found,
   warframe.market refused a request, or a relic overlay took long to appear.
@@ -42,6 +63,16 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - The separate session and debug files HexDesk wrote to your temporary folder.
   Debug files that earlier versions left behind, such as inventory snapshots,
   memory dumps, captures and session logs, are deleted when HexDesk starts.
+
+### Fixed
+
+- "Changed recently" in Inventory no longer shows everything that ever
+  changed. By default it shows what changed since HexDesk started.
+- The main window is called HexDesk again in Alt+Tab, the taskbar and Task
+  Manager.
+- Clicking an active filter preset again turns it off, in Inventory, Foundry
+  and Market. With "Restore previous filters" on, it brings back the filters
+  you had before.
 
 ## [1.0.1] - 2026-11-17
 
