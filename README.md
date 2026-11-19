@@ -20,6 +20,12 @@
 
 <p align="center"><strong>The Origin System, Connected.</strong></p>
 
+<p align="center">
+  <a href="https://github.com/OostHash/HexDesk/actions/workflows/ci.yml"><img src="https://github.com/OostHash/HexDesk/actions/workflows/ci.yml/badge.svg?branch=master" alt="CI status"></a>
+  <a href="https://github.com/OostHash/HexDesk/releases/latest"><img src="https://img.shields.io/github/v/release/OostHash/HexDesk?display_name=tag" alt="Latest release"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/OostHash/HexDesk" alt="License: GPLv3"></a>
+</p>
+
 HexDesk is a free, open-source desktop companion for Warframe. It combines
 inventory and mastery tracking, market tools, timers, relic overlays, and riven
 analysis in one local app. Built by Tenno, for Tenno.
