@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { clearMocks, mockIPC, mockWindows } from "@tauri-apps/api/mocks";
 import { useState } from "react";
-import { afterEach, beforeEach, expect, it } from "vitest";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { page, userEvent } from "vitest/browser";
 import { cleanup, render } from "vitest-browser-react";
 import { SettingsDialog, type SettingsTab } from "./SettingsDialog";
@@ -89,6 +89,17 @@ it("clamps the auto-invisible minutes when the field is left", async () => {
   await userEvent.tab();
   await expect.element(field).toHaveValue(480);
   expect(saved().wfmAutoInvisibleMins).toBe(480);
+});
+
+it("saves what Changed recently counts, defaulting to since HexDesk started", async () => {
+  const { client, saved } = setup();
+  await mount(client, "filters");
+  const select = page.getByRole("combobox", { name: "Counts changes from" });
+  await expect.element(select).toHaveValue("session");
+  await select.selectOptions("Last 7 days");
+  await vi.waitFor(() => {
+    expect(saved().recentWindow).toBe("week");
+  });
 });
 
 it("renames and deletes presets of the chosen page, keeping other pages", async () => {

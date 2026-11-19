@@ -28,6 +28,11 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   Market that match their screens, shown larger in the sidebar.
 - The collapsed modular window shows its name along the bar, and clicking
   anywhere on the bar opens it again.
+- Choose what "Changed recently" counts in Settings → Filters: since HexDesk
+  started, the last hour, the last 24 hours, the last 7 days or everything in
+  the changelog. The filter, the recent sort and the change badge on items
+  all follow it, and the badge now shows how long ago in minutes, hours or
+  days instead of disappearing after five minutes.
 - The logs now say why something failed instead of only that it failed, for
   example when Warframe's memory could not be read, no inventory was found,
   warframe.market refused a request, or a relic overlay took long to appear.
@@ -50,6 +55,11 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - The separate session and debug files HexDesk wrote to your temporary folder.
   Debug files that earlier versions left behind, such as inventory snapshots,
   memory dumps, captures and session logs, are deleted when HexDesk starts.
+
+### Fixed
+
+- "Changed recently" in Inventory no longer shows everything that ever
+  changed. By default it shows what changed since HexDesk started.
 
 ## [1.0.1] - 2026-11-17
 
