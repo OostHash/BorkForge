@@ -1,18 +1,5 @@
-import { useQueryClient } from "@tanstack/react-query";
-import { X } from "lucide-react";
 import { useEffect, useState } from "react";
-import {
-  dismissUpdate,
-  pokeScan,
-  refreshAllCaches,
-  useBlobStatus,
-  useCacheStatuses,
-  useGameState,
-  useInstallUpdate,
-  useMonitorStatus,
-  usePendingUpdate,
-  usePlayer,
-} from "../api/app";
+import { pokeScan, refreshAllCaches, useBlobStatus, useCacheStatuses, useGameState, useMonitorStatus, usePlayer } from "../api/app";
 import { useOverlayStatus } from "../api/overlays";
 import { useSettings } from "../api/settings";
 import { useSession } from "../api/trading";
@@ -20,7 +7,7 @@ import { useNow } from "../state/useNow";
 import { cacheAge, cacheHealth, cacheLabel, sourceTone } from "../domain/cache";
 import { memoryStatus, POKE_MS, wfmStatus } from "../domain/status";
 import { StatusChip } from "../patterns/StatusChip";
-import { Button, IconButton } from "../primitives/actions";
+import { Button } from "../primitives/actions";
 import { Badge } from "../primitives/display";
 import { Popover } from "../primitives/overlay";
 
@@ -34,7 +21,7 @@ type Props = {
   onOpenSettings: () => void;
 };
 
-/** Top bar of the main window: account, update and status chips. */
+/** Top bar of the main window: account and status chips. An available update shows on Settings instead. */
 export function Header({ onOpenScreen, onOpenSettings }: Props) {
   return (
     <header className="flex shrink-0 flex-wrap items-center gap-2 border-b border-border bg-surface px-4 py-2">
@@ -64,7 +51,6 @@ function Account() {
           {name}
         </Badge>
       )}
-      <UpdateBadge />
       {blob?.stage === "done" && (
         <Badge tone="success" variant="outline" title={blob.detail}>
           Inventory loaded
@@ -81,39 +67,6 @@ function OverlayStatus() {
   return (
     <span role="status" className="contents">
       {text && <StatusChip label="Overlay" detail={text} state="online" hint="Overlay status" />}
-    </span>
-  );
-}
-
-function UpdateBadge() {
-  const queryClient = useQueryClient();
-  const version = usePendingUpdate();
-  const install = useInstallUpdate();
-  if (!version) return null;
-  return (
-    <span className="inline-flex items-center gap-0.5">
-      <Button
-        size="sm"
-        variant="primary"
-        loading={install.isPending}
-        disabled={install.isPending}
-        title={install.isPending ? "Installing update…" : `v${version} is available — click to install`}
-        onClick={() => {
-          install.mutate();
-        }}
-      >
-        {install.isPending ? "Installing…" : `Update to v${version}`}
-      </Button>
-      {!install.isPending && (
-        <IconButton
-          icon={X}
-          size="sm"
-          label="Dismiss update"
-          onClick={() => {
-            dismissUpdate(queryClient);
-          }}
-        />
-      )}
     </span>
   );
 }

@@ -1,7 +1,9 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { page, userEvent } from "vitest/browser";
 import { cleanup, render } from "vitest-browser-react";
 import "../theme/index.css";
+import { appKeys } from "../api/app";
 import { MainNav, type NavScreen } from "./MainNav";
 import { NAV_COLLAPSED_KEY } from "./navCollapsed";
 import { NAV_ICONS } from "./navIcons";
@@ -11,8 +13,14 @@ const SCREENS: NavScreen[] = [
   { id: "market", label: "Market", icon: NAV_ICONS.market },
 ];
 
-function renderNav() {
-  return render(<MainNav screens={SCREENS} current="inventory" onSelect={() => undefined} settingsOpen={false} onOpenSettings={() => undefined} />);
+function renderNav(update: string | null = null) {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  client.setQueryData(appKeys.update, update);
+  return render(
+    <QueryClientProvider client={client}>
+      <MainNav screens={SCREENS} current="inventory" onSelect={() => undefined} settingsOpen={false} onOpenSettings={() => undefined} />
+    </QueryClientProvider>,
+  );
 }
 
 // The label text exists twice: in the item and in its tooltip. The item comes first.
@@ -77,6 +85,18 @@ describe("MainNav", () => {
     const screen = await renderNav();
     await expect.element(label(screen)).not.toBeVisible();
     await expect.element(screen.getByRole("button", { name: "Collapse navigation", includeHidden: true })).not.toBeVisible();
+  });
+});
+
+describe("MainNav update", () => {
+  it("marks Settings while an update waits, and names why", async () => {
+    const screen = await renderNav("2.4.0");
+    await expect.element(screen.getByRole("button", { name: "Settings, update available" })).toBeVisible();
+  });
+
+  it("leaves Settings plain without an update", async () => {
+    const screen = await renderNav();
+    await expect.element(screen.getByRole("button", { name: "Settings", exact: true })).toBeVisible();
   });
 });
 

@@ -17,6 +17,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   Downloads folder, ready to attach to a bug report. Choose what goes in:
   system information, your settings, the activity entries and the log files.
   Passwords, tokens, e-mail addresses and player names are removed from it.
+- Check for updates yourself in Settings → General, and install one from
+  there.
 - The navigation sidebar can collapse to icons only. Click the empty space
   between the screens and Report a bug to collapse or expand it; HexDesk
   remembers your choice. When collapsed, hover or focus an icon to see its
@@ -28,6 +30,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   a column next to the navigation, Settings reopens on the category you used
   last, and the changelog and modular window are hidden while it is open.
   The HexDesk logo and version sit at the bottom of the category column.
+- An available update shows as a red dot on Settings, and on General inside
+  it, instead of a button in the header.
 - New navigation icons for Inventory, Foundry, Relics, Rivens, Timers and
   Market that match their screens, shown larger in the sidebar.
 - The collapsed modular window shows its name along the bar, and clicking

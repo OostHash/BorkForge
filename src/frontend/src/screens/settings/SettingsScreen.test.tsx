@@ -18,7 +18,7 @@ afterEach(async () => {
 });
 
 /** A backend whose settings file merges saves, like the real one. */
-function setup(initial: { settings?: Record<string, unknown>; session?: [string, string] | null } = {}) {
+function setup(initial: { settings?: Record<string, unknown>; session?: [string, string] | null; update?: string | null } = {}) {
   const calls: Call[] = [];
   let settings: Record<string, unknown> = { ...initial.settings };
   mockWindows("main");
@@ -36,6 +36,8 @@ function setup(initial: { settings?: Record<string, unknown>; session?: [string,
         return { count: 1200, recipe_count: 300 };
       case "get_system_locale":
         return "nl-NL";
+      case "check_for_update":
+        return initial.update ?? null;
       default:
         return null;
     }
@@ -68,6 +70,26 @@ it("lists the categories in a navigator and shows the chosen one beside it", asy
   await expect.element(nav.getByRole("button", { name: "Filters" })).toHaveAttribute("aria-current", "page");
   await expect.element(page.getByRole("heading", { name: "Filters", level: 2 })).toBeVisible();
   await expect.element(page.getByRole("combobox", { name: "Counts changes from" })).toBeVisible();
+});
+
+it("checks for updates on demand and says when HexDesk is up to date", async () => {
+  const { client } = setup();
+  await mount(client);
+  await page.getByRole("button", { name: "Check now" }).click();
+  await expect.element(page.getByRole("group", { name: "Check for updates" }).getByRole("status")).toHaveTextContent("HexDesk is up to date.");
+  await expect.element(page.getByRole("button", { name: "General", exact: true })).toBeVisible();
+});
+
+it("offers to install a found update and marks General until then", async () => {
+  const { client, calls } = setup({ update: "2.4.0" });
+  await mount(client);
+  await page.getByRole("button", { name: "Check now" }).click();
+  await expect.element(page.getByRole("group", { name: "Check for updates" }).getByRole("status")).toHaveTextContent("Version 2.4.0 is available.");
+  await expect.element(page.getByRole("navigation", { name: "Settings" }).getByRole("button", { name: "General, update available" })).toBeVisible();
+  await page.getByRole("button", { name: "Install and restart" }).click();
+  await vi.waitFor(() => {
+    expect(calls.map((c) => c.cmd)).toContain("install_update");
+  });
 });
 
 it("turns the memory scanner on in the settings file", async () => {

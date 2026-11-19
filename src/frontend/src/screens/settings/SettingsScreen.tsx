@@ -1,5 +1,5 @@
 import { useId } from "react";
-import { useAppVersion } from "../../api/app";
+import { useAppVersion, usePendingUpdate } from "../../api/app";
 import { HexDeskMark } from "../../patterns/HexDeskMark";
 import { SidebarItem } from "../../primitives/navigation";
 import { ConsoleTab } from "./ConsoleTab";
@@ -38,6 +38,7 @@ type Props = {
  */
 export function SettingsScreen({ tab, onTabChange }: Props) {
   const version = useAppVersion();
+  const update = usePendingUpdate();
   const headingId = useId();
   const current = VISIBLE_TABS.find((t) => t.id === tab) ?? SETTINGS_TABS[0];
   return (
@@ -49,6 +50,13 @@ export function SettingsScreen({ tab, onTabChange }: Props) {
               <SidebarItem
                 active={t.id === current.id}
                 label={t.label}
+                // General holds the Updates group: point there while an update waits.
+                {...(update && t.id === "general"
+                  ? {
+                      "aria-label": `${t.label}, update available`,
+                      badge: <span aria-hidden="true" className="size-2 shrink-0 rounded-full bg-danger" />,
+                    }
+                  : {})}
                 onClick={() => {
                   onTabChange(t.id);
                 }}

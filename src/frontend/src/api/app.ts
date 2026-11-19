@@ -140,7 +140,19 @@ export async function checkForUpdate(queryClient: QueryClient): Promise<void> {
   queryClient.setQueryData(appKeys.update, version);
 }
 
-export const dismissUpdate = (queryClient: QueryClient) => queryClient.setQueryData(appKeys.update, null);
+/**
+ * A check started by the user (Settings → General). Unlike the check at
+ * start it reports failures; a found update also marks Settings.
+ */
+export function useCheckForUpdate() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => invoke("check_for_update"),
+    onSuccess: (version) => {
+      queryClient.setQueryData(appKeys.update, version);
+    },
+  });
+}
 
 /** Downloads and installs; the backend restarts the app when done. */
 export function useInstallUpdate() {
