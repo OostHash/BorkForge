@@ -80,6 +80,17 @@ it("saves the switches and choices of each overlay", async () => {
     .toBeDisabled();
 });
 
+it("closes the relic pick overlay with Home unless another key is chosen", async () => {
+  const { client, saved } = setup();
+  await mount(client);
+  const closeKey = group("Relic pick overlay").getByRole("combobox", { name: "Close key" });
+  await expect.element(closeKey).toHaveValue("Home");
+  await closeKey.selectOptions("F8");
+  await vi.waitFor(() => {
+    expect(saved()).toMatchObject({ relicPickCloseKey: "F8" });
+  });
+});
+
 it("disables an overlay's choices while it is off, and hides the reward strip", async () => {
   const { client, saved } = setup({ relicPickEnabled: false });
   const seen = await heard("relic-screen");

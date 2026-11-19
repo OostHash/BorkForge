@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
-use std::sync::atomic::AtomicBool;
+use std::sync::atomic::{AtomicBool, AtomicU64};
 use std::sync::{Arc, Mutex};
 
 use crate::memory_scanner;
@@ -132,6 +132,12 @@ pub struct AppState {
     pub force_pid_check: Arc<AtomicBool>,
     /// When false, the Relic Pick Overlay is suppressed even when EE.log triggers it.
     pub relic_pick_overlay_enabled: Arc<AtomicBool>,
+    /// Relic selection counter: odd while a selection is open, even when none
+    /// is. A background step of the Relic Pick overlay (era OCR, timeout) only
+    /// acts while the value it started with is still current, so a late
+    /// result cannot reopen a selection that already closed. See
+    /// `begin_relic_pick` and `end_relic_pick` in `src/backend/src/log_watcher.rs`.
+    pub relic_pick_session: Arc<AtomicU64>,
     /// When false, all automatically-triggered overlays are suppressed.
     pub overlays_enabled: Arc<AtomicBool>,
 }

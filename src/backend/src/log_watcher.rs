@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::sync::atomic::Ordering;
+use std::sync::atomic::{AtomicU64, Ordering};
 use tauri::{Emitter, Manager};
 use tracing::{info, warn};
 
@@ -280,6 +280,73 @@ pub(crate) fn handle_riven_events(
     }
 }
 
+/// How long the Relic Pick overlay stays up when EE.log never reports that
+/// the selection screen closed.
+const RELIC_PICK_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(120);
+
+/// A relic selection event in EE.log.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum RelicPickSignal {
+    /// The relic grid finished loading.
+    Open,
+    /// The selection screen is over; names the EE.log line that said so.
+    Close(&'static str),
+}
+
+/// The relic selection events in lower-cased EE.log text, in the order the
+/// game wrote them. Order matters: one read can hold both a close line from
+/// before the screen opened and the open line itself, and only a close that
+/// comes after the open ends that selection.
+pub(crate) fn relic_pick_signals(lower: &str) -> Vec<RelicPickSignal> {
+    lower
+        .lines()
+        .filter_map(|line| {
+            if line.contains("themedprojectionmanager.lua: populateinventorygrid") {
+                Some(RelicPickSignal::Open)
+            } else if line.contains("subscribing for /lotus/interface/mapredux.swf")
+                && line.contains("mapreduxinputfilter")
+            {
+                // The star chart takes input again: the player backed out.
+                Some(RelicPickSignal::Close("mapredux"))
+            } else if line.contains("onentitlementservicecomplete false:") {
+                Some(RelicPickSignal::Close("OnEntitlementServiceComplete"))
+            } else if line.contains("gamerulesimpl - changing state from") {
+                // A level is loading, which after a relic pick is the mission.
+                Some(RelicPickSignal::Close("GameRulesImpl state change"))
+            } else {
+                None
+            }
+        })
+        .collect()
+}
+
+/// Start a relic selection and return its session value (always odd). A
+/// selection that is still open is replaced, which also stops its pending
+/// steps.
+pub(crate) fn begin_relic_pick(counter: &AtomicU64) -> u64 {
+    let step = |v: u64| if v % 2 == 1 { v + 2 } else { v + 1 };
+    let previous = counter
+        .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |v| Some(step(v)))
+        .unwrap_or_else(|v| v);
+    step(previous)
+}
+
+/// End the open relic selection. With `Some(session)` only that selection is
+/// ended. Returns false when there was nothing to end.
+pub(crate) fn end_relic_pick(counter: &AtomicU64, session: Option<u64>) -> bool {
+    counter
+        .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |v| {
+            let open = v % 2 == 1 && session.is_none_or(|s| s == v);
+            open.then_some(v + 1)
+        })
+        .is_ok()
+}
+
+fn relic_pick_on(state: &AppState) -> bool {
+    state.overlays_enabled.load(Ordering::SeqCst)
+        && state.relic_pick_overlay_enabled.load(Ordering::SeqCst)
+}
+
 /// Detect the relic-pick screen trigger and its dismiss from freshly-read EE.log text.
 /// `last_relic_pick_trigger` is the caller's cooldown state, carried across calls.
 pub(crate) fn handle_relic_pick_events(
@@ -287,102 +354,122 @@ pub(crate) fn handle_relic_pick_events(
     lower: &str,
     last_relic_pick_trigger: &mut Option<std::time::Instant>,
 ) {
-    // ── Relic selection screen ───────────────────────────────────────
-    // Trigger: relic grid fully loaded → OCR the era from top-left quarter.
-    if lower.contains("themedprojectionmanager.lua: populateinventorygrid") {
-        let now = std::time::Instant::now();
-        let state = app.state::<AppState>();
-        let relic_pick_on = state.overlays_enabled.load(Ordering::SeqCst)
-            && state.relic_pick_overlay_enabled.load(Ordering::SeqCst);
-        let cooldown = last_relic_pick_trigger.is_some_and(|t| now.duration_since(t).as_secs() < 5);
-        let should_trigger = relic_pick_on && !cooldown;
-        hexdesk_diag::info!(
-            overlay,
-            overlay_on = relic_pick_on,
-            cooldown,
-            "Relic selection screen seen in EE.log"
-        );
-        if should_trigger {
-            *last_relic_pick_trigger = Some(now);
-            let app_clone = app.clone();
-            std::thread::spawn(move || {
-                // Brief delay for the screen to finish rendering before capture.
-                std::thread::sleep(std::time::Duration::from_millis(400));
-                let state = app_clone.state::<AppState>();
-                if !state.overlays_enabled.load(Ordering::SeqCst)
-                    || !state.relic_pick_overlay_enabled.load(Ordering::SeqCst)
-                {
-                    return;
-                }
-                let started = std::time::Instant::now();
-                let era = crate::ocr::detect_fissure_era();
-                let ocr_ms = started.elapsed().as_millis() as u64;
-                if era.is_none() {
-                    let _ = hexdesk_diag::DiagError::new(
-                        hexdesk_diag::Source::Overlay,
-                        hexdesk_diag::Kind::NotFound,
-                        "Relic Pick overlay not shown: no fissure era read from the screen",
-                    )
-                    .with("ocr_ms", ocr_ms)
-                    .log();
-                }
-                if let Some(era) = era {
-                    let payload = build_relic_pick_payload(&era, &app_clone);
-                    let state = app_clone.state::<AppState>();
-                    if !state.overlays_enabled.load(Ordering::SeqCst)
-                        || !state.relic_pick_overlay_enabled.load(Ordering::SeqCst)
-                    {
-                        return;
-                    }
-                    let relic_count = payload["relics"].as_array().map_or(0, |a| a.len());
-                    hexdesk_diag::info!(
-                        overlay,
-                        era = %era,
-                        relics = relic_count,
-                        ocr_ms,
-                        "Fissure era read for the Relic Pick overlay"
-                    );
-                    // Show the overlay window from Rust — more reliable than
-                    // calling win.show() from the WebView (avoids timing races).
-                    relic_pick_show(&app_clone);
-                    let state = app_clone.state::<AppState>();
-                    if !state.overlays_enabled.load(Ordering::SeqCst)
-                        || !state.relic_pick_overlay_enabled.load(Ordering::SeqCst)
-                    {
-                        relic_pick_hide(&app_clone);
-                        let _ = app_clone.emit(events::RELIC_PICK_CLOSE, ());
-                        return;
-                    }
-                    let _ = app_clone.emit(events::RELIC_PICK_OPEN, payload);
-                }
-            });
-        } else if !relic_pick_on {
-            hexdesk_diag::debug!(
-                overlay,
-                "Relic Pick overlay skipped: turned off in settings"
-            );
-        } else {
-            hexdesk_diag::debug!(
-                overlay,
-                "Relic Pick overlay skipped: the selection screen was seen less than 5 s ago"
-            );
+    for signal in relic_pick_signals(lower) {
+        match signal {
+            RelicPickSignal::Open => open_relic_pick(app, last_relic_pick_trigger),
+            RelicPickSignal::Close(line) => close_relic_pick(app, line),
         }
     }
-    // Dismiss: solar map regains input focus (player cancelled or mission started).
-    let mapredux_dismiss = lower.contains("subscribing for /lotus/interface/mapredux.swf")
-        && lower.contains("mapreduxinputfilter");
-    // Candidate: entitlement service completing signals the refinement screen closed.
-    let entitlement_dismiss = lower.contains("onentitlementservicecomplete false:");
-    if mapredux_dismiss || entitlement_dismiss {
-        let which = if entitlement_dismiss {
-            "OnEntitlementServiceComplete"
-        } else {
-            "mapredux"
-        };
+}
+
+fn close_relic_pick(app: &tauri::AppHandle, ee_log_line: &'static str) {
+    if !end_relic_pick(&app.state::<AppState>().relic_pick_session, None) {
+        return;
+    }
+    hexdesk_diag::info!(
+        overlay,
+        ee_log_line,
+        "Relic Pick overlay closing: EE.log reports the selection screen closed"
+    );
+    relic_pick_hide(app);
+    let _ = app.emit(events::RELIC_PICK_CLOSE, ());
+}
+
+fn open_relic_pick(
+    app: &tauri::AppHandle,
+    last_relic_pick_trigger: &mut Option<std::time::Instant>,
+) {
+    let now = std::time::Instant::now();
+    let state = app.state::<AppState>();
+    let overlay_on = relic_pick_on(&state);
+    let cooldown = last_relic_pick_trigger.is_some_and(|t| now.duration_since(t).as_secs() < 5);
+    hexdesk_diag::info!(
+        overlay,
+        overlay_on,
+        cooldown,
+        "Relic selection screen seen in EE.log"
+    );
+    if !overlay_on {
+        hexdesk_diag::debug!(
+            overlay,
+            "Relic Pick overlay skipped: turned off in settings"
+        );
+        return;
+    }
+    if cooldown {
+        hexdesk_diag::debug!(
+            overlay,
+            "Relic Pick overlay skipped: the selection screen was seen less than 5 s ago"
+        );
+        return;
+    }
+    *last_relic_pick_trigger = Some(now);
+    let session = begin_relic_pick(&state.relic_pick_session);
+    let app = app.clone();
+    std::thread::spawn(move || show_relic_pick(&app, session));
+}
+
+/// Read the fissure era and show the overlay, unless the selection this
+/// `session` belongs to closed in the meantime.
+fn show_relic_pick(app: &tauri::AppHandle, session: u64) {
+    let state = app.state::<AppState>();
+    let current = || state.relic_pick_session.load(Ordering::SeqCst) == session;
+    // Give the screen time to finish rendering before the capture.
+    std::thread::sleep(std::time::Duration::from_millis(400));
+    if !relic_pick_on(&state) || !current() {
+        return;
+    }
+    let started = std::time::Instant::now();
+    let era = crate::ocr::detect_fissure_era();
+    let ocr_ms = started.elapsed().as_millis() as u64;
+    let Some(era) = era else {
+        let _ = hexdesk_diag::DiagError::new(
+            hexdesk_diag::Source::Overlay,
+            hexdesk_diag::Kind::NotFound,
+            "Relic Pick overlay not shown: no fissure era read from the screen",
+        )
+        .with("ocr_ms", ocr_ms)
+        .log();
+        return;
+    };
+    let payload = build_relic_pick_payload(&era, app);
+    if !relic_pick_on(&state) {
+        return;
+    }
+    if !current() {
         hexdesk_diag::info!(
             overlay,
-            ee_log_line = which,
-            "Relic Pick overlay closing: EE.log reports the selection screen closed"
+            era = %era,
+            ocr_ms,
+            "Relic Pick overlay not shown: the selection screen closed before the era was read"
+        );
+        return;
+    }
+    let relic_count = payload["relics"].as_array().map_or(0, |a| a.len());
+    hexdesk_diag::info!(
+        overlay,
+        era = %era,
+        relics = relic_count,
+        ocr_ms,
+        "Fissure era read for the Relic Pick overlay"
+    );
+    // Shown from Rust rather than from the WebView, so placement and
+    // visibility do not depend on when the overlay page handles the event.
+    relic_pick_show(app);
+    // A close or a settings change can land while the window was being shown.
+    if !relic_pick_on(&state) || !current() {
+        relic_pick_hide(app);
+        let _ = app.emit(events::RELIC_PICK_CLOSE, ());
+        return;
+    }
+    let _ = app.emit(events::RELIC_PICK_OPEN, payload);
+
+    std::thread::sleep(RELIC_PICK_TIMEOUT);
+    if end_relic_pick(&state.relic_pick_session, Some(session)) {
+        hexdesk_diag::info!(
+            overlay,
+            timeout_s = RELIC_PICK_TIMEOUT.as_secs(),
+            "Relic Pick overlay hidden: no close line in EE.log before the timeout"
         );
         relic_pick_hide(app);
         let _ = app.emit(events::RELIC_PICK_CLOSE, ());
@@ -1202,6 +1289,83 @@ pub(crate) fn parse_and_emit_wfm_whisper(app: &tauri::AppHandle, log_line: &str)
             "timestamp": chrono::Local::now().format("%H:%M:%S").to_string(),
         }),
     );
+}
+
+#[cfg(test)]
+mod relic_pick_tests {
+    use super::*;
+
+    const OPEN: &str = "301.2 Script [Info]: ThemedProjectionManager.lua: PopulateInventoryGrid";
+    const MAPREDUX: &str = "305.1 Input [Info]: Subscribing for /Lotus/Interface/MapRedux.swf with input filter /Lotus/Interface/MapReduxInputFilter";
+    const ENTITLEMENT: &str = "299.8 Sys [Info]: OnEntitlementServiceComplete false:";
+    const LEVEL_LOAD: &str =
+        "320.4 Net [Info]: GameRulesImpl - changing state from SS_INVALID to SS_WAITING_TO_START";
+
+    fn signals(lines: &[&str]) -> Vec<RelicPickSignal> {
+        relic_pick_signals(&lines.join("\n").to_lowercase())
+    }
+
+    #[test]
+    fn signals_keep_the_order_of_the_log() {
+        assert_eq!(
+            signals(&[ENTITLEMENT, OPEN]),
+            vec![
+                RelicPickSignal::Close("OnEntitlementServiceComplete"),
+                RelicPickSignal::Open
+            ]
+        );
+        assert_eq!(
+            signals(&[OPEN, MAPREDUX]),
+            vec![RelicPickSignal::Open, RelicPickSignal::Close("mapredux")]
+        );
+    }
+
+    #[test]
+    fn a_level_load_closes_the_selection() {
+        assert_eq!(
+            signals(&[LEVEL_LOAD]),
+            vec![RelicPickSignal::Close("GameRulesImpl state change")]
+        );
+    }
+
+    #[test]
+    fn other_star_chart_input_lines_are_not_a_close() {
+        let other =
+            "7.179 Input [Info]: Subscribing for /Lotus/Interface/Progress.swf with input filter /Lotus/Interface/ProgressInputFilter";
+        assert!(signals(&[other, "budget overrun retiring read of solarmapredux"]).is_empty());
+    }
+
+    #[test]
+    fn a_close_before_the_open_leaves_the_selection_open() {
+        let counter = AtomicU64::new(0);
+        assert!(!end_relic_pick(&counter, None), "nothing is open yet");
+        let session = begin_relic_pick(&counter);
+        assert_eq!(counter.load(Ordering::SeqCst), session);
+    }
+
+    #[test]
+    fn a_close_after_the_open_stops_its_pending_steps() {
+        let counter = AtomicU64::new(0);
+        let session = begin_relic_pick(&counter);
+        assert!(end_relic_pick(&counter, None));
+        assert_ne!(counter.load(Ordering::SeqCst), session);
+        assert!(
+            !end_relic_pick(&counter, Some(session)),
+            "the timeout of a closed selection does nothing"
+        );
+        assert!(!end_relic_pick(&counter, None), "already closed");
+    }
+
+    #[test]
+    fn a_new_open_replaces_one_that_never_closed() {
+        let counter = AtomicU64::new(0);
+        let first = begin_relic_pick(&counter);
+        let second = begin_relic_pick(&counter);
+        assert_ne!(first, second);
+        assert_eq!(second % 2, 1, "the new selection is open");
+        assert!(!end_relic_pick(&counter, Some(first)));
+        assert!(end_relic_pick(&counter, Some(second)));
+    }
 }
 
 #[cfg(test)]

@@ -23,6 +23,9 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   between the screens and Report a bug to collapse or expand it; HexDesk
   remembers your choice. When collapsed, hover or focus an icon to see its
   name. HexDesk starts collapsed, and narrow windows always show icons only.
+- Press Home to close the Relic Pick overlay when it stays on screen. Choose
+  another key, or none, in Settings → Overlays. The game still receives the
+  key as well.
 
 ### Changed
 
@@ -82,6 +85,10 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - Clicking an active filter preset again turns it off, in Inventory, Foundry
   and Market. With "Restore previous filters" on, it brings back the filters
   you had before.
+- The Relic Pick overlay closes by itself again when you pick a relic, back
+  out to the star chart or the mission starts. It no longer opens after the
+  selection screen has already closed, and it hides after two minutes if the
+  game never reports that the screen closed.
 
 ## [1.0.1] - 2026-11-17
 

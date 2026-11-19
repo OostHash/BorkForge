@@ -40,6 +40,7 @@ mod platform;
 mod pricing;
 mod refresh;
 mod relic_pick;
+mod relic_pick_key;
 mod resolver;
 mod reward_watcher;
 mod rivens;
@@ -583,6 +584,7 @@ pub fn run() {
             corrections: initial.corrections,
             force_pid_check: Arc::new(AtomicBool::new(false)),
             relic_pick_overlay_enabled: Arc::new(AtomicBool::new(false)),
+            relic_pick_session: Arc::new(std::sync::atomic::AtomicU64::new(0)),
             overlays_enabled: Arc::new(AtomicBool::new(false)),
         })
         .setup(setup_app)
@@ -678,6 +680,7 @@ pub fn run() {
             platform::get_system_locale,
             catalogue::get_current_crafting,
             relic_pick::show_relic_pick_window,
+            relic_pick_key::set_relic_pick_close_key,
             wfcd::get_drop_data,
             pricing::get_cache_statuses,
             pricing::refresh_all_caches,

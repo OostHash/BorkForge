@@ -44,6 +44,22 @@ it("tells the backend the overlay switches once settings are read", async () => 
   });
 });
 
+it("tells the backend the relic pick close key, Home by default", async () => {
+  const { client, find } = setup();
+  await mount(client);
+  await vi.waitFor(() => {
+    expect(find("set_relic_pick_close_key")[0]?.args).toEqual({ vk: 0x24 });
+  });
+});
+
+it("tells the backend when there is no close key", async () => {
+  const { client, find } = setup({ relicPickCloseKey: "off" });
+  await mount(client);
+  await vi.waitFor(() => {
+    expect(find("set_relic_pick_close_key")[0]?.args).toEqual({ vk: 0 });
+  });
+});
+
 it("places the strip over the game when the reward screen opens", async () => {
   const { client, find } = setup();
   await mount(client);
