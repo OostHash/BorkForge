@@ -35,14 +35,14 @@ describe("MainNav", () => {
     const screen = await renderNav();
     await expect.element(screen.getByRole("button", { name: "Expand navigation" })).toBeVisible();
     await expect.element(label(screen)).not.toBeVisible();
-    expect(navWidth()).toBeLessThan(80);
+    expect(navWidth()).toBeLessThan(100);
   });
 
   it("expands and collapses again from the empty space, and remembers it", async () => {
     const screen = await renderNav();
     await userEvent.click(screen.getByRole("button", { name: "Expand navigation" }));
     await expect.element(label(screen)).toBeVisible();
-    expect(navWidth()).toBeGreaterThan(150);
+    expect(navWidth()).toBeGreaterThan(200);
     expect(localStorage.getItem(NAV_COLLAPSED_KEY)).toBe("expanded");
 
     await cleanup();

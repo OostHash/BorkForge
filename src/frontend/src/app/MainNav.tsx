@@ -2,7 +2,7 @@ import { Bug, PanelLeftClose, PanelLeftOpen, Settings, type LucideIcon } from "l
 import type { ComponentProps } from "react";
 import { openExternal } from "../api/links";
 import { cn } from "../primitives/cn";
-import { Icon } from "../primitives/display";
+import { Icon, type IconSize } from "../primitives/display";
 import { SidebarItem } from "../primitives/navigation";
 import { Tooltip, type TooltipTriggerProps } from "../primitives/overlay";
 import { HexDeskMark } from "./HexDeskMark";
@@ -13,8 +13,14 @@ export type NavScreen = { id: string; label: string; icon: LucideIcon };
 const BUG_REPORT_URL = "https://github.com/OostHash/HexDesk/issues/new/choose";
 
 // Narrow windows always get icons only; the collapse toggle decides for wider ones.
-const ICON_ONLY_ITEM = "justify-center px-0 [&>span]:hidden";
-const RESPONSIVE_ITEM = "justify-center px-0 md:justify-start md:px-3 [&>span]:hidden md:[&>span]:inline";
+const ICON_ONLY_ITEM = "justify-center gap-3 px-0 [&>span]:hidden";
+const RESPONSIVE_ITEM = "justify-center gap-3 px-0 md:justify-start md:px-3 [&>span]:hidden md:[&>span]:inline";
+
+/** Screens are the main navigation; support and settings sit smaller below them. */
+const ITEM_KIND = {
+  screen: { iconSize: "xl", className: "h-14 text-lg" },
+  secondary: { iconSize: "lg", className: "h-10 text-sm" },
+} as const satisfies Record<string, { iconSize: IconSize; className: string }>;
 
 /** The label is already the accessible name; aria-describedby would only repeat it. */
 function withoutDescription({ style, onPointerEnter, onPointerLeave, onFocus, onBlur }: TooltipTriggerProps) {
@@ -24,11 +30,12 @@ function withoutDescription({ style, onPointerEnter, onPointerLeave, onFocus, on
 type ItemProps = Omit<ComponentProps<typeof SidebarItem>, "label" | "icon" | "aria-label" | "className"> & {
   label: string;
   icon: LucideIcon;
+  kind: keyof typeof ITEM_KIND;
   collapsed: boolean;
 };
 
 /** A navigation entry that names itself in a tooltip whenever its label is hidden. */
-function NavItem({ label, icon, collapsed, ...rest }: ItemProps) {
+function NavItem({ label, icon, kind, collapsed, ...rest }: ItemProps) {
   return (
     <Tooltip content={label} placement="right" delay={150} className={collapsed ? "" : "md:hidden"}>
       {(trigger) => (
@@ -37,9 +44,9 @@ function NavItem({ label, icon, collapsed, ...rest }: ItemProps) {
           {...withoutDescription(trigger)}
           label={label}
           icon={icon}
-          iconSize="lg"
+          iconSize={ITEM_KIND[kind].iconSize}
           aria-label={label}
-          className={collapsed ? ICON_ONLY_ITEM : RESPONSIVE_ITEM}
+          className={cn(collapsed ? ICON_ONLY_ITEM : RESPONSIVE_ITEM, ITEM_KIND[kind].className)}
         />
       )}
     </Tooltip>
@@ -62,10 +69,10 @@ export function MainNav({ screens, current, onSelect, settingsOpen, onOpenSettin
     <nav
       aria-label="Main"
       data-collapsed={collapsed || undefined}
-      className={cn("flex w-14 shrink-0 flex-col gap-4 border-e border-border bg-surface p-2", !collapsed && "md:w-52")}
+      className={cn("flex w-20 shrink-0 flex-col gap-4 border-e border-border bg-surface p-2", !collapsed && "md:w-64")}
     >
-      <div className={cn("flex items-center justify-center gap-2 pt-1 text-sm font-semibold", !collapsed && "md:justify-start md:px-2")}>
-        <HexDeskMark className="size-5 text-accent" />
+      <div className={cn("flex items-center justify-center gap-2.5 pt-1 text-xl font-semibold", !collapsed && "md:justify-start md:px-2")}>
+        <HexDeskMark className="size-12 text-accent" />
         <span className={cn("hidden", !collapsed && "md:inline")}>HexDesk</span>
       </div>
       <ul className="flex flex-col gap-0.5">
@@ -75,6 +82,7 @@ export function MainNav({ screens, current, onSelect, settingsOpen, onOpenSettin
               active={current === s.id}
               label={s.label}
               icon={s.icon}
+              kind="screen"
               collapsed={collapsed}
               onClick={() => {
                 onSelect(s.id);
@@ -89,13 +97,17 @@ export function MainNav({ screens, current, onSelect, settingsOpen, onOpenSettin
           <button
             type="button"
             aria-label={toggleLabel}
-            className="group hidden min-h-control-md flex-1 items-end justify-center rounded-md pb-1 text-muted hover:bg-hover hover:text-text md:flex"
+            className="group hidden min-h-control-md flex-1 items-end justify-center rounded-md pb-1 text-muted hover:text-text md:flex"
             onClick={() => {
               setCollapsed(!collapsed);
             }}
             {...withoutDescription(trigger)}
           >
-            <Icon icon={collapsed ? PanelLeftOpen : PanelLeftClose} className="opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100" />
+            <Icon
+              icon={collapsed ? PanelLeftOpen : PanelLeftClose}
+              size="lg"
+              className="opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100"
+            />
           </button>
         )}
       </Tooltip>
@@ -105,6 +117,7 @@ export function MainNav({ screens, current, onSelect, settingsOpen, onOpenSettin
             active={false}
             label="Report a bug"
             icon={Bug}
+            kind="secondary"
             collapsed={collapsed}
             onClick={() => {
               void openExternal(BUG_REPORT_URL).catch(() => undefined);
@@ -112,7 +125,7 @@ export function MainNav({ screens, current, onSelect, settingsOpen, onOpenSettin
           />
         </li>
         <li>
-          <NavItem active={settingsOpen} label="Settings" icon={Settings} collapsed={collapsed} onClick={onOpenSettings} />
+          <NavItem active={settingsOpen} label="Settings" icon={Settings} kind="secondary" collapsed={collapsed} onClick={onOpenSettings} />
         </li>
       </ul>
     </nav>
