@@ -23,9 +23,10 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   between the screens and Report a bug to collapse or expand it; HexDesk
   remembers your choice. When collapsed, hover or focus an icon to see its
   name. HexDesk starts collapsed, and narrow windows always show icons only.
-- Press Home to close the Relic Pick overlay when it stays on screen. Choose
-  another key, or none, in Settings → Overlays. The game still receives the
-  key as well.
+- Press Home on the relic selection screen to show the Relic Pick overlay at
+  once, without waiting for the game's log, and press it again to hide it.
+  Choose another key, or none, in Settings → Overlays. The game still
+  receives the key as well.
 
 ### Changed
 
@@ -89,6 +90,10 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   out to the star chart or the mission starts. It no longer opens after the
   selection screen has already closed, and it hides after two minutes if the
   game never reports that the screen closed.
+- The mouse cursor shows over the Relic Pick overlay, as it does over the
+  Riven overlay, and its close button can be clicked.
+- The Relic Pick overlay shows the rewards of each relic again after a
+  restart, instead of only the relic names.
 
 ## [1.0.1] - 2026-11-17
 

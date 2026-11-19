@@ -301,15 +301,17 @@ pub(crate) fn relic_pick_signals(lower: &str) -> Vec<RelicPickSignal> {
     lower
         .lines()
         .filter_map(|line| {
-            if line.contains("themedprojectionmanager.lua: populateinventorygrid") {
+            // Not PopulateInventoryGridEnd, which follows right after.
+            if line
+                .trim_end()
+                .ends_with("themedprojectionmanager.lua: populateinventorygrid")
+            {
                 Some(RelicPickSignal::Open)
             } else if line.contains("subscribing for /lotus/interface/mapredux.swf")
                 && line.contains("mapreduxinputfilter")
             {
                 // The star chart takes input again: the player backed out.
                 Some(RelicPickSignal::Close("mapredux"))
-            } else if line.contains("onentitlementservicecomplete false:") {
-                Some(RelicPickSignal::Close("OnEntitlementServiceComplete"))
             } else if line.contains("gamerulesimpl - changing state from") {
                 // A level is loading, which after a relic pick is the mission.
                 Some(RelicPickSignal::Close("GameRulesImpl state change"))
@@ -347,18 +349,57 @@ fn relic_pick_on(state: &AppState) -> bool {
         && state.relic_pick_overlay_enabled.load(Ordering::SeqCst)
 }
 
+/// What one read of EE.log means for the relic selection.
+#[derive(Debug, PartialEq, Eq)]
+pub(crate) struct RelicPickRead {
+    /// The last close line, which ends a selection opened in an earlier read.
+    pub close: Option<&'static str>,
+    /// Selection screens that opened and closed again within this read.
+    pub closed_opens: usize,
+    /// A selection screen is open at the end of this read.
+    pub open: bool,
+}
+
+/// Sums up the signals of one read. The game writes EE.log to disk in bursts,
+/// seconds after the fact, so one read can hold several screens; only the
+/// state at its end is still on screen.
+pub(crate) fn relic_pick_read(signals: &[RelicPickSignal]) -> RelicPickRead {
+    let open = matches!(signals.last(), Some(RelicPickSignal::Open));
+    let opens = signals
+        .iter()
+        .filter(|s| **s == RelicPickSignal::Open)
+        .count();
+    RelicPickRead {
+        close: signals.iter().rev().find_map(|s| match s {
+            RelicPickSignal::Close(line) => Some(*line),
+            RelicPickSignal::Open => None,
+        }),
+        closed_opens: opens - usize::from(open),
+        open,
+    }
+}
+
 /// Detect the relic-pick screen trigger and its dismiss from freshly-read EE.log text.
-/// `last_relic_pick_trigger` is the caller's cooldown state, carried across calls.
-pub(crate) fn handle_relic_pick_events(
-    app: &tauri::AppHandle,
-    lower: &str,
-    last_relic_pick_trigger: &mut Option<std::time::Instant>,
-) {
-    for signal in relic_pick_signals(lower) {
-        match signal {
-            RelicPickSignal::Open => open_relic_pick(app, last_relic_pick_trigger),
-            RelicPickSignal::Close(line) => close_relic_pick(app, line),
-        }
+pub(crate) fn handle_relic_pick_events(app: &tauri::AppHandle, lower: &str) {
+    let signals = relic_pick_signals(lower);
+    if signals.is_empty() {
+        return;
+    }
+    let read = relic_pick_read(&signals);
+    // A close followed by an open in the same read leaves a selection on
+    // screen, so only a read that ends closed hides the overlay.
+    if let (Some(line), false) = (read.close, read.open) {
+        close_relic_pick(app, line);
+    }
+    if read.closed_opens > 0 {
+        hexdesk_diag::info!(
+            overlay,
+            screens = read.closed_opens,
+            "Relic selection screen seen in EE.log, closed again within the same read"
+        );
+    }
+    if read.open {
+        open_relic_pick(app);
     }
 }
 
@@ -375,20 +416,10 @@ fn close_relic_pick(app: &tauri::AppHandle, ee_log_line: &'static str) {
     let _ = app.emit(events::RELIC_PICK_CLOSE, ());
 }
 
-fn open_relic_pick(
-    app: &tauri::AppHandle,
-    last_relic_pick_trigger: &mut Option<std::time::Instant>,
-) {
-    let now = std::time::Instant::now();
+fn open_relic_pick(app: &tauri::AppHandle) {
     let state = app.state::<AppState>();
     let overlay_on = relic_pick_on(&state);
-    let cooldown = last_relic_pick_trigger.is_some_and(|t| now.duration_since(t).as_secs() < 5);
-    hexdesk_diag::info!(
-        overlay,
-        overlay_on,
-        cooldown,
-        "Relic selection screen seen in EE.log"
-    );
+    hexdesk_diag::info!(overlay, overlay_on, "Relic selection screen seen in EE.log");
     if !overlay_on {
         hexdesk_diag::debug!(
             overlay,
@@ -396,15 +427,21 @@ fn open_relic_pick(
         );
         return;
     }
-    if cooldown {
-        hexdesk_diag::debug!(
+    if crate::relic_pick_key::key_used_recently() {
+        // EE.log reaches the disk late, so this line can describe the screen
+        // the player already showed or hid with the key.
+        hexdesk_diag::info!(
             overlay,
-            "Relic Pick overlay skipped: the selection screen was seen less than 5 s ago"
+            "Relic Pick overlay left as it is: the show/hide key was used more recently"
         );
         return;
     }
-    *last_relic_pick_trigger = Some(now);
-    let session = begin_relic_pick(&state.relic_pick_session);
+    start_relic_pick(app);
+}
+
+/// Start a selection and show the overlay for it once the era is read.
+pub(crate) fn start_relic_pick(app: &tauri::AppHandle) {
+    let session = begin_relic_pick(&app.state::<AppState>().relic_pick_session);
     let app = app.clone();
     std::thread::spawn(move || show_relic_pick(&app, session));
 }
@@ -1295,11 +1332,14 @@ pub(crate) fn parse_and_emit_wfm_whisper(app: &tauri::AppHandle, log_line: &str)
 mod relic_pick_tests {
     use super::*;
 
-    const OPEN: &str = "301.2 Script [Info]: ThemedProjectionManager.lua: PopulateInventoryGrid";
-    const MAPREDUX: &str = "305.1 Input [Info]: Subscribing for /Lotus/Interface/MapRedux.swf with input filter /Lotus/Interface/MapReduxInputFilter";
-    const ENTITLEMENT: &str = "299.8 Sys [Info]: OnEntitlementServiceComplete false:";
+    // Line text as EE.log writes it, with \r\n line ends.
+    const OPEN: &str = "28.945 Script [Info]: ThemedProjectionManager.lua: PopulateInventoryGrid\r";
+    const OPEN_END: &str =
+        "29.012 Script [Info]: ThemedProjectionManager.lua: PopulateInventoryGridEnd\r";
+    const MAPREDUX: &str = "56.340 Input [Info]: Subscribing for /Lotus/Interface/MapRedux.swf with input filter /EE/Types/Input/MapReduxInputFilter\r";
+    const ENTITLEMENT: &str = "34.241 Sys [Info]: OnEntitlementServiceComplete false:\r";
     const LEVEL_LOAD: &str =
-        "320.4 Net [Info]: GameRulesImpl - changing state from SS_INVALID to SS_WAITING_TO_START";
+        "320.4 Net [Info]: GameRulesImpl - changing state from SS_INVALID to SS_WAITING_TO_START\r";
 
     fn signals(lines: &[&str]) -> Vec<RelicPickSignal> {
         relic_pick_signals(&lines.join("\n").to_lowercase())
@@ -1308,16 +1348,51 @@ mod relic_pick_tests {
     #[test]
     fn signals_keep_the_order_of_the_log() {
         assert_eq!(
-            signals(&[ENTITLEMENT, OPEN]),
-            vec![
-                RelicPickSignal::Close("OnEntitlementServiceComplete"),
-                RelicPickSignal::Open
-            ]
+            signals(&[MAPREDUX, OPEN]),
+            vec![RelicPickSignal::Close("mapredux"), RelicPickSignal::Open]
         );
         assert_eq!(
             signals(&[OPEN, MAPREDUX]),
             vec![RelicPickSignal::Open, RelicPickSignal::Close("mapredux")]
         );
+    }
+
+    #[test]
+    fn a_read_ending_on_an_open_screen_opens_it() {
+        // EE.log from one late write: two screens backed out of, a third still open.
+        let read = relic_pick_read(&signals(&[OPEN, MAPREDUX, OPEN, MAPREDUX, OPEN]));
+        assert_eq!(
+            read,
+            RelicPickRead {
+                close: Some("mapredux"),
+                closed_opens: 2,
+                open: true
+            }
+        );
+    }
+
+    #[test]
+    fn a_read_ending_on_a_close_opens_nothing() {
+        let read = relic_pick_read(&signals(&[OPEN, MAPREDUX]));
+        assert_eq!(
+            read,
+            RelicPickRead {
+                close: Some("mapredux"),
+                closed_opens: 1,
+                open: false
+            }
+        );
+    }
+
+    #[test]
+    fn one_selection_screen_is_one_open() {
+        assert_eq!(signals(&[OPEN, OPEN_END]), vec![RelicPickSignal::Open]);
+    }
+
+    #[test]
+    fn the_entitlement_line_does_not_close_an_open_selection() {
+        // The game writes it while the selection screen is still open.
+        assert_eq!(signals(&[OPEN, ENTITLEMENT]), vec![RelicPickSignal::Open]);
     }
 
     #[test]

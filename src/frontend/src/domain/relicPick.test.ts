@@ -1,22 +1,22 @@
 import { describe, expect, it } from "vitest";
-import { pickCloseKeyCode, pickCloseKeyFrom } from "./relicPick";
+import { pickKeyCode, pickKeyFrom } from "./relicPick";
 
-describe("relic pick close key", () => {
+describe("relic pick show/hide key", () => {
   it("is Home when nothing or something unknown is saved", () => {
-    expect(pickCloseKeyFrom(undefined)).toBe("Home");
-    expect(pickCloseKeyFrom("Ctrl+Q")).toBe("Home");
+    expect(pickKeyFrom(undefined)).toBe("Home");
+    expect(pickKeyFrom("Ctrl+Q")).toBe("Home");
   });
 
   it("keeps a saved key, including none", () => {
-    expect(pickCloseKeyFrom("F8")).toBe("F8");
-    expect(pickCloseKeyFrom("off")).toBe("off");
+    expect(pickKeyFrom("F8")).toBe("F8");
+    expect(pickKeyFrom("off")).toBe("off");
   });
 
   it("maps keys to Windows virtual-key codes", () => {
-    expect(pickCloseKeyCode("Home")).toBe(0x24);
-    expect(pickCloseKeyCode("F1")).toBe(0x70);
-    expect(pickCloseKeyCode("F12")).toBe(0x7b);
-    expect(pickCloseKeyCode("ScrollLock")).toBe(0x91);
-    expect(pickCloseKeyCode("off")).toBe(0);
+    expect(pickKeyCode("Home")).toBe(0x24);
+    expect(pickKeyCode("F1")).toBe(0x70);
+    expect(pickKeyCode("F12")).toBe(0x7b);
+    expect(pickKeyCode("ScrollLock")).toBe(0x91);
+    expect(pickKeyCode("off")).toBe(0);
   });
 });

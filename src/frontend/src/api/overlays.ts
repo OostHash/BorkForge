@@ -7,15 +7,7 @@ import { invoke } from "./invoke";
 import { useSettings, type SettingsFile } from "./settings";
 import { craftingCounts, overlayPriorityFrom, stripBounds, type OverlayPriority, type Stock } from "../domain/relicReward";
 import type { CatalogItem } from "../domain/relics";
-import {
-  pickCloseKeyCode,
-  pickCloseKeyFrom,
-  pickLinesFrom,
-  pickPriorityFrom,
-  type PickCloseKey,
-  type PickLines,
-  type PickPriority,
-} from "../domain/relicPick";
+import { pickKeyCode, pickKeyFrom, pickLinesFrom, pickPriorityFrom, type PickKey, type PickLines, type PickPriority } from "../domain/relicPick";
 import { offsetsFrom, type OverlayOffsets } from "../domain/overlayOffsets";
 import { worthAnalysing, type OcrRiven, type OverlayAnalysis } from "../domain/rivenOverlay";
 import { useCrafting, useQuantities } from "./inventory";
@@ -31,8 +23,8 @@ export type OverlayPrefs = {
   relicPickEnabled: boolean;
   pickPriority: PickPriority;
   pickLines: PickLines;
-  /** The key that closes the relic pick overlay (default Home). */
-  pickCloseKey: PickCloseKey;
+  /** The key that shows or hides the relic pick overlay (default Home). */
+  pickKey: PickKey;
   /** The riven overlay (default on). */
   rivenEnabled: boolean;
   offsets: OverlayOffsets;
@@ -46,7 +38,7 @@ export function overlayPrefsFrom(s: SettingsFile | undefined): OverlayPrefs {
     relicPickEnabled: s?.relicPickEnabled !== false,
     pickPriority: pickPriorityFrom(s?.relicPickPriority),
     pickLines: pickLinesFrom(s?.relicPickLines),
-    pickCloseKey: pickCloseKeyFrom(s?.relicPickCloseKey),
+    pickKey: pickKeyFrom(s?.relicPickKey),
     rivenEnabled: s?.rivenEnabled !== false,
     offsets: offsetsFrom(s?.overlayOffsets),
   };
@@ -61,7 +53,7 @@ export async function syncOverlaySwitches(prefs: OverlayPrefs): Promise<void> {
   await Promise.all([
     invoke("set_overlays_enabled", { enabled: prefs.overlaysEnabled }),
     invoke("set_relic_pick_enabled", { enabled: prefs.relicPickEnabled }),
-    invoke("set_relic_pick_close_key", { vk: pickCloseKeyCode(prefs.pickCloseKey) }),
+    invoke("set_relic_pick_key", { vk: pickKeyCode(prefs.pickKey) }),
   ]);
   if (!prefs.overlaysEnabled) await emitEvent("overlays-disabled");
 }
@@ -181,11 +173,6 @@ export async function showPickPreview(): Promise<void> {
 }
 
 export const hidePickPreview = () => emitEvent("relic-pick-preview-close");
-
-/** Inside the pick window: let clicks reach the game, except over the close button. */
-export function setClickThrough(through: boolean): Promise<void> {
-  return getCurrentWindow().setIgnoreCursorEvents(through);
-}
 
 export const hideCurrentWindow = () => getCurrentWindow().hide();
 

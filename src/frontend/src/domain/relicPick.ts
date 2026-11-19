@@ -22,11 +22,11 @@ export const pickPriorityFrom = (v: unknown): PickPriority => ((PICK_PRIORITIES 
 export const pickLinesFrom = (v: unknown): PickLines => ((PICK_LINES as readonly unknown[]).includes(v) ? (v as PickLines) : "all");
 
 /**
- * Keys that can close the relic pick overlay, with their Windows virtual-key
+ * Keys that can show and hide the relic pick overlay, with their Windows virtual-key
  * codes. Keys only, no combinations: the game receives the key as well, so a
  * key without a game action is the best choice.
  */
-export const PICK_CLOSE_KEYS = [
+export const PICK_KEYS = [
   { id: "off", label: "None", vk: 0 },
   { id: "Home", label: "Home", vk: 0x24 },
   { id: "End", label: "End", vk: 0x23 },
@@ -38,13 +38,12 @@ export const PICK_CLOSE_KEYS = [
   { id: "ScrollLock", label: "Scroll Lock", vk: 0x91 },
   ...Array.from({ length: 12 }, (_, i) => ({ id: `F${String(i + 1)}`, label: `F${String(i + 1)}`, vk: 0x70 + i })),
 ] as const satisfies ReadonlyArray<{ id: string; label: string; vk: number }>;
-export type PickCloseKey = string;
+export type PickKey = string;
 
-export const DEFAULT_PICK_CLOSE_KEY: PickCloseKey = "Home";
-export const pickCloseKeyFrom = (v: unknown): PickCloseKey =>
-  PICK_CLOSE_KEYS.some((k) => k.id === v) ? (v as PickCloseKey) : DEFAULT_PICK_CLOSE_KEY;
+export const DEFAULT_PICK_KEY: PickKey = "Home";
+export const pickKeyFrom = (v: unknown): PickKey => (PICK_KEYS.some((k) => k.id === v) ? (v as PickKey) : DEFAULT_PICK_KEY);
 /** The virtual-key code the backend listens for; 0 for none. */
-export const pickCloseKeyCode = (key: PickCloseKey): number => PICK_CLOSE_KEYS.find((k) => k.id === key)?.vk ?? 0;
+export const pickKeyCode = (key: PickKey): number => PICK_KEYS.find((k) => k.id === key)?.vk ?? 0;
 
 export const PICK_PRIORITY_LABEL: Readonly<Record<PickPriority, string>> = {
   unowned: "Unowned / mastery",

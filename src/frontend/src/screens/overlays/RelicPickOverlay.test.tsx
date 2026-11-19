@@ -41,12 +41,12 @@ const open = async () => {
   });
 };
 
-it("lets clicks through to the game from the start", async () => {
+it("takes the mouse itself, so the cursor shows over it", async () => {
   const { client, calls } = setup();
   await mount(client);
-  await vi.waitFor(() => {
-    expect(calls.find((c) => c.cmd === "plugin:window|set_ignore_cursor_events")?.args).toMatchObject({ value: true });
-  });
+  await open();
+  await page.getByRole("button", { name: "Close relic pick" }).hover();
+  expect(calls.some((c) => c.cmd === "plugin:window|set_ignore_cursor_events")).toBe(false);
 });
 
 it("ranks the relics for the priority and lists their rewards", async () => {

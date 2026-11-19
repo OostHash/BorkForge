@@ -206,8 +206,8 @@ export interface CommandMap {
   /** Master switch for every overlay trigger in the backend. */
   set_overlays_enabled: { args: { enabled: boolean }; result: null };
   set_relic_pick_enabled: { args: { enabled: boolean }; result: null };
-  /** The key that closes the relic pick overlay, as a Windows virtual-key code (0 for none). */
-  set_relic_pick_close_key: { args: { vk: number }; result: null };
+  /** The key that shows or hides the relic pick overlay, as a Windows virtual-key code (0 for none). */
+  set_relic_pick_key: { args: { vk: number }; result: null };
   /** Places and shows the relic pick window (no payload): previews and offset changes. */
   show_relic_pick_window: { args: undefined; result: null };
   /** Reads the riven card on screen (OCR). */

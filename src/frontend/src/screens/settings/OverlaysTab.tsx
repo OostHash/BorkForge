@@ -13,7 +13,7 @@ import {
 } from "../../api/overlays";
 import { useSaveSettings } from "../../api/settings";
 import { OFFSET_LIMIT, OFFSET_STEP, offsetDraft, offsetOf, withOffset, type OffsetTarget, type OverlayOffsets } from "../../domain/overlayOffsets";
-import { PICK_CLOSE_KEYS, PICK_LINES, PICK_LINES_LABEL, PICK_PRIORITIES, PICK_PRIORITY_LABEL } from "../../domain/relicPick";
+import { PICK_KEYS, PICK_LINES, PICK_LINES_LABEL, PICK_PRIORITIES, PICK_PRIORITY_LABEL } from "../../domain/relicPick";
 import { OVERLAY_PRIORITIES, OVERLAY_PRIORITY_LABEL } from "../../domain/relicReward";
 import { Button } from "../../primitives/actions";
 import { FormField, Input, Select } from "../../primitives/forms";
@@ -280,16 +280,20 @@ export function OverlaysTab() {
             ))}
           </Select>
         </FormField>
-        <FormField layout="row" label="Close key" description="Closes the overlay when it stays on screen. The game still receives the key.">
+        <FormField
+          layout="row"
+          label="Show/hide key"
+          description="On the relic selection screen, shows the overlay at once, or hides it. The game still receives the key."
+        >
           <Select
             className="w-48"
-            value={prefs.pickCloseKey}
+            value={prefs.pickKey}
             disabled={!prefs.relicPickEnabled}
             onChange={(event) => {
-              set({ relicPickCloseKey: event.target.value });
+              set({ relicPickKey: event.target.value });
             }}
           >
-            {PICK_CLOSE_KEYS.map((k) => (
+            {PICK_KEYS.map((k) => (
               <option key={k.id} value={k.id}>
                 {k.label}
               </option>

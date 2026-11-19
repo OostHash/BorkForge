@@ -136,6 +136,29 @@ struct InitialCachePaths<'a> {
     corrections_path: &'a std::path::PathBuf,
 }
 
+/// Whether a stored relic rewards map can be used: keyed by relic display
+/// name ("Axi A21 Intact"), the key the Relic Pick overlay looks up.
+fn relic_rewards_usable(map: &HashMap<String, Vec<wfcd::RelicReward>>) -> bool {
+    !map.is_empty() && !map.keys().any(|k| k.starts_with('/'))
+}
+
+/// The relic rewards stored by the last catalogue build. A file that cannot
+/// be used is removed, so the next catalogue refresh rebuilds it.
+fn load_relic_rewards_cache(path: &std::path::Path) -> HashMap<String, Vec<wfcd::RelicReward>> {
+    let loaded: Option<HashMap<String, Vec<wfcd::RelicReward>>> = std::fs::read_to_string(path)
+        .ok()
+        .and_then(|s| serde_json::from_str(&s).ok());
+    match loaded {
+        Some(map) if relic_rewards_usable(&map) => map,
+        Some(_) => {
+            info!("relic rewards cache not usable, removed so the catalogue rebuilds it");
+            let _ = std::fs::remove_file(path);
+            HashMap::new()
+        }
+        None => HashMap::new(),
+    }
+}
+
 fn load_initial_state(paths: InitialCachePaths<'_>) -> InitialState {
     let InitialCachePaths {
         items_cache_path,
@@ -159,35 +182,7 @@ fn load_initial_state(paths: InitialCachePaths<'_>) -> InitialState {
         .and_then(|s| serde_json::from_str(&s).ok())
         .unwrap_or_default();
 
-    // Relic rewards: invalidate on old format or age > 24 h.
-    let relic_rewards: HashMap<String, Vec<wfcd::RelicReward>> = {
-        let cache_age_ok = std::fs::metadata(relic_rewards_cache_path)
-            .and_then(|m| m.modified())
-            .map(|t| {
-                t.elapsed().unwrap_or(std::time::Duration::MAX)
-                    < std::time::Duration::from_secs(86_400)
-            })
-            .unwrap_or(false);
-        let loaded: Option<HashMap<String, Vec<wfcd::RelicReward>>> = if cache_age_ok {
-            std::fs::read_to_string(relic_rewards_cache_path)
-                .ok()
-                .and_then(|s| serde_json::from_str(&s).ok())
-        } else {
-            None
-        };
-        match loaded {
-            Some(map) if map.keys().any(|k| k.starts_with("/Lotus/")) => map,
-            Some(_) => {
-                info!("relic_rewards cache is old format (no path keys) — discarding, will regenerate");
-                let _ = std::fs::remove_file(relic_rewards_cache_path);
-                HashMap::new()
-            }
-            None => {
-                let _ = std::fs::remove_file(relic_rewards_cache_path);
-                HashMap::new()
-            }
-        }
-    };
+    let relic_rewards = load_relic_rewards_cache(relic_rewards_cache_path);
 
     // Inventory state → split into quantities, uniques, mods.
     let inv_state = load_inventory_state_cache(inventory_state_cache_path);
@@ -680,7 +675,7 @@ pub fn run() {
             platform::get_system_locale,
             catalogue::get_current_crafting,
             relic_pick::show_relic_pick_window,
-            relic_pick_key::set_relic_pick_close_key,
+            relic_pick_key::set_relic_pick_key,
             wfcd::get_drop_data,
             pricing::get_cache_statuses,
             pricing::refresh_all_caches,
@@ -715,4 +710,42 @@ pub fn run() {
         })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+#[cfg(test)]
+mod relic_rewards_cache_tests {
+    use super::*;
+
+    fn rewards(keys: &[&str]) -> HashMap<String, Vec<wfcd::RelicReward>> {
+        keys.iter().map(|k| (k.to_string(), Vec::new())).collect()
+    }
+
+    #[test]
+    fn rewards_keyed_by_relic_name_are_usable() {
+        assert!(relic_rewards_usable(&rewards(&[
+            "Axi A21 Intact",
+            "Lith G1 Radiant"
+        ])));
+    }
+
+    #[test]
+    fn rewards_keyed_by_path_or_empty_are_not() {
+        assert!(!relic_rewards_usable(&rewards(&[
+            "/Lotus/Types/Game/Projections/T4VoidProjectionA21Bronze"
+        ])));
+        assert!(!relic_rewards_usable(&rewards(&[])));
+    }
+
+    #[test]
+    fn a_stored_rewards_file_survives_a_restart() {
+        let dir =
+            std::env::temp_dir().join(format!("hexdesk-relic-rewards-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("relic_rewards_cache.json");
+        std::fs::write(&path, r#"{"Axi A21 Intact":[{"unique_name":"/Lotus/X","name":"X","rarity":"Gold","image_name":null}]}"#).unwrap();
+        let loaded = load_relic_rewards_cache(&path);
+        assert_eq!(loaded.get("Axi A21 Intact").map(Vec::len), Some(1));
+        assert!(path.exists());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 }

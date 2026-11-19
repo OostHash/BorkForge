@@ -95,8 +95,6 @@ pub(crate) fn spawn_reward_watcher_thread(deps: RewardWatcherDeps) {
             const LOG_ACTIVITY_WINDOW: std::time::Duration = std::time::Duration::from_secs(5);
             // Cooldown: don't fire riven-screen-open again within 4 seconds of the last fire.
             let mut last_riven_fire: Option<std::time::Instant> = None;
-            // Cooldown: prevent spawning multiple relic-pick OCR threads if the trigger fires rapidly.
-            let mut last_relic_pick_trigger: Option<std::time::Instant> = None;
             // Rolling raw log text used to reconstruct multi-read trade dialogs.
             let mut trade_buffer = String::new();
             // Trailing partial-line buffer: a marker split across two reads by a
@@ -240,11 +238,7 @@ pub(crate) fn spawn_reward_watcher_thread(deps: RewardWatcherDeps) {
                 }
 
                 log_watcher::handle_riven_events(&ee_ocr_app, &lower, &mut last_riven_fire);
-                log_watcher::handle_relic_pick_events(
-                    &ee_ocr_app,
-                    &lower,
-                    &mut last_relic_pick_trigger,
-                );
+                log_watcher::handle_relic_pick_events(&ee_ocr_app, &lower);
                 log_watcher::handle_trade_completion(&ee_ocr_app, &buf, &mut trade_buffer);
 
                 // Unveil: riven challenge completion
