@@ -17,7 +17,7 @@ function ExportRow() {
   );
 }
 
-/** Settings → Debugging: what a bug report needs, plus the developer pages in development builds. */
+/** Settings → Debugging, in development builds only: the diagnostics export and the developer pages. */
 export function DebuggingTab() {
   return (
     <>
@@ -25,32 +25,30 @@ export function DebuggingTab() {
         <ExportRow />
       </SettingsGroup>
 
-      {import.meta.env.DEV && (
-        <SettingsGroup title="Developer pages">
-          <SettingRow label="Kitchen sink" description="Inspect the app's reusable interface components and interaction states.">
-            <Button
-              size="sm"
-              leadingIcon={FlaskConical}
-              onClick={() => {
-                window.location.assign("?view=kitchen-sink");
-              }}
-            >
-              Open
-            </Button>
-          </SettingRow>
-          <SettingRow label="Tokens" description="Inspect the generated theme colours, spacing and density tokens.">
-            <Button
-              size="sm"
-              leadingIcon={Palette}
-              onClick={() => {
-                window.location.assign("?view=tokens");
-              }}
-            >
-              Open
-            </Button>
-          </SettingRow>
-        </SettingsGroup>
-      )}
+      <SettingsGroup title="Developer pages">
+        <SettingRow label="Kitchen sink" description="Inspect the app's reusable interface components and interaction states.">
+          <Button
+            size="sm"
+            leadingIcon={FlaskConical}
+            onClick={() => {
+              window.location.assign("?view=kitchen-sink");
+            }}
+          >
+            Open
+          </Button>
+        </SettingRow>
+        <SettingRow label="Tokens" description="Inspect the generated theme colours, spacing and density tokens.">
+          <Button
+            size="sm"
+            leadingIcon={Palette}
+            onClick={() => {
+              window.location.assign("?view=tokens");
+            }}
+          >
+            Open
+          </Button>
+        </SettingRow>
+      </SettingsGroup>
     </>
   );
 }

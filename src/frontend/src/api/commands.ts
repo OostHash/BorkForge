@@ -218,7 +218,7 @@ export interface CommandMap {
   /** The most recent log entries, oldest first (activity console); new ones follow as diag-entry events. */
   get_recent_logs: { args: { limit?: number }; result: LogEntry[] };
   /** Writes the diagnostics zip (logs, system facts, settings; redacted) and returns its path. */
-  export_diagnostics: { args: undefined; result: string };
+  export_diagnostics: { args: { parts: DiagnosticsParts }; result: string };
   /** Opens Explorer with an exported diagnostics zip selected. */
   show_diagnostics_export: { args: { path: string }; result: null };
 }
@@ -230,3 +230,6 @@ export type CommandResult<C extends CommandName> = CommandMap[C]["result"];
 // Compile-time check: every entry has IPC-compatible arguments.
 type AssertSpecs<T extends Record<CommandName, CommandSpec>> = T;
 export type CheckedCommandMap = AssertSpecs<CommandMap>;
+
+/** Which parts go into a diagnostics export; the user picks them before exporting. */
+export type DiagnosticsParts = { system: boolean; settings: boolean; activity: boolean; logs: boolean };

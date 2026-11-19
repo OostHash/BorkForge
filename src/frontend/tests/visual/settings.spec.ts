@@ -81,7 +81,11 @@ test("console, an entry opened and the export", async ({ page }) => {
   const failure = entries.getByRole("button", { name: /Order could not be created/ });
   await failure.click();
   await expect(entries.getByText("market.denied")).toBeVisible();
-  await page.getByRole("button", { name: "Export", exact: true }).click();
+  await page.getByRole("button", { name: "Export…" }).click();
+  const choose = page.getByRole("dialog", { name: "Export diagnostics" });
+  await axe(page);
+  await choose.getByRole("button", { name: "Export", exact: true }).click();
+  await expect(choose).toBeHidden();
   await expect(page.getByText(/^Saved to .*hexdesk-diagnostics-.*\.zip$/)).toBeVisible();
   await expect(page.getByRole("button", { name: "Show in folder" })).toBeVisible();
   await axe(page);

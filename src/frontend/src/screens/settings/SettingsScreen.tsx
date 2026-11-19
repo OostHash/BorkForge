@@ -10,18 +10,21 @@ import { GeneralTab } from "./GeneralTab";
 import { MarketTab } from "./MarketTab";
 import { OverlaysTab } from "./OverlaysTab";
 
-/** Every category, in navigator order. */
+/** Every category, in navigator order. `devOnly` ones are left out of release builds. */
 export const SETTINGS_TABS = [
   { id: "general", label: "General", Panel: GeneralTab },
   { id: "overlays", label: "Overlays", Panel: OverlaysTab },
   { id: "market", label: "Market", Panel: MarketTab },
   { id: "filters", label: "Filters", Panel: FiltersTab },
   { id: "data", label: "Data", Panel: DataTab },
-  { id: "debugging", label: "Debugging", Panel: DebuggingTab },
+  { id: "debugging", label: "Debugging", Panel: DebuggingTab, devOnly: true },
   { id: "console", label: "Console", Panel: ConsoleTab },
 ] as const;
 
 export type SettingsTab = (typeof SETTINGS_TABS)[number]["id"];
+
+// Debugging holds developer pages; release builds export diagnostics from the console instead.
+const VISIBLE_TABS = SETTINGS_TABS.filter((t) => !("devOnly" in t) || import.meta.env.DEV);
 
 type Props = {
   tab: SettingsTab;
@@ -36,12 +39,12 @@ type Props = {
 export function SettingsScreen({ tab, onTabChange }: Props) {
   const version = useAppVersion();
   const headingId = useId();
-  const current = SETTINGS_TABS.find((t) => t.id === tab) ?? SETTINGS_TABS[0];
+  const current = VISIBLE_TABS.find((t) => t.id === tab) ?? SETTINGS_TABS[0];
   return (
     <div className="flex min-h-0 flex-1">
       <nav aria-label="Settings" className="flex w-52 shrink-0 flex-col gap-0.5 overflow-y-auto border-e border-border p-2">
         <ul className="flex flex-col gap-0.5">
-          {SETTINGS_TABS.map((t) => (
+          {VISIBLE_TABS.map((t) => (
             <li key={t.id}>
               <SidebarItem
                 active={t.id === current.id}

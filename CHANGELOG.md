@@ -13,10 +13,10 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   background as it happens. Filter by level and by source, open an entry to
   see its details and the reason it failed, follow one inventory scan or
   overlay from start to end, and copy lines for a bug report.
-- A one-click diagnostics export in Settings → Debugging and in the console
-  saves a single zip with the logs, your settings and facts about your system
-  to your Downloads folder, ready to attach to a bug report. Passwords,
-  tokens, e-mail addresses and player names are removed from it.
+- A diagnostics export in the activity console saves a single zip to your
+  Downloads folder, ready to attach to a bug report. Choose what goes in:
+  system information, your settings, the activity entries and the log files.
+  Passwords, tokens, e-mail addresses and player names are removed from it.
 - The navigation sidebar can collapse to icons only. Click the empty space
   between the screens and Report a bug to collapse or expand it; HexDesk
   remembers your choice. When collapsed, hover or focus an icon to see its
@@ -52,8 +52,9 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - Error messages for warframe.market actions now name what failed and how
   warframe.market answered.
 - Your Windows user name and player names no longer appear in log files.
-- Settings → Debugging now only holds the diagnostics export. What the old
-  tools wrote to separate files is in the log and the activity console.
+- Settings → Debugging is gone from release builds; the diagnostics export
+  is in the activity console. What the old debugging tools wrote to separate
+  files is in the log and the activity console.
 
 ### Removed
 
