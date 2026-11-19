@@ -131,3 +131,20 @@ it("simulates an available update and clears it again", async () => {
   await row("Simulate update").getByRole("button", { name: "Clear" }).click();
   await expect.element(page.getByRole("navigation", { name: "Settings" }).getByRole("button", { name: "General", exact: true })).toBeVisible();
 });
+
+it("lists owned items whose icon is missing", async () => {
+  const { client } = setup({
+    get_all_items: () => [
+      { unique_name: "/Res/Credits", name: "Credits", category: "Resources", image_name: null },
+      { unique_name: "/Res/Spare", name: "Spare Part", category: "Resources", image_name: null },
+    ],
+    get_current_quantities: () => ({ "/Res/Credits": 1000, "/Res/Mystery": 3 }),
+  });
+  await mount(client);
+  await row("Check item icons").getByRole("button", { name: "Owned items" }).click();
+  await expect.element(row("Check item icons").getByRole("status")).toHaveTextContent("2 owned items checked, 2 with a problem.");
+  // Spare Part is not owned, so it is not checked.
+  await expect.element(page.getByRole("region", { name: "No image name in the catalogue" }).getByText("Credits")).toBeVisible();
+  await expect.element(page.getByText("Spare Part")).not.toBeInTheDocument();
+  await expect.element(page.getByRole("region", { name: "Owned but not in the catalogue" }).getByText("Mystery")).toBeVisible();
+});

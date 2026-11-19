@@ -3,6 +3,7 @@ import { FlaskConical, Palette } from "lucide-react";
 import { simulateUpdate, usePendingUpdate } from "../../api/app";
 import { Button } from "../../primitives/actions";
 import { ExportDiagnosticsButtons, useDiagnosticsExport } from "./ExportDiagnostics";
+import { IconCheckGroup } from "./IconCheck";
 import { ResultText, SettingRow, SettingsGroup } from "./parts";
 
 /** One zip for a bug report; the path stays visible so it can be shown in Explorer. */
@@ -51,7 +52,7 @@ function SimulateUpdateRow() {
   );
 }
 
-/** Settings → Debugging, in development builds only: the diagnostics export, update simulation and the developer pages. */
+/** Settings → Debugging, in development builds only: the diagnostics export, update simulation, the icon check and the developer pages. */
 export function DebuggingTab() {
   return (
     <>
@@ -62,6 +63,8 @@ export function DebuggingTab() {
       <SettingsGroup title="Updates">
         <SimulateUpdateRow />
       </SettingsGroup>
+
+      <IconCheckGroup />
 
       <SettingsGroup title="Developer pages">
         <SettingRow label="Kitchen sink" description="Inspect the app's reusable interface components and interaction states.">
