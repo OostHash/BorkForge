@@ -5,7 +5,7 @@ import { useState } from "react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { page, userEvent } from "vitest/browser";
 import { cleanup, render } from "vitest-browser-react";
-import { SettingsDialog, type SettingsTab } from "./SettingsDialog";
+import { SettingsScreen, type SettingsTab } from "./SettingsScreen";
 
 type Call = { cmd: string; args: unknown };
 
@@ -40,7 +40,7 @@ function setup(initial: Record<string, unknown> = {}) {
 
 function Harness() {
   const [tab, setTab] = useState<SettingsTab>("overlays");
-  return <SettingsDialog open tab={tab} onTabChange={setTab} onClose={() => undefined} />;
+  return <SettingsScreen tab={tab} onTabChange={setTab} />;
 }
 
 const mount = (client: QueryClient) =>
@@ -162,7 +162,7 @@ it("shows all previews, and hides them when overlays go off or the tab closes", 
 
   seen.length = 0;
   await group("Riven overlay").getByRole("button", { name: "Show preview" }).click();
-  await page.getByRole("tab", { name: "General" }).click();
+  await page.getByRole("navigation", { name: "Settings" }).getByRole("button", { name: "General" }).click();
   await vi.waitFor(() => {
     expect(seen).toEqual(["riven-preview", "riven-preview-close"]);
   });

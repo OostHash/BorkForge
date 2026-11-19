@@ -1,11 +1,12 @@
 import { Bug, PanelLeftClose, PanelLeftOpen, Settings, type LucideIcon } from "lucide-react";
 import type { ComponentProps } from "react";
+import { usePendingUpdate } from "../api/app";
 import { openExternal } from "../api/links";
 import { cn } from "../primitives/cn";
 import { Icon, type IconSize } from "../primitives/display";
 import { SidebarItem } from "../primitives/navigation";
 import { Tooltip, type TooltipTriggerProps } from "../primitives/overlay";
-import { HexDeskMark } from "./HexDeskMark";
+import { HexDeskMark } from "../patterns/HexDeskMark";
 import { useNavCollapsed } from "./navCollapsed";
 
 export type NavScreen = { id: string; label: string; icon: LucideIcon };
@@ -32,12 +33,15 @@ type ItemProps = Omit<ComponentProps<typeof SidebarItem>, "label" | "icon" | "ar
   icon: LucideIcon;
   kind: keyof typeof ITEM_KIND;
   collapsed: boolean;
+  /** Something waiting here (an update): a red dot, and the reason in the name and tooltip. */
+  alert?: string;
 };
 
 /** A navigation entry that names itself in a tooltip whenever its label is hidden. */
-function NavItem({ label, icon, kind, collapsed, ...rest }: ItemProps) {
+function NavItem({ label, icon, kind, collapsed, alert, ...rest }: ItemProps) {
+  const name = alert ? `${label}, ${alert}` : label;
   return (
-    <Tooltip content={label} placement="right" delay={150} className={collapsed ? "" : "md:hidden"}>
+    <Tooltip content={name} placement="right" delay={150} className={collapsed ? "" : "md:hidden"}>
       {(trigger) => (
         <SidebarItem
           {...rest}
@@ -45,7 +49,8 @@ function NavItem({ label, icon, kind, collapsed, ...rest }: ItemProps) {
           label={label}
           icon={icon}
           iconSize={ITEM_KIND[kind].iconSize}
-          aria-label={label}
+          dot={alert !== undefined}
+          aria-label={name}
           className={cn(collapsed ? ICON_ONLY_ITEM : RESPONSIVE_ITEM, ITEM_KIND[kind].className)}
         />
       )}
@@ -64,6 +69,7 @@ type Props = {
 /** The main window's sidebar: screens, then support and settings at the bottom. */
 export function MainNav({ screens, current, onSelect, settingsOpen, onOpenSettings }: Props) {
   const [collapsed, setCollapsed] = useNavCollapsed();
+  const update = usePendingUpdate();
   const toggleLabel = collapsed ? "Expand navigation" : "Collapse navigation";
   return (
     <nav
@@ -125,7 +131,15 @@ export function MainNav({ screens, current, onSelect, settingsOpen, onOpenSettin
           />
         </li>
         <li>
-          <NavItem active={settingsOpen} label="Settings" icon={Settings} kind="secondary" collapsed={collapsed} onClick={onOpenSettings} />
+          <NavItem
+            active={settingsOpen}
+            label="Settings"
+            icon={Settings}
+            kind="secondary"
+            collapsed={collapsed}
+            {...(update ? { alert: "update available" } : {})}
+            onClick={onOpenSettings}
+          />
         </li>
       </ul>
     </nav>

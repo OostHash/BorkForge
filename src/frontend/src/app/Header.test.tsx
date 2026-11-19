@@ -95,22 +95,3 @@ it("lists the data caches and refreshes them all", async () => {
   await expect.element(panel.getByRole("button", { name: /Refreshing…/ })).toHaveAttribute("aria-busy", "true");
   expect(ctx.calls).toContain("refresh_all_caches");
 });
-
-it("offers a pending update, and hides it when dismissed", async () => {
-  const ctx = setup();
-  ctx.client.setQueryData(appKeys.update, "2.4.0");
-  await mount(ctx);
-  await expect.element(page.getByRole("button", { name: "Update to v2.4.0" })).toBeVisible();
-  await page.getByRole("button", { name: "Dismiss update" }).click();
-  expect(page.getByRole("button", { name: "Update to v2.4.0" }).query()).toBeNull();
-});
-
-it("installs the update and shows progress", async () => {
-  const ctx = setup();
-  ctx.client.setQueryData(appKeys.update, "2.4.0");
-  mockIPC((cmd) => (cmd === "install_update" ? new Promise(() => undefined) : null));
-  await mount(ctx);
-  await page.getByRole("button", { name: "Update to v2.4.0" }).click();
-  await expect.element(page.getByRole("button", { name: /Installing…/ })).toHaveAttribute("aria-busy", "true");
-  expect(page.getByRole("button", { name: "Dismiss update" }).query()).toBeNull();
-});

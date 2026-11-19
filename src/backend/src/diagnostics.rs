@@ -124,12 +124,41 @@ pub(crate) fn log_relic_fe(msg: String) {
     hexdesk_diag::debug!(overlay, window_message = %msg, "Overlay window reported");
 }
 
-/// Creates the diagnostics zip and returns its full path.
+/// Which parts go into the diagnostics zip. The user picks them before
+/// exporting; a missing field counts as included.
+#[derive(Debug, Clone, Copy, serde::Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub(crate) struct ExportParts {
+    /// `system.json`: app version, OS, monitors, locale, WebView2, OCR languages.
+    system: bool,
+    /// `settings.json`, the settings file as stored (secrets are redacted).
+    settings: bool,
+    /// `recent.jsonl`, the activity console entries.
+    activity: bool,
+    /// The log files under `logs/`.
+    logs: bool,
+}
+
+impl Default for ExportParts {
+    fn default() -> Self {
+        Self {
+            system: true,
+            settings: true,
+            activity: true,
+            logs: true,
+        }
+    }
+}
+
+/// Creates the diagnostics zip with the chosen parts (all when `parts` is
+/// absent) and returns its full path.
 #[tauri::command]
 pub(crate) async fn export_diagnostics(
     app: tauri::AppHandle,
     state: State<'_, AppState>,
+    parts: Option<ExportParts>,
 ) -> Result<String, DiagError> {
+    let parts = parts.unwrap_or_default();
     // Pending repeat counts belong in the exported logs.
     hexdesk_diag::flush();
 
@@ -149,20 +178,30 @@ pub(crate) async fn export_diagnostics(
         chrono::Local::now().format("%Y-%m-%d-%H%M%S")
     ));
 
-    let ocr_languages = tokio::task::spawn_blocking(crate::ocr::ocr_languages)
-        .await
-        .unwrap_or_default();
-    let settings = crate::settings::read_settings_map(&state.settings_path)
-        .map(serde_json::Value::Object)
-        .unwrap_or_else(|e| serde_json::json!({ "_error": e }));
-
     let mut bundle = Bundle::new();
     bundle.add_text("README.txt", README);
-    bundle.add_json("system.json", system_facts(&app, ocr_languages));
-    bundle.add_json("settings.json", settings);
-    bundle.add_entries("recent.jsonl", &hexdesk_diag::recent(usize::MAX));
+    if parts.system {
+        let ocr_languages = tokio::task::spawn_blocking(crate::ocr::ocr_languages)
+            .await
+            .unwrap_or_default();
+        bundle.add_json("system.json", system_facts(&app, ocr_languages));
+    }
+    if parts.settings {
+        let settings = crate::settings::read_settings_map(&state.settings_path)
+            .map(serde_json::Value::Object)
+            .unwrap_or_else(|e| serde_json::json!({ "_error": e }));
+        bundle.add_json("settings.json", settings);
+    }
+    if parts.activity {
+        bundle.add_entries("recent.jsonl", &hexdesk_diag::recent(usize::MAX));
+    }
     let mut skipped = 0usize;
-    for log in log_files(&crate::paths::state_dir().join("logs")) {
+    let logs = if parts.logs {
+        log_files(&crate::paths::state_dir().join("logs"))
+    } else {
+        Vec::new()
+    };
+    for log in logs {
         let name = format!(
             "logs/{}",
             log.file_name().unwrap_or_default().to_string_lossy()
@@ -194,6 +233,10 @@ pub(crate) async fn export_diagnostics(
         files,
         unreadable_logs = skipped,
         bytes,
+        system = parts.system,
+        settings = parts.settings,
+        activity = parts.activity,
+        logs = parts.logs,
         "Diagnostics exported"
     );
     Ok(path.to_string_lossy().into_owned())
@@ -287,6 +330,14 @@ fn system_facts(app: &tauri::AppHandle, ocr_languages: Vec<String>) -> serde_jso
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn export_parts_left_out_of_the_request_are_included() {
+        let parts: ExportParts = serde_json::from_str(r#"{"system":false,"logs":false}"#).unwrap();
+        assert!(!parts.system && parts.settings && parts.activity && !parts.logs);
+        let all = ExportParts::default();
+        assert!(all.system && all.settings && all.activity && all.logs);
+    }
 
     #[test]
     fn only_hexdesk_log_files_are_collected_in_order() {

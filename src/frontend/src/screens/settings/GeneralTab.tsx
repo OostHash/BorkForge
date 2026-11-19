@@ -1,4 +1,6 @@
+import { useAppVersion, useCheckForUpdate, useInstallUpdate, usePendingUpdate } from "../../api/app";
 import { useClock } from "../../api/statistics";
+import { Button } from "../../primitives/actions";
 import { clockFormatFrom, type ClockFormat } from "../../domain/statistics";
 import { Badge } from "../../primitives/display";
 import { FormField, RadioGroup, Slider } from "../../primitives/forms";
@@ -14,7 +16,7 @@ import {
   usePreferences,
 } from "../../state/preferences";
 import { NotificationsGroup } from "./NotificationsGroup";
-import { SettingRow, SettingsGroup, SwitchRow, useSettingsFile } from "./parts";
+import { ResultText, SettingRow, SettingsGroup, SwitchRow, useSettingsFile } from "./parts";
 
 const CLOCK_OPTIONS: ReadonlyArray<{ value: ClockFormat; label: string }> = [
   { value: "auto", label: "Auto" },
@@ -116,10 +118,62 @@ function AppearanceGroup() {
   );
 }
 
+/** Check for a new release on demand, and install it from here when there is one. */
+function UpdatesGroup() {
+  const version = useAppVersion();
+  const check = useCheckForUpdate();
+  const install = useInstallUpdate();
+  // The check at start (or an earlier one here) may already have found an update.
+  const pending = usePendingUpdate();
+  const available = check.data ?? pending;
+  const result = check.isError ? (
+    <ResultText tone="danger">Update check failed: {String(check.error)}</ResultText>
+  ) : install.isError ? (
+    <ResultText tone="danger">Update failed: {String(install.error)}</ResultText>
+  ) : available ? (
+    <ResultText tone="success">Version {available} is available.</ResultText>
+  ) : check.isSuccess ? (
+    <ResultText tone="success">HexDesk is up to date.</ResultText>
+  ) : null;
+  return (
+    <SettingsGroup title="Updates">
+      <SettingRow
+        label="Check for updates"
+        description={`You have version ${version ?? "unknown"}. HexDesk also checks when it starts.`}
+        result={result}
+      >
+        {available ? (
+          <Button
+            size="sm"
+            variant="primary"
+            loading={install.isPending}
+            onClick={() => {
+              install.mutate();
+            }}
+          >
+            {install.isPending ? "Installing…" : "Install and restart"}
+          </Button>
+        ) : (
+          <Button
+            size="sm"
+            loading={check.isPending}
+            onClick={() => {
+              check.mutate();
+            }}
+          >
+            {check.isPending ? "Checking…" : "Check now"}
+          </Button>
+        )}
+      </SettingRow>
+    </SettingsGroup>
+  );
+}
+
 export function GeneralTab() {
   const { settings, set } = useSettingsFile();
   return (
     <>
+      <UpdatesGroup />
       <SettingsGroup
         title="Memory scanner"
         badge={

@@ -4,7 +4,7 @@ import { useState } from "react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { page } from "vitest/browser";
 import { cleanup, render } from "vitest-browser-react";
-import { SettingsDialog, type SettingsTab } from "./SettingsDialog";
+import { SettingsScreen, type SettingsTab } from "./SettingsScreen";
 
 type Call = { cmd: string; args: unknown };
 
@@ -38,7 +38,7 @@ function setup(overrides: Record<string, (args: unknown) => unknown> = {}) {
 
 function Harness() {
   const [tab, setTab] = useState<SettingsTab>("debugging");
-  return <SettingsDialog open tab={tab} onTabChange={setTab} onClose={() => undefined} />;
+  return <SettingsScreen tab={tab} onTabChange={setTab} />;
 }
 
 const mount = (client: QueryClient) =>
@@ -49,13 +49,22 @@ const mount = (client: QueryClient) =>
   );
 
 const row = (name: string) => page.getByRole("group", { name, exact: true });
+const exportDialog = () => page.getByRole("dialog", { name: "Export diagnostics" });
+
+/** "Export…" asks what to include; the dialog's Export writes the zip. */
+async function exportWith(uncheck: string[] = []) {
+  await row("Diagnostics export").getByRole("button", { name: "Export…" }).click();
+  for (const label of uncheck) await exportDialog().getByText(label, { exact: true }).click();
+  await exportDialog().getByRole("button", { name: "Export", exact: true }).click();
+}
 
 it("exports diagnostics and then offers to show the zip in its folder", async () => {
   const { client, find } = setup();
   await mount(client);
   const exportRow = row("Diagnostics export");
   await expect.element(exportRow.getByRole("button", { name: "Show in folder" })).not.toBeInTheDocument();
-  await exportRow.getByRole("button", { name: "Export" }).click();
+  await exportWith();
+  await expect.element(exportDialog()).not.toBeInTheDocument();
   await expect.element(exportRow.getByRole("status")).toHaveTextContent(`Saved to ${SAVED}`);
   await exportRow.getByRole("button", { name: "Show in folder" }).click();
   await vi.waitFor(() => {
@@ -66,8 +75,28 @@ it("exports diagnostics and then offers to show the zip in its folder", async ()
 it("shows why an export failed", async () => {
   const { client } = setup({ export_diagnostics: () => Promise.reject(new Error("the zip file could not be created")) });
   await mount(client);
-  await row("Diagnostics export").getByRole("button", { name: "Export" }).click();
-  await expect.element(row("Diagnostics export").getByRole("status")).toHaveTextContent("Export failed: the zip file could not be created");
+  await exportWith();
+  // The dialog stays open with the reason, so the user can try again.
+  await expect.element(exportDialog().getByRole("alert")).toHaveTextContent("Export failed: the zip file could not be created");
+});
+
+it("exports only the parts the user keeps checked", async () => {
+  const { client, find } = setup();
+  await mount(client);
+  await exportWith(["System information", /* settings stay */ "Log files"]);
+  await vi.waitFor(() => {
+    expect(find("export_diagnostics").map((c) => c.args)).toEqual([{ parts: { system: false, settings: true, activity: true, logs: false } }]);
+  });
+});
+
+it("cannot export with every part left out", async () => {
+  const { client } = setup();
+  await mount(client);
+  await row("Diagnostics export").getByRole("button", { name: "Export…" }).click();
+  for (const label of ["System information", "Settings", "Activity", "Log files"]) {
+    await exportDialog().getByText(label, { exact: true }).click();
+  }
+  await expect.element(exportDialog().getByRole("button", { name: "Export", exact: true })).toBeDisabled();
 });
 
 it("has none of the old FrameForge debug tools", async () => {
@@ -92,4 +121,13 @@ it("keeps the developer pages under Debugging", async () => {
   await mount(client);
   await expect.element(row("Kitchen sink").getByRole("button", { name: "Open" })).toBeVisible();
   await expect.element(row("Tokens").getByRole("button", { name: "Open" })).toBeVisible();
+});
+
+it("simulates an available update and clears it again", async () => {
+  const { client } = setup();
+  await mount(client);
+  await row("Simulate update").getByRole("button", { name: "Simulate" }).click();
+  await expect.element(page.getByRole("navigation", { name: "Settings" }).getByRole("button", { name: "General, update available" })).toBeVisible();
+  await row("Simulate update").getByRole("button", { name: "Clear" }).click();
+  await expect.element(page.getByRole("navigation", { name: "Settings" }).getByRole("button", { name: "General", exact: true })).toBeVisible();
 });
