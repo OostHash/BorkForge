@@ -319,7 +319,7 @@ export function ChangeLogDock({ onOpenInventory }: Props) {
           className="absolute inset-x-0 top-0 z-(--ff-z-sticky) h-1.5"
         />
       )}
-      <div className="group relative flex min-h-control-md items-center gap-2 border-b border-border px-3 text-xs font-semibold tracking-wide text-muted uppercase hover:text-text">
+      <div className="group relative flex h-11 shrink-0 items-center gap-2.5 border-b border-border px-3 text-sm font-semibold tracking-wide text-muted uppercase hover:text-text">
         {/* The whole bar opens and closes the list; the controls on it sit above this button. */}
         <button
           type="button"
@@ -377,7 +377,7 @@ export function ChangeLogDock({ onOpenInventory }: Props) {
           )}
         </div>
         <IconButton
-          size="sm"
+          size="md"
           icon={ExternalLink}
           label="Open in its own window"
           className="relative"
