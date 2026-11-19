@@ -122,3 +122,12 @@ it("keeps the developer pages under Debugging", async () => {
   await expect.element(row("Kitchen sink").getByRole("button", { name: "Open" })).toBeVisible();
   await expect.element(row("Tokens").getByRole("button", { name: "Open" })).toBeVisible();
 });
+
+it("simulates an available update and clears it again", async () => {
+  const { client } = setup();
+  await mount(client);
+  await row("Simulate update").getByRole("button", { name: "Simulate" }).click();
+  await expect.element(page.getByRole("navigation", { name: "Settings" }).getByRole("button", { name: "General, update available" })).toBeVisible();
+  await row("Simulate update").getByRole("button", { name: "Clear" }).click();
+  await expect.element(page.getByRole("navigation", { name: "Settings" }).getByRole("button", { name: "General", exact: true })).toBeVisible();
+});

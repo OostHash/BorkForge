@@ -140,6 +140,9 @@ export async function checkForUpdate(queryClient: QueryClient): Promise<void> {
   queryClient.setQueryData(appKeys.update, version);
 }
 
+/** Development builds only: pretend a release is (or no longer is) available, to try the update interface. */
+export const simulateUpdate = (queryClient: QueryClient, version: string | null) => queryClient.setQueryData(appKeys.update, version);
+
 /**
  * A check started by the user (Settings → General). Unlike the check at
  * start it reports failures; a found update also marks Settings.

@@ -1,4 +1,6 @@
+import { useQueryClient } from "@tanstack/react-query";
 import { FlaskConical, Palette } from "lucide-react";
+import { simulateUpdate, usePendingUpdate } from "../../api/app";
 import { Button } from "../../primitives/actions";
 import { ExportDiagnosticsButtons, useDiagnosticsExport } from "./ExportDiagnostics";
 import { ResultText, SettingRow, SettingsGroup } from "./parts";
@@ -17,12 +19,48 @@ function ExportRow() {
   );
 }
 
-/** Settings → Debugging, in development builds only: the diagnostics export and the developer pages. */
+/** A fake available release, so the red dot and the Updates group can be tried without a real one. */
+function SimulateUpdateRow() {
+  const queryClient = useQueryClient();
+  const pending = usePendingUpdate();
+  return (
+    <SettingRow
+      label="Simulate update"
+      description="Pretend version 9.9.9 is available: Settings gets its red dot and General offers to install. Installing still runs the real check, so nothing is installed."
+    >
+      {pending ? (
+        <Button
+          size="sm"
+          onClick={() => {
+            simulateUpdate(queryClient, null);
+          }}
+        >
+          Clear
+        </Button>
+      ) : (
+        <Button
+          size="sm"
+          onClick={() => {
+            simulateUpdate(queryClient, "9.9.9");
+          }}
+        >
+          Simulate
+        </Button>
+      )}
+    </SettingRow>
+  );
+}
+
+/** Settings → Debugging, in development builds only: the diagnostics export, update simulation and the developer pages. */
 export function DebuggingTab() {
   return (
     <>
       <SettingsGroup title="Bug reports">
         <ExportRow />
+      </SettingsGroup>
+
+      <SettingsGroup title="Updates">
+        <SimulateUpdateRow />
       </SettingsGroup>
 
       <SettingsGroup title="Developer pages">
