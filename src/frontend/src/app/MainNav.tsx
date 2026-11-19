@@ -105,7 +105,7 @@ export function MainNav({ screens, current, onSelect, settingsOpen, onOpenSettin
           >
             <Icon
               icon={collapsed ? PanelLeftOpen : PanelLeftClose}
-              size="lg"
+              size="md"
               className="opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100"
             />
           </button>

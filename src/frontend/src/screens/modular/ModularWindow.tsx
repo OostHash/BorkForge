@@ -318,9 +318,9 @@ export function ModularWindow({ onPopout, onCollapse, className }: Props) {
   const { prefs } = useModularPrefs();
   return (
     <aside aria-label="Modular window" className={cn("flex min-h-0 min-w-0 flex-col bg-surface", className)}>
-      <div className="flex shrink-0 items-center gap-1 border-b border-border py-1.5 ps-3 pe-1">
-        <span className="flex-1 text-xs font-semibold tracking-wide text-muted uppercase">Modular window</span>
-        {onPopout && <IconButton size="sm" icon={ExternalLink} label="Open in its own window" onClick={onPopout} />}
+      <div className="flex h-11 shrink-0 items-center gap-1 border-b border-border ps-3 pe-1">
+        <span className="flex-1 text-sm font-semibold tracking-wide text-muted uppercase">Modular window</span>
+        {onPopout && <IconButton size="lg" icon={ExternalLink} label="Open in its own window" onClick={onPopout} />}
       </div>
       <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto">
         {prefs.sectionOrder.map((id, index) => (
