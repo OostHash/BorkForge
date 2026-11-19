@@ -1,12 +1,14 @@
 import type { LucideIcon } from "lucide-react";
 import type { ComponentProps, ReactNode } from "react";
 import { cn } from "../cn";
-import { Icon } from "../display/Icon";
+import { Icon, type IconSize } from "../display/Icon";
 
 type Props = Omit<ComponentProps<"button">, "children"> & {
   active: boolean;
   label: ReactNode;
   icon?: LucideIcon;
+  /** Defaults to sm; a sidebar that can show icons only uses a larger size. */
+  iconSize?: IconSize;
   /** Small count shown at the end, e.g. items in a category. */
   count?: number;
   /** Free slot after the label, e.g. a Badge. */
@@ -17,7 +19,7 @@ type Props = Omit<ComponentProps<"button">, "children"> & {
  * Category/navigation entry for a sidebar list. Put it in <nav><ul><li>.
  * The active entry gets aria-current="page".
  */
-export function SidebarItem({ active, label, icon, count, badge, className, type = "button", ...rest }: Props) {
+export function SidebarItem({ active, label, icon, iconSize = "sm", count, badge, className, type = "button", ...rest }: Props) {
   return (
     <button
       type={type}
@@ -29,7 +31,7 @@ export function SidebarItem({ active, label, icon, count, badge, className, type
       )}
       {...rest}
     >
-      {icon && <Icon icon={icon} size="sm" />}
+      {icon && <Icon icon={icon} size={iconSize} />}
       <span className="min-w-0 flex-1 truncate">{label}</span>
       {badge}
       {count !== undefined && <span className="text-xs text-muted tabular-nums">{count}</span>}

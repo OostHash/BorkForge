@@ -1,7 +1,4 @@
-import { Backpack, Bug, Clock, Gem, Hammer, Settings, Sparkles, Store, type LucideIcon } from "lucide-react";
 import { useCallback, useState, type ComponentType } from "react";
-import { openExternal } from "../api/links";
-import { SidebarItem } from "../primitives/navigation";
 import { FoundryScreen } from "../screens/foundry/FoundryScreen";
 import { ItemWindowHost } from "../screens/market/ItemWindow";
 import { MarketScreen } from "../screens/market/MarketScreen";
@@ -11,31 +8,29 @@ import { InventoryScreen } from "../screens/inventory/InventoryScreen";
 import { RelicsScreen } from "../screens/relics/RelicsScreen";
 import { TimersScreen } from "../screens/timers/TimersScreen";
 import { AppLifecycle } from "./AppLifecycle";
-import { HexDeskMark } from "./HexDeskMark";
 import { ChangeLogDock } from "./ChangeLogDock";
 import { FissureAlerts } from "./FissureAlerts";
 import { Header } from "./Header";
+import { MainNav, type NavScreen } from "./MainNav";
 import { ModularDock } from "./ModularDock";
+import { NAV_ICONS } from "./navIcons";
 import { RelicOverlayController } from "./RelicOverlayController";
 import { RivenOverlayController } from "./RivenOverlayController";
 import { ScreenBoundary } from "./ScreenBoundary";
 import { TradeWatcher } from "./TradeWatcher";
 import { WindowTitleBar } from "./WindowTitleBar";
 
-type ScreenDef = { id: string; label: string; icon: LucideIcon; Screen: ComponentType };
+type ScreenDef = NavScreen & { Screen: ComponentType };
 
 /** The screens of the main window, in sidebar order. */
 const SCREENS: readonly ScreenDef[] = [
-  { id: "inventory", label: "Inventory", icon: Backpack, Screen: InventoryScreen },
-  { id: "foundry", label: "Foundry", icon: Hammer, Screen: FoundryScreen },
-  { id: "relics", label: "Relics", icon: Gem, Screen: RelicsScreen },
-  { id: "rivens", label: "Rivens", icon: Sparkles, Screen: RivensScreen },
-  { id: "timers", label: "Timers", icon: Clock, Screen: TimersScreen },
-  { id: "market", label: "Market", icon: Store, Screen: MarketScreen },
+  { id: "inventory", label: "Inventory", icon: NAV_ICONS.inventory, Screen: InventoryScreen },
+  { id: "foundry", label: "Foundry", icon: NAV_ICONS.foundry, Screen: FoundryScreen },
+  { id: "relics", label: "Relics", icon: NAV_ICONS.relics, Screen: RelicsScreen },
+  { id: "rivens", label: "Rivens", icon: NAV_ICONS.rivens, Screen: RivensScreen },
+  { id: "timers", label: "Timers", icon: NAV_ICONS.timers, Screen: TimersScreen },
+  { id: "market", label: "Market", icon: NAV_ICONS.market, Screen: MarketScreen },
 ];
-
-const BUG_REPORT_URL = "https://github.com/OostHash/HexDesk/issues/new/choose";
-const NARROW_NAV_ITEM = "justify-center px-0 md:justify-start md:px-3 [&>span]:hidden md:[&>span]:inline";
 
 /** Main window: navigation on the left, the active screen on the right. */
 export function AppShell() {
@@ -56,57 +51,15 @@ export function AppShell() {
       <RivenOverlayController />
       <WindowTitleBar />
       <div className="flex min-h-0 flex-1">
-        <nav aria-label="Main" className="flex w-14 shrink-0 flex-col gap-4 border-e border-border bg-surface p-2 md:w-52">
-          <div className="flex items-center justify-center gap-2 pt-1 text-sm font-semibold md:justify-start md:px-2">
-            <HexDeskMark className="size-5 text-accent" />
-            <span className="hidden md:inline">HexDesk</span>
-          </div>
-          <ul className="flex flex-col gap-0.5">
-            {SCREENS.map((s) => (
-              <li key={s.id}>
-                <SidebarItem
-                  active={screen === s.id}
-                  label={s.label}
-                  icon={s.icon}
-                  aria-label={s.label}
-                  title={s.label}
-                  className={NARROW_NAV_ITEM}
-                  onClick={() => {
-                    setScreen(s.id);
-                  }}
-                />
-              </li>
-            ))}
-          </ul>
-          <ul aria-label="Support and settings" className="mt-auto flex flex-col gap-0.5 border-t border-border pt-2">
-            <li>
-              <SidebarItem
-                active={false}
-                label="Report a bug"
-                icon={Bug}
-                aria-label="Report a bug"
-                title="Report a bug"
-                className={NARROW_NAV_ITEM}
-                onClick={() => {
-                  void openExternal(BUG_REPORT_URL).catch(() => undefined);
-                }}
-              />
-            </li>
-            <li>
-              <SidebarItem
-                active={settingsOpen}
-                label="Settings"
-                icon={Settings}
-                aria-label="Settings"
-                title="Settings"
-                className={NARROW_NAV_ITEM}
-                onClick={() => {
-                  setSettingsOpen(true);
-                }}
-              />
-            </li>
-          </ul>
-        </nav>
+        <MainNav
+          screens={SCREENS}
+          current={screen}
+          onSelect={setScreen}
+          settingsOpen={settingsOpen}
+          onOpenSettings={() => {
+            setSettingsOpen(true);
+          }}
+        />
         <div className="flex min-w-0 flex-1 flex-col">
           <Header
             onOpenScreen={setScreen}

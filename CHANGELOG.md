@@ -17,9 +17,15 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   saves a single zip with the logs, your settings and facts about your system
   to your Downloads folder, ready to attach to a bug report. Passwords,
   tokens, e-mail addresses and player names are removed from it.
+- The navigation sidebar can collapse to icons only. Click the empty space
+  between the screens and Report a bug to collapse or expand it; HexDesk
+  remembers your choice. When collapsed, hover or focus an icon to see its
+  name. HexDesk starts collapsed, and narrow windows always show icons only.
 
 ### Changed
 
+- New navigation icons for Inventory, Foundry, Relics, Rivens, Timers and
+  Market that match their screens, shown larger in the sidebar.
 - The logs now say why something failed instead of only that it failed, for
   example when Warframe's memory could not be read, no inventory was found,
   warframe.market refused a request, or a relic overlay took long to appear.
