@@ -70,6 +70,9 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   changed. By default it shows what changed since HexDesk started.
 - The main window is called HexDesk again in Alt+Tab, the taskbar and Task
   Manager.
+- Clicking an active filter preset again turns it off, in Inventory, Foundry
+  and Market. With "Restore previous filters" on, it brings back the filters
+  you had before.
 
 ## [1.0.1] - 2026-11-17
 
