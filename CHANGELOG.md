@@ -24,6 +24,10 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Changed
 
+- Settings is a full screen instead of a pop-up. Its categories are listed in
+  a column next to the navigation, Settings reopens on the category you used
+  last, and the changelog and modular window are hidden while it is open.
+  The HexDesk logo and version sit at the bottom of the category column.
 - New navigation icons for Inventory, Foundry, Relics, Rivens, Timers and
   Market that match their screens, shown larger in the sidebar.
 - The collapsed modular window shows its name along the bar, and clicking

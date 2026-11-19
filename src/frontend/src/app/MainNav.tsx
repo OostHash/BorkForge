@@ -5,7 +5,7 @@ import { cn } from "../primitives/cn";
 import { Icon, type IconSize } from "../primitives/display";
 import { SidebarItem } from "../primitives/navigation";
 import { Tooltip, type TooltipTriggerProps } from "../primitives/overlay";
-import { HexDeskMark } from "./HexDeskMark";
+import { HexDeskMark } from "../patterns/HexDeskMark";
 import { useNavCollapsed } from "./navCollapsed";
 
 export type NavScreen = { id: string; label: string; icon: LucideIcon };

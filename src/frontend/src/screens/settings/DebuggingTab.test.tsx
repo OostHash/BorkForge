@@ -4,7 +4,7 @@ import { useState } from "react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { page } from "vitest/browser";
 import { cleanup, render } from "vitest-browser-react";
-import { SettingsDialog, type SettingsTab } from "./SettingsDialog";
+import { SettingsScreen, type SettingsTab } from "./SettingsScreen";
 
 type Call = { cmd: string; args: unknown };
 
@@ -38,7 +38,7 @@ function setup(overrides: Record<string, (args: unknown) => unknown> = {}) {
 
 function Harness() {
   const [tab, setTab] = useState<SettingsTab>("debugging");
-  return <SettingsDialog open tab={tab} onTabChange={setTab} onClose={() => undefined} />;
+  return <SettingsScreen tab={tab} onTabChange={setTab} />;
 }
 
 const mount = (client: QueryClient) =>

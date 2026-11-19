@@ -1,9 +1,10 @@
 import { useCallback, useState, type ComponentType } from "react";
+import { cn } from "../primitives/cn";
 import { FoundryScreen } from "../screens/foundry/FoundryScreen";
 import { ItemWindowHost } from "../screens/market/ItemWindow";
 import { MarketScreen } from "../screens/market/MarketScreen";
 import { RivensScreen } from "../screens/rivens/RivensScreen";
-import { SettingsDialog, type SettingsTab } from "../screens/settings/SettingsDialog";
+import { SettingsScreen, type SettingsTab } from "../screens/settings/SettingsScreen";
 import { InventoryScreen } from "../screens/inventory/InventoryScreen";
 import { RelicsScreen } from "../screens/relics/RelicsScreen";
 import { TimersScreen } from "../screens/timers/TimersScreen";
@@ -35,13 +36,18 @@ const SCREENS: readonly ScreenDef[] = [
 /** Main window: navigation on the left, the active screen on the right. */
 export function AppShell() {
   const [screen, setScreen] = useState("inventory");
-  const [settingsOpen, setSettingsOpen] = useState(false);
+  // Kept while the app runs, so Settings reopens on the category used last.
   const [settingsTab, setSettingsTab] = useState<SettingsTab>("general");
+  const onSettings = screen === "settings";
   const current = SCREENS.find((s) => s.id === screen) ?? SCREENS[0];
   // Stable: the changelog dock listens for the pop-out's requests with it.
   const openInventory = useCallback(() => {
     setScreen("inventory");
   }, []);
+  const openSettings = (tab?: SettingsTab) => {
+    if (tab) setSettingsTab(tab);
+    setScreen("settings");
+  };
   return (
     <div className="flex h-full min-h-0 flex-col">
       <AppLifecycle />
@@ -55,44 +61,48 @@ export function AppShell() {
           screens={SCREENS}
           current={screen}
           onSelect={setScreen}
-          settingsOpen={settingsOpen}
+          settingsOpen={onSettings}
           onOpenSettings={() => {
-            setSettingsOpen(true);
+            openSettings();
           }}
         />
         <div className="flex min-w-0 flex-1 flex-col">
           <Header
             onOpenScreen={setScreen}
             onOpenSettings={() => {
-              setSettingsOpen(true);
+              // The memory scanner switch lives in General.
+              openSettings("general");
             }}
           />
           <div className="flex min-h-0 flex-1">
             <div className="flex min-w-0 flex-1 flex-col">
               <main className="flex min-h-0 flex-1 flex-col">
-                <h1 className="sr-only">{current?.label}</h1>
-                {current && (
-                  <ScreenBoundary key={current.id} label={current.label}>
-                    <current.Screen />
+                <h1 className="sr-only">{onSettings ? "Settings" : current?.label}</h1>
+                {onSettings ? (
+                  <ScreenBoundary key="settings" label="Settings">
+                    <SettingsScreen tab={settingsTab} onTabChange={setSettingsTab} />
                   </ScreenBoundary>
+                ) : (
+                  current && (
+                    <ScreenBoundary key={current.id} label={current.label}>
+                      <current.Screen />
+                    </ScreenBoundary>
+                  )
                 )}
               </main>
-              <ChangeLogDock onOpenInventory={openInventory} />
+              {/* Hidden, not unmounted, on Settings: the docks keep their state and their pop-out listeners. */}
+              <div className={cn("contents", onSettings && "hidden")}>
+                <ChangeLogDock onOpenInventory={openInventory} />
+              </div>
             </div>
-            <ModularDock />
+            <div className={cn("contents", onSettings && "hidden")}>
+              <ModularDock />
+            </div>
           </div>
         </div>
       </div>
       {/* Outside the screens: React Aria renders Tabs children in a detached collection pass, where showModal() fails. */}
       <ItemWindowHost />
-      <SettingsDialog
-        open={settingsOpen}
-        tab={settingsTab}
-        onTabChange={setSettingsTab}
-        onClose={() => {
-          setSettingsOpen(false);
-        }}
-      />
     </div>
   );
 }

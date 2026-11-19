@@ -4,7 +4,7 @@ import { useState } from "react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { page, userEvent } from "vitest/browser";
 import { cleanup, render } from "vitest-browser-react";
-import { SettingsDialog, type SettingsTab } from "./SettingsDialog";
+import { SettingsScreen, type SettingsTab } from "./SettingsScreen";
 
 type Call = { cmd: string; args: unknown };
 
@@ -47,7 +47,7 @@ function setup(initial: { settings?: Record<string, unknown>; session?: [string,
 
 function Harness({ initialTab }: { initialTab: SettingsTab }) {
   const [tab, setTab] = useState<SettingsTab>(initialTab);
-  return <SettingsDialog open tab={tab} onTabChange={setTab} onClose={() => undefined} />;
+  return <SettingsScreen tab={tab} onTabChange={setTab} />;
 }
 
 const mount = (client: QueryClient, tab: SettingsTab = "general") =>
@@ -56,6 +56,19 @@ const mount = (client: QueryClient, tab: SettingsTab = "general") =>
       <Harness initialTab={tab} />
     </QueryClientProvider>,
   );
+
+it("lists the categories in a navigator and shows the chosen one beside it", async () => {
+  const { client } = setup();
+  await mount(client);
+  const nav = page.getByRole("navigation", { name: "Settings" });
+  await expect.element(nav.getByRole("button", { name: "General" })).toHaveAttribute("aria-current", "page");
+  await expect.element(page.getByRole("heading", { name: "General", level: 2 })).toBeVisible();
+
+  await nav.getByRole("button", { name: "Filters" }).click();
+  await expect.element(nav.getByRole("button", { name: "Filters" })).toHaveAttribute("aria-current", "page");
+  await expect.element(page.getByRole("heading", { name: "Filters", level: 2 })).toBeVisible();
+  await expect.element(page.getByRole("combobox", { name: "Counts changes from" })).toBeVisible();
+});
 
 it("turns the memory scanner on in the settings file", async () => {
   const { client, saved } = setup();
