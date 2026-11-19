@@ -40,11 +40,13 @@ const RECENT: LogEntry[] = [
   entry(4, { source: "market", message: "Top-items ranking refreshed" }),
 ];
 
-function mount() {
+function mount(entries: LogEntry[] = RECENT, calls: Array<{ cmd: string; args: unknown }> = []) {
   mockWindows("main");
   mockIPC(
-    (cmd) => {
-      if (cmd === "get_recent_logs") return RECENT;
+    (cmd, args) => {
+      calls.push({ cmd, args });
+      if (cmd === "get_recent_logs") return entries;
+      if (cmd === "get_capture") return new Uint8Array([0x42, 0x4d]).buffer;
       return null;
     },
     { shouldMockEvents: true },
@@ -100,4 +102,18 @@ it("adds new entries live", async () => {
   await emit("diag-entry", entry(5, { level: "error", source: "updater", message: "Update check failed", code: "updater.network" }));
   await expect.element(list().getByRole("listitem").first().getByText("Update check failed")).toBeVisible();
   await expect.element(page.getByText("4 of 5 entries")).toBeVisible();
+});
+
+it("saves the capture choice and shows a saved capture in the entry details", async () => {
+  const calls: Array<{ cmd: string; args: unknown }> = [];
+  await mount([entry(1, { source: "overlay", message: "Overlay key capture saved", fields: { capture: "overlay-key-1.bmp" } })], calls);
+  await page.getByRole("checkbox", { name: "Save a capture on each overlay key press" }).click();
+  await expect
+    .poll(() => calls.some((c) => c.cmd === "save_settings" && (c.args as { json: string }).json.includes('"overlayKeyCapture":true')))
+    .toBe(true);
+  await list()
+    .getByRole("button", { name: /Overlay key capture saved/ })
+    .click();
+  await expect.element(page.getByRole("img", { name: "Screen capture given to OCR" })).toBeInTheDocument();
+  expect(calls.find((c) => c.cmd === "get_capture")?.args).toEqual({ name: "overlay-key-1.bmp" });
 });

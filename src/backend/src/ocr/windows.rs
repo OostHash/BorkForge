@@ -260,6 +260,36 @@ pub fn ocr_pixels_rect(
     y_start: f32,
     y_end: f32,
 ) -> Result<String, String> {
+    let (bmp, w, h) = ocr_input_bmp(pixels, full_w, full_h, x_start, x_end, y_start, y_end)?;
+    run_windows_ocr(bmp, w, h).map(|(text, _)| text)
+}
+
+/// The bitmap `ocr_pixels_rect` hands to OCR: the rectangle, cropped and
+/// contrast-stretched, with its width and height.
+fn ocr_input_bmp(
+    pixels: &[u8],
+    full_w: u32,
+    full_h: u32,
+    x_start: f32,
+    x_end: f32,
+    y_start: f32,
+    y_end: f32,
+) -> Result<(Vec<u8>, u32, u32), String> {
+    let (cropped, w, h) = crop_rect(pixels, full_w, full_h, x_start, x_end, y_start, y_end)?;
+    let (enhanced, ew, eh) = super::preprocess_for_ocr(&cropped, w, h);
+    Ok((super::to_bmp(&enhanced, ew, eh), ew, eh))
+}
+
+/// A rectangle of a BGRA pixel buffer; coordinates are 0.0–1.0 fractions.
+fn crop_rect(
+    pixels: &[u8],
+    full_w: u32,
+    full_h: u32,
+    x_start: f32,
+    x_end: f32,
+    y_start: f32,
+    y_end: f32,
+) -> Result<(Vec<u8>, u32, u32), String> {
     let col_s = (full_w as f32 * x_start.clamp(0.0, 1.0)) as usize;
     let col_e = ((full_w as f32 * x_end.clamp(0.0, 1.0)) as usize).min(full_w as usize);
     let row_s = (full_h as f32 * y_start.clamp(0.0, 1.0)) as usize;
@@ -278,10 +308,7 @@ pub fn ocr_pixels_rect(
         let dst = row * dst_stride;
         cropped[dst..dst + dst_stride].copy_from_slice(&pixels[src..src + dst_stride]);
     }
-
-    let (enhanced, ew, eh) = super::preprocess_for_ocr(&cropped, rect_w, rect_h);
-    let bmp = super::to_bmp(&enhanced, ew, eh);
-    run_windows_ocr(bmp, ew, eh).map(|(text, _)| text)
+    Ok((cropped, rect_w, rect_h))
 }
 
 /// OCR a rectangle WITHOUT preprocessing — for white-on-dark text that OCRs fine raw.
@@ -362,11 +389,53 @@ pub fn detect_fissure_era() -> Option<String> {
     None
 }
 
-/// The screen title in the top-left corner of the game, such as
-/// "VOID FISSURE/SELECT RELIC". None when nothing could be read.
-pub fn read_screen_title() -> Option<String> {
-    let (pixels, w, h) = capture_warframe_pixels().ok()?;
-    ocr_pixels_rect(&pixels, w, h, 0.0, 0.6, 0.0, 0.15).ok()
+/// What was read from the screen title in the top-left corner of the game.
+pub struct ScreenTitle {
+    /// The text, such as "VOID FISSURE/SELECT RELIC"; None when OCR failed.
+    pub text: Option<String>,
+    /// The bitmap OCR was given for this text, as a .bmp file.
+    pub image: Vec<u8>,
+    /// The size the title area was read at: "1x", "2x" or "0.5x".
+    pub scale: &'static str,
+    /// Every size tried, in order, with the text OCR returned ("" when it
+    /// failed) and whether `accept` took it.
+    pub attempts: Vec<(&'static str, String, bool)>,
+}
+
+/// Reads the screen title, trying several sizes until `accept` takes the
+/// text: OCR skips the title's thin, widely spaced letters at one size on one
+/// screen and at another size on the next. Returns the accepted read, or the
+/// last one. Fails when the game window cannot be captured.
+pub fn read_screen_title(accept: impl Fn(&str) -> bool) -> Result<ScreenTitle, String> {
+    let (pixels, w, h) = capture_warframe_pixels()?;
+    let (cropped, cw, ch) = crop_rect(&pixels, w, h, 0.0, 0.6, 0.0, 0.15)?;
+    let (gray, gw, gh) = super::preprocess_for_ocr(&cropped, cw, ch);
+    let sizes: [(&'static str, (Vec<u8>, u32, u32)); 3] = [
+        ("1x", (gray.clone(), gw, gh)),
+        ("2x", super::upscale_2x(&gray, gw, gh)),
+        ("0.5x", super::downscale_2x(&gray, gw, gh)),
+    ];
+    let mut attempts = Vec::new();
+    let mut last = None;
+    for (scale, (px, sw, sh)) in sizes {
+        let bmp = super::to_bmp(&px, sw, sh);
+        let text = run_windows_ocr(bmp.clone(), sw, sh)
+            .ok()
+            .map(|(text, _)| text);
+        let accepted = text.as_deref().is_some_and(&accept);
+        attempts.push((scale, text.clone().unwrap_or_default(), accepted));
+        last = Some((text, bmp, scale));
+        if accepted {
+            break;
+        }
+    }
+    let (text, image, scale) = last.ok_or_else(|| "no title read".to_string())?;
+    Ok(ScreenTitle {
+        text,
+        image,
+        scale,
+        attempts,
+    })
 }
 
 /// DXGI Desktop Duplication capture — works for Fullscreen Exclusive (and all other modes).

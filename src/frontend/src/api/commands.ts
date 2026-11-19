@@ -208,6 +208,10 @@ export interface CommandMap {
   set_relic_pick_enabled: { args: { enabled: boolean }; result: null };
   /** The key that shows or hides the overlays, as a Windows virtual-key code (0 for none). */
   set_overlay_key: { args: { vk: number }; result: null };
+  /** Save the screen title capture on each overlay key press, shown in the activity console. */
+  set_overlay_key_capture: { args: { enabled: boolean }; result: null };
+  /** A saved screen capture as .bmp bytes, by file name. */
+  get_capture: { args: { name: string }; result: ArrayBuffer };
   /** Places and shows the relic pick window (no payload): previews and offset changes. */
   show_relic_pick_window: { args: undefined; result: null };
   /** Reads the riven card on screen (OCR). */

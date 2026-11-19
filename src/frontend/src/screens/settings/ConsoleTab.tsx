@@ -1,6 +1,8 @@
 import { ChevronDown, ChevronRight, Copy } from "lucide-react";
-import { useId, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useState } from "react";
 import { useConsoleEntries } from "../../api/console";
+import { invoke } from "../../api/invoke";
+import { overlayPrefsFrom } from "../../api/overlays";
 import {
   CONSOLE_LEVELS,
   DEFAULT_FILTER,
@@ -20,7 +22,7 @@ import { Badge, Icon } from "../../primitives/display";
 import type { Tone } from "../../primitives/display/tone";
 import { Checkbox, SearchInput, Select } from "../../primitives/forms";
 import { ExportDiagnosticsButtons, useDiagnosticsExport } from "./ExportDiagnostics";
-import { ResultText, SettingsGroup } from "./parts";
+import { ResultText, SettingsGroup, useSettingsFile } from "./parts";
 
 /** Rendering every one of 2000 rows is slow; the newest are what matters. */
 const MAX_SHOWN = 500;
@@ -31,6 +33,33 @@ const LEVEL_BADGE: Record<ConsoleLevel, string> = { error: "Error", warn: "Warni
 const copy = (text: string) => {
   void navigator.clipboard.writeText(text).catch(() => undefined);
 };
+
+/** A saved screen capture named in an entry's `capture` field. */
+function CaptureImage({ name }: { name: string }) {
+  const [url, setUrl] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
+  useEffect(() => {
+    let objectUrl: string | null = null;
+    let cancelled = false;
+    invoke("get_capture", { name }).then(
+      (bytes) => {
+        if (cancelled) return;
+        objectUrl = URL.createObjectURL(new Blob([bytes], { type: "image/bmp" }));
+        setUrl(objectUrl);
+      },
+      () => {
+        if (!cancelled) setFailed(true);
+      },
+    );
+    return () => {
+      cancelled = true;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [name]);
+  if (failed) return <p className="text-muted">The capture is no longer stored.</p>;
+  if (!url) return null;
+  return <img src={url} alt="Screen capture given to OCR" className="max-w-full rounded-sm border border-border" />;
+}
 
 /** One entry: a readable line, with fields, causes and the code behind a click. */
 function EntryRow({ entry, onOp }: { entry: LogEntry; onOp: (op: number) => void }) {
@@ -92,6 +121,7 @@ function EntryRow({ entry, onOp }: { entry: LogEntry; onOp: (op: number) => void
               ))}
             </dl>
           )}
+          {entry.fields.capture && <CaptureImage name={entry.fields.capture} />}
           {entry.causes.map((cause, i) => (
             <p key={i}>
               <span className="text-muted">Caused by </span>
@@ -180,6 +210,7 @@ function Filters({ filter, sources, onChange }: { filter: ConsoleFilter; sources
 /** Live background activity: what HexDesk does and why something failed. */
 export function ConsoleTab() {
   const entries = useConsoleEntries();
+  const { settings, set } = useSettingsFile();
   const [filter, setFilter] = useState<ConsoleFilter>(DEFAULT_FILTER);
   const exporting = useDiagnosticsExport();
   const sources = useMemo(() => sourcesOf(entries), [entries]);
@@ -191,6 +222,14 @@ export function ConsoleTab() {
       <SettingsGroup title="Activity">
         <div className="flex flex-col gap-3">
           <Filters filter={filter} sources={sources} onChange={setFilter} />
+          <Checkbox
+            checked={overlayPrefsFrom(settings).overlayKeyCapture}
+            onCheckedChange={(on) => {
+              set({ overlayKeyCapture: on });
+            }}
+          >
+            Save a capture on each overlay key press
+          </Checkbox>
           <div className="flex flex-wrap items-center justify-between gap-2">
             <p className="text-xs text-muted" aria-live="polite">
               {shown.length === entries.length ? `${String(entries.length)} entries` : `${String(shown.length)} of ${String(entries.length)} entries`}

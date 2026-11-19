@@ -399,8 +399,61 @@ pub(crate) fn handle_relic_pick_events(app: &tauri::AppHandle, lower: &str) {
         );
     }
     if read.open {
-        open_relic_pick(app);
+        open_relic_pick(app, last_open_seconds(lower));
     }
+}
+
+/// When the game started writing the current EE.log, from its
+/// "Current time: Thu Nov 19 23:44:03 2026" line. Line times in EE.log are
+/// seconds since then.
+static EE_LOG_START: std::sync::Mutex<Option<chrono::NaiveDateTime>> = std::sync::Mutex::new(None);
+
+/// The start time in an EE.log "Current time:" line, if `text` holds one.
+pub(crate) fn parse_ee_log_start(text: &str) -> Option<chrono::NaiveDateTime> {
+    let line = text.lines().find(|l| l.contains("Current time:"))?;
+    let after = line.split("Current time:").nth(1)?;
+    let stamp = after.split('[').next()?.trim();
+    chrono::NaiveDateTime::parse_from_str(stamp, "%a %b %d %H:%M:%S %Y").ok()
+}
+
+/// Remembers the EE.log start time when `text` holds it. A new log starts
+/// with it, so this follows a game restart.
+pub(crate) fn note_ee_log_start(text: &str) {
+    if let Some(start) = parse_ee_log_start(text) {
+        *EE_LOG_START.lock().unwrap_or_else(|e| e.into_inner()) = Some(start);
+    }
+}
+
+/// Reads the EE.log start time from the head of the file.
+pub(crate) fn seed_ee_log_start(log_path: &std::path::Path) {
+    use std::io::Read;
+    let mut head = vec![0u8; 8 * 1024];
+    let Ok(n) = std::fs::File::open(log_path).and_then(|mut f| f.read(&mut head)) else {
+        return;
+    };
+    note_ee_log_start(&String::from_utf8_lossy(&head[..n]));
+}
+
+/// Seconds since the log started of the last relic list open line in `lower`.
+pub(crate) fn last_open_seconds(lower: &str) -> Option<f64> {
+    lower
+        .lines()
+        .rev()
+        .find(|l| {
+            l.trim_end()
+                .ends_with("themedprojectionmanager.lua: populateinventorygrid")
+        })?
+        .split_whitespace()
+        .next()?
+        .parse()
+        .ok()
+}
+
+/// The local time an EE.log line was written, from its seconds since start.
+fn ee_log_time(seconds: Option<f64>) -> Option<chrono::DateTime<chrono::Local>> {
+    let start = (*EE_LOG_START.lock().unwrap_or_else(|e| e.into_inner()))?;
+    let start = start.and_local_timezone(chrono::Local).single()?;
+    Some(start + chrono::Duration::milliseconds((seconds? * 1000.0) as i64))
 }
 
 fn close_relic_pick(app: &tauri::AppHandle, ee_log_line: &'static str) {
@@ -416,7 +469,7 @@ fn close_relic_pick(app: &tauri::AppHandle, ee_log_line: &'static str) {
     let _ = app.emit(events::RELIC_PICK_CLOSE, ());
 }
 
-fn open_relic_pick(app: &tauri::AppHandle) {
+fn open_relic_pick(app: &tauri::AppHandle, line_seconds: Option<f64>) {
     let state = app.state::<AppState>();
     let overlay_on = relic_pick_on(&state);
     hexdesk_diag::info!(overlay, overlay_on, "Relic selection screen seen in EE.log");
@@ -427,37 +480,61 @@ fn open_relic_pick(app: &tauri::AppHandle) {
         );
         return;
     }
-    if crate::overlay_key::key_used_recently() {
+    let line_time = ee_log_time(line_seconds);
+    if crate::overlay_key::key_used_after(line_time) {
         // EE.log reaches the disk late, so this line can describe the screen
         // the player already showed or hid with the key.
         hexdesk_diag::info!(
             overlay,
-            "Relic Pick overlay left as it is: the overlay key was used more recently"
+            line_time = line_time
+                .map(|t| t.format("%H:%M:%S").to_string())
+                .unwrap_or_default(),
+            "Relic Pick overlay left as it is: the overlay key was used after this EE.log line"
         );
         return;
     }
-    start_relic_pick(app);
+    start_relic_pick(app, false);
 }
 
 /// Start a selection and show the overlay for it once the era is read.
-pub(crate) fn start_relic_pick(app: &tauri::AppHandle) {
+/// `screen_up` says the relic list is already on screen (the overlay key
+/// read it), so there is no need to wait for it to finish drawing.
+pub(crate) fn start_relic_pick(app: &tauri::AppHandle, screen_up: bool) {
     let session = begin_relic_pick(&app.state::<AppState>().relic_pick_session);
     let app = app.clone();
-    std::thread::spawn(move || show_relic_pick(&app, session));
+    std::thread::spawn(move || show_relic_pick(&app, session, screen_up));
 }
+
+/// Era reads before the overlay gives up, and the pause between them. An
+/// EE.log line can arrive while the screen is still drawing its era label.
+const ERA_ATTEMPTS: u32 = 3;
+const ERA_RETRY: std::time::Duration = std::time::Duration::from_millis(500);
 
 /// Read the fissure era and show the overlay, unless the selection this
 /// `session` belongs to closed in the meantime.
-fn show_relic_pick(app: &tauri::AppHandle, session: u64) {
+fn show_relic_pick(app: &tauri::AppHandle, session: u64, screen_up: bool) {
     let state = app.state::<AppState>();
     let current = || state.relic_pick_session.load(Ordering::SeqCst) == session;
-    // Give the screen time to finish rendering before the capture.
-    std::thread::sleep(std::time::Duration::from_millis(400));
-    if !relic_pick_on(&state) || !current() {
-        return;
+    if !screen_up {
+        // Give the screen time to finish rendering before the capture.
+        std::thread::sleep(std::time::Duration::from_millis(400));
     }
     let started = std::time::Instant::now();
-    let era = crate::ocr::detect_fissure_era();
+    let mut era = None;
+    let mut attempts = 0;
+    while attempts < ERA_ATTEMPTS {
+        if attempts > 0 {
+            std::thread::sleep(ERA_RETRY);
+        }
+        if !relic_pick_on(&state) || !current() {
+            return;
+        }
+        attempts += 1;
+        era = crate::ocr::detect_fissure_era();
+        if era.is_some() {
+            break;
+        }
+    }
     let ocr_ms = started.elapsed().as_millis() as u64;
     let Some(era) = era else {
         let _ = hexdesk_diag::DiagError::new(
@@ -465,6 +542,7 @@ fn show_relic_pick(app: &tauri::AppHandle, session: u64) {
             hexdesk_diag::Kind::NotFound,
             "Relic Pick overlay not shown: no fissure era read from the screen",
         )
+        .with("attempts", attempts)
         .with("ocr_ms", ocr_ms)
         .log();
         return;
@@ -487,6 +565,7 @@ fn show_relic_pick(app: &tauri::AppHandle, session: u64) {
         overlay,
         era = %era,
         relics = relic_count,
+        attempts,
         ocr_ms,
         "Fissure era read for the Relic Pick overlay"
     );
@@ -1341,8 +1420,26 @@ mod relic_pick_tests {
     const LEVEL_LOAD: &str =
         "320.4 Net [Info]: GameRulesImpl - changing state from SS_INVALID to SS_WAITING_TO_START\r";
 
+    fn signals_text(lines: &[&str]) -> String {
+        lines.join("\n").to_lowercase()
+    }
+
     fn signals(lines: &[&str]) -> Vec<RelicPickSignal> {
-        relic_pick_signals(&lines.join("\n").to_lowercase())
+        relic_pick_signals(&signals_text(lines))
+    }
+
+    #[test]
+    fn the_log_start_and_line_times_are_read() {
+        let head = "0.095 Sys [Diag]: Current time: Thu Nov 19 23:44:03 2026 [UTC: Thu Nov 19 22:44:03 2026]\r\n";
+        assert_eq!(
+            parse_ee_log_start(head).map(|t| t.to_string()),
+            Some("2026-11-19 23:44:03".to_string())
+        );
+        let later = "2185.901 Script [Info]: ThemedProjectionManager.lua: PopulateInventoryGrid\r";
+        assert_eq!(
+            last_open_seconds(&signals_text(&[OPEN, MAPREDUX, later])),
+            Some(2185.901)
+        );
     }
 
     #[test]

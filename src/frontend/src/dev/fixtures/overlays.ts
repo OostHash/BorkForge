@@ -69,6 +69,8 @@ export const overlayFixtures = {
   set_overlays_enabled: noResult<{ enabled: boolean }>(),
   set_relic_pick_enabled: noResult<{ enabled: boolean }>(),
   set_overlay_key: noResult<{ vk: number }>(),
+  set_overlay_key_capture: noResult<{ enabled: boolean }>(),
+  get_capture: { default: () => new ArrayBuffer(0) } satisfies Fixture<ArrayBuffer, { name: string }>,
   ocr_riven_screen: {
     default: () => ({
       weapon: "soma",

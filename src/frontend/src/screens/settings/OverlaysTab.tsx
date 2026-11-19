@@ -189,7 +189,7 @@ export function OverlaysTab() {
         <FormField
           layout="row"
           label="Overlay key"
-          description="Hides the overlays on screen. With none on screen, opens the overlay for the screen you are on: relic selection, fissure rewards or mods. The game still receives the key."
+          description="Hides the overlays on screen. With none on screen, opens the overlay for the screen you are on: relic selection or refinement, fissure rewards or mods. The game still receives the key."
         >
           <Select
             className="w-48"

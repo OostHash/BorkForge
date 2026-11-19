@@ -40,6 +40,34 @@ pub fn preprocess_for_ocr(pixels: &[u8], width: u32, height: u32) -> (Vec<u8>, u
     (out, width, height)
 }
 
+/// BGRA pixels at twice the width and height, each pixel repeated.
+pub fn upscale_2x(pixels: &[u8], width: u32, height: u32) -> (Vec<u8>, u32, u32) {
+    let (w, h) = (width as usize, height as usize);
+    let mut out = vec![0u8; w * h * 16];
+    for y in 0..h * 2 {
+        for x in 0..w * 2 {
+            let src = ((y / 2) * w + x / 2) * 4;
+            let dst = (y * w * 2 + x) * 4;
+            out[dst..dst + 4].copy_from_slice(&pixels[src..src + 4]);
+        }
+    }
+    (out, width * 2, height * 2)
+}
+
+/// BGRA pixels at half the width and height, keeping every other pixel.
+pub fn downscale_2x(pixels: &[u8], width: u32, height: u32) -> (Vec<u8>, u32, u32) {
+    let (w, nw, nh) = (width as usize, (width / 2) as usize, (height / 2) as usize);
+    let mut out = vec![0u8; nw * nh * 4];
+    for y in 0..nh {
+        for x in 0..nw {
+            let src = (y * 2 * w + x * 2) * 4;
+            let dst = (y * nw + x) * 4;
+            out[dst..dst + 4].copy_from_slice(&pixels[src..src + 4]);
+        }
+    }
+    (out, width / 2, height / 2)
+}
+
 /// Encode BGRA pixels as a 24-bit BGR BMP (no alpha — BitmapDecoder handles it fine).
 pub fn to_bmp(pixels_bgra: &[u8], width: u32, height: u32) -> Vec<u8> {
     let row_bytes = width * 3;
@@ -1427,6 +1455,24 @@ pub fn extract_reward_items_twophase(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn downscale_2x_keeps_every_other_pixel() {
+        let px = [1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4];
+        let (out, w, h) = downscale_2x(&px, 2, 2);
+        assert_eq!((w, h), (1, 1));
+        assert_eq!(out, vec![1, 1, 1, 1]);
+    }
+
+    #[test]
+    fn upscale_2x_repeats_each_pixel() {
+        let px = [1, 2, 3, 4, 5, 6, 7, 8];
+        let (out, w, h) = upscale_2x(&px, 2, 1);
+        assert_eq!((w, h), (4, 2));
+        let row = [1, 2, 3, 4, 1, 2, 3, 4, 5, 6, 7, 8, 5, 6, 7, 8];
+        assert_eq!(&out[..16], &row);
+        assert_eq!(&out[16..], &row);
+    }
 
     fn ocr_words(words: &[&str]) -> std::collections::HashSet<String> {
         words.iter().map(|s| s.to_string()).collect()

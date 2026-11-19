@@ -109,6 +109,7 @@ pub(crate) fn spawn_reward_watcher_thread(deps: RewardWatcherDeps) {
             use std::io::{Read, Seek, SeekFrom};
 
             log_watcher::seed_ee_log_names(&log_path, &shared_squad_names2, &ee_ocr_app);
+            log_watcher::seed_ee_log_start(&log_path);
 
             // ── VoidProjections reward sequence state ─────────────────────────
             // The game logs squad reward info BEFORE the screen trigger fires.
@@ -262,6 +263,7 @@ pub(crate) fn spawn_reward_watcher_thread(deps: RewardWatcherDeps) {
                 }
 
                 log_watcher::handle_riven_events(&ee_ocr_app, &lower, &mut last_riven_fire);
+                log_watcher::note_ee_log_start(&buf);
                 log_watcher::handle_relic_pick_events(&ee_ocr_app, &lower);
                 log_watcher::handle_trade_completion(&ee_ocr_app, &buf, &mut trade_buffer);
 

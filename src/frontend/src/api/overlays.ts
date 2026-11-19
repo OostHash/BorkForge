@@ -26,6 +26,8 @@ export type OverlayPrefs = {
   pickLines: PickLines;
   /** The key that shows or hides the overlays (default Home). */
   overlayKey: OverlayKey;
+  /** Save the screen title capture on each overlay key press (default off). */
+  overlayKeyCapture: boolean;
   /** The riven overlay (default on). */
   rivenEnabled: boolean;
   offsets: OverlayOffsets;
@@ -40,6 +42,7 @@ export function overlayPrefsFrom(s: SettingsFile | undefined): OverlayPrefs {
     pickPriority: pickPriorityFrom(s?.relicPickPriority),
     pickLines: pickLinesFrom(s?.relicPickLines),
     overlayKey: overlayKeyFrom(s?.overlayKey),
+    overlayKeyCapture: s?.overlayKeyCapture === true,
     rivenEnabled: s?.rivenEnabled !== false,
     offsets: offsetsFrom(s?.overlayOffsets),
   };
@@ -55,6 +58,7 @@ export async function syncOverlaySwitches(prefs: OverlayPrefs): Promise<void> {
     invoke("set_overlays_enabled", { enabled: prefs.overlaysEnabled }),
     invoke("set_relic_pick_enabled", { enabled: prefs.relicPickEnabled }),
     invoke("set_overlay_key", { vk: overlayKeyCode(prefs.overlayKey) }),
+    invoke("set_overlay_key_capture", { enabled: prefs.overlayKeyCapture }),
   ]);
   if (!prefs.overlaysEnabled) await emitEvent("overlays-disabled");
 }

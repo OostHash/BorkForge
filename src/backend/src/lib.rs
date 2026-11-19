@@ -21,6 +21,7 @@ use wfm::Wfm;
 mod app_state;
 mod blob_capture;
 mod cache;
+mod captures;
 mod catalogue;
 mod credentials;
 mod db;
@@ -678,6 +679,8 @@ pub fn run() {
             catalogue::get_current_crafting,
             relic_pick::show_relic_pick_window,
             overlay_key::set_overlay_key,
+            overlay_key::set_overlay_key_capture,
+            captures::get_capture,
             wfcd::get_drop_data,
             pricing::get_cache_statuses,
             pricing::refresh_all_caches,

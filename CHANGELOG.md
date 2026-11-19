@@ -25,9 +25,12 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   name. HexDesk starts collapsed, and narrow windows always show icons only.
 - Press Home to hide the overlays on screen. With none on screen, Home opens
   the overlay for the screen you are on, without waiting for the game's log:
-  Relic Pick on the relic selection screen, Relic Reward on the fissure
-  reward screen and the riven check on the mods screen. Choose another key,
-  or none, in Settings → Overlays. The game still receives the key as well.
+  Relic Pick on the relic selection and refinement screens, Relic Reward on
+  the fissure reward screen and the riven check on the mods screen. Choose
+  another key, or none, in Settings → Overlays. The game still receives the
+  key as well. The activity console says what each press did, and with "Save
+  a capture on each overlay key press" on it also shows the part of the
+  screen that was read.
 
 ### Changed
 
@@ -90,7 +93,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - The Relic Pick overlay closes by itself again when you pick a relic, back
   out to the star chart or the mission starts. It no longer opens after the
   selection screen has already closed, and it hides after two minutes if the
-  game never reports that the screen closed.
+  game never reports that the screen closed. It also opens when the relic
+  list was still drawing at the moment the game reported it.
 - The Riven overlay no longer has a second border around it.
 - The mouse cursor shows over the Relic Pick overlay, as it does over the
   Riven overlay, and its close button can be clicked.

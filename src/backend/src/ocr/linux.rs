@@ -53,8 +53,15 @@ pub fn detect_fissure_era() -> Option<String> {
     None
 }
 
-pub fn read_screen_title() -> Option<String> {
-    None
+pub struct ScreenTitle {
+    pub text: Option<String>,
+    pub image: Vec<u8>,
+    pub scale: &'static str,
+    pub attempts: Vec<(&'static str, String, bool)>,
+}
+
+pub fn read_screen_title(_accept: impl Fn(&str) -> bool) -> Result<ScreenTitle, String> {
+    Err("OCR not supported on Linux yet".into())
 }
 
 pub type OcrResult = (String, Vec<(String, f32, f32)>);
