@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicBool, AtomicU64};
+use std::sync::atomic::{AtomicBool, AtomicU64, AtomicU8};
 use std::sync::{Arc, Mutex};
 
 use crate::memory_scanner;
@@ -140,4 +140,10 @@ pub struct AppState {
     pub relic_pick_session: Arc<AtomicU64>,
     /// When false, all automatically-triggered overlays are suppressed.
     pub overlays_enabled: Arc<AtomicBool>,
+    /// True while the Relic Reward overlay is up for a reward screen.
+    pub reward_overlay_active: Arc<AtomicBool>,
+    /// A request from the overlay key for the EE.log watcher, which owns the
+    /// Relic Reward overlay: one of the `REWARD_KEY_*` values in
+    /// `src/backend/src/overlay_key.rs`.
+    pub reward_key_request: Arc<AtomicU8>,
 }

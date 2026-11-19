@@ -26,13 +26,13 @@ export function RelicOverlayController() {
     current.current = prefs;
   });
 
-  const { overlaysEnabled, relicPickEnabled, pickKey } = prefs;
+  const { overlaysEnabled, relicPickEnabled, overlayKey } = prefs;
   useEffect(() => {
     if (!isSuccess || !isTauri()) return;
-    syncOverlaySwitches({ ...current.current, overlaysEnabled, relicPickEnabled, pickKey }).catch((error: unknown) => {
+    syncOverlaySwitches({ ...current.current, overlaysEnabled, relicPickEnabled, overlayKey }).catch((error: unknown) => {
       console.error("overlays: syncing switches failed", error);
     });
-  }, [isSuccess, overlaysEnabled, relicPickEnabled, pickKey]);
+  }, [isSuccess, overlaysEnabled, relicPickEnabled, overlayKey]);
 
   useEffect(() => {
     if (!isTauri()) return;

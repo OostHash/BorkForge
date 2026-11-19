@@ -68,7 +68,7 @@ export const overlayFixtures = {
   >,
   set_overlays_enabled: noResult<{ enabled: boolean }>(),
   set_relic_pick_enabled: noResult<{ enabled: boolean }>(),
-  set_relic_pick_key: noResult<{ vk: number }>(),
+  set_overlay_key: noResult<{ vk: number }>(),
   ocr_riven_screen: {
     default: () => ({
       weapon: "soma",

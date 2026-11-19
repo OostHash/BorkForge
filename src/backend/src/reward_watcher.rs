@@ -9,6 +9,7 @@ use tracing::Instrument;
 use crate::app_state::AppState;
 use crate::events;
 use crate::log_watcher;
+use crate::overlay_key;
 use crate::wfcd::RelicReward;
 
 /// Shared state for the reward watcher thread.
@@ -45,8 +46,8 @@ pub(crate) fn spawn_reward_watcher_thread(deps: RewardWatcherDeps) {
     // EE.log path
     let ee_log_path = dirs::data_local_dir().map(|d| d.join("Warframe").join("EE.log"));
 
-    // Shared flag: true while the reward screen is active according to EE.log
-    let reward_screen_active = Arc::new(AtomicBool::new(false));
+    // True while the reward overlay is up; the overlay key reads it too.
+    let reward_screen_active = Arc::clone(&app.state::<AppState>().reward_overlay_active);
     let reward_screen_active2 = reward_screen_active.clone();
 
     // Unix-ms timestamp of the last relic-rewards emit with real items. Zero = never.
@@ -180,6 +181,26 @@ pub(crate) fn spawn_reward_watcher_thread(deps: RewardWatcherDeps) {
                         idle_wait_ms.min(200) as u64
                     ));
                 }
+                let key_request = ee_ocr_app
+                    .state::<AppState>()
+                    .reward_key_request
+                    .swap(overlay_key::REWARD_KEY_NONE, Ordering::SeqCst);
+                if key_request == overlay_key::REWARD_KEY_CLOSE && active_since.is_some() {
+                    log_watcher::close_reward_overlay(
+                        &ee_ocr_app,
+                        &reward_screen_active2,
+                        &mut active_since,
+                        &mut last_dismiss_at,
+                        &rewards_emitted_ms_ee,
+                        "overlay key pressed",
+                    );
+                }
+                // The key starts the reward overlay as the EE.log trigger would,
+                // even in a wake-up with nothing new in the log.
+                let key_open = key_request == overlay_key::REWARD_KEY_OPEN;
+                if key_open {
+                    last_dismiss_at = None;
+                }
                 let Ok(mut f) = std::fs::File::open(&log_path) else {
                     continue;
                 };
@@ -198,10 +219,12 @@ pub(crate) fn spawn_reward_watcher_thread(deps: RewardWatcherDeps) {
                     continue;
                 }
                 file_pos = len;
-                if raw.is_empty() {
+                if raw.is_empty() && !key_open {
                     continue;
                 }
-                last_log_activity = Some(std::time::Instant::now());
+                if !raw.is_empty() {
+                    last_log_activity = Some(std::time::Instant::now());
+                }
 
                 line_carry.push_str(&raw);
                 if line_carry.len() > MAX_LINE_CARRY_BYTES {
@@ -213,10 +236,11 @@ pub(crate) fn spawn_reward_watcher_thread(deps: RewardWatcherDeps) {
                 }
                 // Hand the detectors below only complete lines; a line still being
                 // written by the game sits in line_carry until the next wake-up.
-                let Some(split_at) = line_carry.rfind('\n') else {
-                    continue;
+                let buf: String = match line_carry.rfind('\n') {
+                    Some(split_at) => line_carry.drain(..=split_at).collect(),
+                    None if key_open => String::new(),
+                    None => continue,
                 };
-                let buf: String = line_carry.drain(..=split_at).collect();
 
                 let lower = buf.to_lowercase();
 
@@ -259,7 +283,8 @@ pub(crate) fn spawn_reward_watcher_thread(deps: RewardWatcherDeps) {
                 let has_trigger = lower
                     .contains("voidprojections: openvoidprojectionrewardscreenrmi")
                     || lower.contains("voidprojections: getvoidprojectionreward")
-                    || vp_state.consume_sequence_completed();
+                    || vp_state.consume_sequence_completed()
+                    || key_open;
 
                 let has_dismiss = log_watcher::dismiss_relic_rewards(
                     &ee_ocr_app,
@@ -338,7 +363,11 @@ pub(crate) fn spawn_reward_watcher_thread(deps: RewardWatcherDeps) {
                             ll.contains("voidprojections: openvoidprojectionrewardscreenrmi")
                                 || ll.contains("voidprojections: getvoidprojectionreward")
                         })
-                        .unwrap_or("<unknown trigger line>")
+                        .unwrap_or(if key_open {
+                            "<overlay key>"
+                        } else {
+                            "<unknown trigger line>"
+                        })
                         .trim()
                         .to_string();
 

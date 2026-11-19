@@ -23,10 +23,11 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   between the screens and Report a bug to collapse or expand it; HexDesk
   remembers your choice. When collapsed, hover or focus an icon to see its
   name. HexDesk starts collapsed, and narrow windows always show icons only.
-- Press Home on the relic selection screen to show the Relic Pick overlay at
-  once, without waiting for the game's log, and press it again to hide it.
-  Choose another key, or none, in Settings → Overlays. The game still
-  receives the key as well.
+- Press Home to hide the overlays on screen. With none on screen, Home opens
+  the overlay for the screen you are on, without waiting for the game's log:
+  Relic Pick on the relic selection screen, Relic Reward on the fissure
+  reward screen and the riven check on the mods screen. Choose another key,
+  or none, in Settings → Overlays. The game still receives the key as well.
 
 ### Changed
 

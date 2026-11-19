@@ -427,12 +427,12 @@ fn open_relic_pick(app: &tauri::AppHandle) {
         );
         return;
     }
-    if crate::relic_pick_key::key_used_recently() {
+    if crate::overlay_key::key_used_recently() {
         // EE.log reaches the disk late, so this line can describe the screen
         // the player already showed or hid with the key.
         hexdesk_diag::info!(
             overlay,
-            "Relic Pick overlay left as it is: the show/hide key was used more recently"
+            "Relic Pick overlay left as it is: the overlay key was used more recently"
         );
         return;
     }

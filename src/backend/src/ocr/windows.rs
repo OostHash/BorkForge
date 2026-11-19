@@ -362,6 +362,13 @@ pub fn detect_fissure_era() -> Option<String> {
     None
 }
 
+/// The screen title in the top-left corner of the game, such as
+/// "VOID FISSURE/SELECT RELIC". None when nothing could be read.
+pub fn read_screen_title() -> Option<String> {
+    let (pixels, w, h) = capture_warframe_pixels().ok()?;
+    ocr_pixels_rect(&pixels, w, h, 0.0, 0.6, 0.0, 0.15).ok()
+}
+
 /// DXGI Desktop Duplication capture — works for Fullscreen Exclusive (and all other modes).
 ///
 /// Dynamically determines which monitor the Warframe window is on so this works correctly

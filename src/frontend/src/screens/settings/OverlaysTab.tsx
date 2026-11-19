@@ -13,7 +13,8 @@ import {
 } from "../../api/overlays";
 import { useSaveSettings } from "../../api/settings";
 import { OFFSET_LIMIT, OFFSET_STEP, offsetDraft, offsetOf, withOffset, type OffsetTarget, type OverlayOffsets } from "../../domain/overlayOffsets";
-import { PICK_KEYS, PICK_LINES, PICK_LINES_LABEL, PICK_PRIORITIES, PICK_PRIORITY_LABEL } from "../../domain/relicPick";
+import { OVERLAY_KEYS } from "../../domain/overlayKey";
+import { PICK_LINES, PICK_LINES_LABEL, PICK_PRIORITIES, PICK_PRIORITY_LABEL } from "../../domain/relicPick";
 import { OVERLAY_PRIORITIES, OVERLAY_PRIORITY_LABEL } from "../../domain/relicReward";
 import { Button } from "../../primitives/actions";
 import { FormField, Input, Select } from "../../primitives/forms";
@@ -185,6 +186,26 @@ export function OverlaysTab() {
             if (!on) previews.set(OVERLAYS, false);
           }}
         />
+        <FormField
+          layout="row"
+          label="Overlay key"
+          description="Hides the overlays on screen. With none on screen, opens the overlay for the screen you are on: relic selection, fissure rewards or mods. The game still receives the key."
+        >
+          <Select
+            className="w-48"
+            value={prefs.overlayKey}
+            disabled={!prefs.overlaysEnabled}
+            onChange={(event) => {
+              set({ overlayKey: event.target.value });
+            }}
+          >
+            {OVERLAY_KEYS.map((k) => (
+              <option key={k.id} value={k.id}>
+                {k.label}
+              </option>
+            ))}
+          </Select>
+        </FormField>
         <PreviewButton
           all
           shown={allShown}
@@ -276,26 +297,6 @@ export function OverlaysTab() {
             {PICK_LINES.map((l) => (
               <option key={l} value={l}>
                 {PICK_LINES_LABEL[l]}
-              </option>
-            ))}
-          </Select>
-        </FormField>
-        <FormField
-          layout="row"
-          label="Show/hide key"
-          description="On the relic selection screen, shows the overlay at once, or hides it. The game still receives the key."
-        >
-          <Select
-            className="w-48"
-            value={prefs.pickKey}
-            disabled={!prefs.relicPickEnabled}
-            onChange={(event) => {
-              set({ relicPickKey: event.target.value });
-            }}
-          >
-            {PICK_KEYS.map((k) => (
-              <option key={k.id} value={k.id}>
-                {k.label}
               </option>
             ))}
           </Select>

@@ -53,6 +53,10 @@ pub fn detect_fissure_era() -> Option<String> {
     None
 }
 
+pub fn read_screen_title() -> Option<String> {
+    None
+}
+
 pub type OcrResult = (String, Vec<(String, f32, f32)>);
 
 pub fn run_windows_ocr(_bmp: Vec<u8>, _w: u32, _h: u32) -> Result<OcrResult, String> {
