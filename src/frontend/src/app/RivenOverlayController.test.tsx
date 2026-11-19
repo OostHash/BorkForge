@@ -80,7 +80,7 @@ it("opens the window, sends scanning, then the result", async () => {
     expect(seen.some((v) => v.kind === "result")).toBe(true);
   });
   expect(find("plugin:webview|create_webview_window")[0]?.args).toMatchObject({
-    options: { label: "riven-overlay", x: 10, y: 216, width: 300, height: 648 },
+    options: { label: "riven-overlay", x: 10, y: 216, width: 300, height: 648, shadow: false },
   });
   expect(seen[0]).toEqual({ kind: "scanning", rollCount: 1 });
   expect(seen[1]).toMatchObject({ kind: "result", preview: false, rollCount: 1, weapon: "tenora prime", analysis: { verdict: "GREAT" } });

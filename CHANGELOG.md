@@ -90,6 +90,7 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   out to the star chart or the mission starts. It no longer opens after the
   selection screen has already closed, and it hides after two minutes if the
   game never reports that the screen closed.
+- The Riven overlay no longer has a second border around it.
 - The mouse cursor shows over the Relic Pick overlay, as it does over the
   Riven overlay, and its close button can be clicked.
 - The Relic Pick overlay shows the rewards of each relic again after a

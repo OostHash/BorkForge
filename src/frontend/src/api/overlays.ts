@@ -223,6 +223,8 @@ export async function placeRivenWindow(place: { x: number; y: number; width: num
     title: "HexDesk Riven",
     transparent: true,
     decorations: false,
+    // Windows draws its own border around an undecorated window with a shadow.
+    shadow: false,
     alwaysOnTop: true,
     skipTaskbar: true,
     resizable: false,
