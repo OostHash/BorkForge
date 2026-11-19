@@ -6,6 +6,7 @@ import { useSettings } from "../api/settings";
 import { clampModularWidth, MODULAR_WIDTH } from "../domain/modular";
 import { ResizeHandle } from "../primitives/behavior/ResizeHandle";
 import { IconButton } from "../primitives/actions";
+import { Icon } from "../primitives/display";
 import { toast } from "../primitives/overlay";
 import { ModularWindow } from "../screens/modular/ModularWindow";
 
@@ -66,15 +67,19 @@ export function ModularDock() {
   }
   if (prefs.collapsed) {
     return (
-      <aside aria-label="Collapsed modular window" className="flex w-10 shrink-0 justify-center border-s border-border bg-surface py-1.5">
-        <IconButton
-          size="sm"
-          icon={PanelRightOpen}
-          label="Expand modular window"
+      <aside aria-label="Collapsed modular window" className="flex w-10 shrink-0 border-s border-border bg-surface">
+        {/* The whole rail is the target, and the vertical title says what it opens. */}
+        <button
+          type="button"
+          aria-label="Expand modular window"
+          className="flex flex-1 flex-col items-center gap-3 py-2.5 text-muted hover:text-text"
           onClick={() => {
             setCollapsed(false);
           }}
-        />
+        >
+          <Icon icon={PanelRightOpen} />
+          <span className="text-xs font-semibold tracking-wide whitespace-nowrap uppercase [writing-mode:vertical-rl]">Modular window</span>
+        </button>
       </aside>
     );
   }

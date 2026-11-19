@@ -26,6 +26,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 - New navigation icons for Inventory, Foundry, Relics, Rivens, Timers and
   Market that match their screens, shown larger in the sidebar.
+- The collapsed modular window shows its name along the bar, and clicking
+  anywhere on the bar opens it again.
 - The logs now say why something failed instead of only that it failed, for
   example when Warframe's memory could not be read, no inventory was found,
   warframe.market refused a request, or a relic overlay took long to appear.
