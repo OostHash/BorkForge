@@ -48,8 +48,10 @@ async fn serve_connection(mut stream: tokio::net::TcpStream, dir: Arc<PathBuf>) 
             },
             None => ("400 Bad Request", "text/plain", Vec::new()),
         };
+        // Access-Control-Allow-Origin lets the app read the pixels of these
+        // images in a canvas (the icon check); without it the canvas is tainted.
         let header = format!(
-            "HTTP/1.1 {status}\r\nContent-Type: {mime}\r\nContent-Length: {}\r\nCache-Control: public, max-age=86400\r\nConnection: {}\r\n\r\n",
+            "HTTP/1.1 {status}\r\nContent-Type: {mime}\r\nContent-Length: {}\r\nCache-Control: public, max-age=86400\r\nAccess-Control-Allow-Origin: *\r\nConnection: {}\r\n\r\n",
             body.len(),
             if keep_alive { "keep-alive" } else { "close" },
         );
@@ -307,6 +309,8 @@ mod tests {
                 assert!(head.starts_with("HTTP/1.1 200 OK"), "{head}");
                 assert!(head.contains(&format!("Content-Type: {mime}")), "{head}");
                 assert!(head.contains("Connection: keep-alive"), "{head}");
+                // The icon check reads pixels of these images in a canvas.
+                assert!(head.contains("Access-Control-Allow-Origin: *"), "{head}");
                 assert_eq!(got, body);
             }
         });
