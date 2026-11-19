@@ -16,6 +16,7 @@ import {
   describeChange,
   FEED_STEP_MS,
   filterChanges,
+  formatChangeTime,
   formatClockTime,
   latestBatch,
   LOG_HEIGHT,
@@ -77,8 +78,8 @@ export function ChangeRow({ change, ctx, feed = false }: { change: ChangeEntry; 
             }
       }
     >
-      <span className="w-12 shrink-0 text-xs text-muted tabular-nums max-[800px]:hidden">
-        {formatClockTime(change.timestamp, ctx.clock, ctx.locale)}
+      <span className="min-w-24 shrink-0 text-xs whitespace-nowrap text-muted tabular-nums max-[800px]:hidden">
+        {formatChangeTime(change.timestamp, ctx.clock, ctx.locale)}
       </span>
       <ItemImage size="sm" sources={imageSources(item?.image_name ?? undefined, ctx.baseUrl)} name={name} />
       <button
@@ -179,7 +180,8 @@ export function ChangeLogList({
             <li
               key={keys[index]}
               className={cn(
-                "overflow-hidden border-b border-border/40 px-3 py-1",
+                // Alternate row shading so a time and its item read as one line.
+                "overflow-hidden border-b border-border/40 px-3 py-1 even:bg-surface-sunken/40",
                 startsBatch(visible, index) && "border-t-2 border-t-border",
                 arriving.has(changeKey(change)) && "motion-safe:animate-row-arrive",
               )}
@@ -333,42 +335,42 @@ export function ChangeLogDock({ onOpenInventory }: Props) {
             setArriving(NO_KEYS);
           }}
         />
+        {/* All text on the bar is one link to recent changes in Inventory; the rest of the bar toggles the list. */}
         <button
           type="button"
-          aria-label="Changelog: show recent changes in Inventory"
           title="Show recent changes in Inventory"
-          className="relative inline-flex min-h-6 shrink-0 items-center uppercase hover:underline"
+          className="group/text relative inline-flex min-h-6 shrink-0 items-center gap-2.5 uppercase hover:text-text"
           onClick={() => {
             showRecent();
             onOpenInventory();
           }}
         >
-          Changelog
+          <span className="group-hover/text:underline">Changelog</span>
+          <span role="status" className="flex items-center gap-1.5 normal-case empty:hidden">
+            {arrived && (counts.up > 0 || counts.down > 0) && (
+              <span key={batchKey} className="flex items-center gap-1.5 motion-safe:animate-fade-in">
+                {counts.up > 0 && (
+                  <span className="text-success">
+                    +{counts.up}
+                    <span className="sr-only"> increased</span>
+                  </span>
+                )}
+                {counts.down > 0 && (
+                  <span className="text-danger">
+                    −{counts.down}
+                    <span className="sr-only"> decreased</span>
+                  </span>
+                )}
+              </span>
+            )}
+          </span>
+          <span aria-hidden="true" className="font-normal">
+            ·
+          </span>
+          <span className="font-normal tracking-normal normal-case">
+            last scan {scannedAt === null ? "not yet" : formatClockTime(scannedAt, clock, locale)}
+          </span>
         </button>
-        <span role="status" className="pointer-events-none relative flex shrink-0 items-center gap-1.5 normal-case">
-          {arrived && (counts.up > 0 || counts.down > 0) && (
-            <span key={batchKey} className="flex items-center gap-1.5 motion-safe:animate-fade-in">
-              {counts.up > 0 && (
-                <span className="text-success">
-                  +{counts.up}
-                  <span className="sr-only"> increased</span>
-                </span>
-              )}
-              {counts.down > 0 && (
-                <span className="text-danger">
-                  −{counts.down}
-                  <span className="sr-only"> decreased</span>
-                </span>
-              )}
-            </span>
-          )}
-        </span>
-        <span aria-hidden="true" className="pointer-events-none relative font-normal">
-          ·
-        </span>
-        <span className="pointer-events-none relative shrink-0 font-normal tracking-normal normal-case">
-          last scan {scannedAt === null ? "not yet" : formatClockTime(scannedAt, clock, locale)}
-        </span>
         <div className="pointer-events-none relative ms-auto w-[min(680px,calc(100%-250px))] min-w-0 font-normal tracking-normal text-text normal-case max-[480px]:hidden">
           {feedChange && (
             <div key={`${batchKey}:${String(feedIndex)}`} className="motion-safe:animate-feed-step">
@@ -377,7 +379,7 @@ export function ChangeLogDock({ onOpenInventory }: Props) {
           )}
         </div>
         <IconButton
-          size="md"
+          size="lg"
           icon={ExternalLink}
           label="Open in its own window"
           className="relative"

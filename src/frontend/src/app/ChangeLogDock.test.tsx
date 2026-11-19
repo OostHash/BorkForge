@@ -122,8 +122,8 @@ it("opens Inventory on an item, a category or recent changes", async () => {
   await list.getByRole("button", { name: "Mods" }).click();
   expect(getInventoryFilters()).toMatchObject({ filterRecent: true, category: "Mods", search: "" });
 
-  // The title on the bar opens recent changes in Inventory.
-  await page.getByRole("button", { name: "Changelog: show recent changes in Inventory" }).click();
+  // All text on the bar opens recent changes in Inventory, the scan time included.
+  await page.getByText(/last scan/).click();
   expect(getInventoryFilters()).toMatchObject({ filterRecent: true, category: "all" });
   expect(ctx.onOpenInventory).toHaveBeenCalledTimes(3);
 });

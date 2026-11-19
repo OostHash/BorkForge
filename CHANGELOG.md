@@ -28,11 +28,13 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   Market that match their screens, shown larger in the sidebar.
 - The collapsed modular window shows its name along the bar, and clicking
   anywhere on the bar opens it again.
-- The changelog works as it did before the redesign: click anywhere on its
-  bar to open or close it, click "Changelog" to see recent changes in
-  Inventory, the collapsed feed shows the full change with time, category
-  and old and new quantity, new changes slide into the open list, and a
-  right-click on a change opens the wiki menu.
+- The changelog works as it did before the redesign: click the empty part
+  of its bar to open or close it, click the text on the bar to see recent
+  changes in Inventory, the collapsed feed shows the full change with
+  category and old and new quantity, new changes slide into the open list,
+  and a right-click on a change opens the wiki menu. Each change shows its
+  date as well as its time, and rows alternate in shade so each line is easy
+  to follow.
 - Choose what "Changed recently" counts in Settings → Filters: since HexDesk
   started, the last hour, the last 24 hours, the last 7 days or everything in
   the changelog. The filter, the recent sort and the change badge on items
