@@ -1696,6 +1696,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "hexdesk-ocr-bench"
+version = "1.0.1"
+dependencies = [
+ "hexdesk-capture",
+ "hexdesk-overlays",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "hexdesk-overlays"
 version = "1.0.1"
 dependencies = [
