@@ -44,8 +44,9 @@ describe("filtering", () => {
     expect(filterEntries(entries, filter({ levels: new Set(["debug"]) })).map((e) => e.id)).toEqual([2, 3]);
   });
 
-  it("filters on one source", () => {
-    expect(filterEntries(entries, filter({ source: "overlay" })).map((e) => e.id)).toEqual([4]);
+  it("filters on one or more sources", () => {
+    expect(filterEntries(entries, filter({ sources: new Set(["overlay"]) })).map((e) => e.id)).toEqual([4]);
+    expect(filterEntries(entries, filter({ sources: new Set(["overlay", "market"]) })).map((e) => e.id)).toEqual([1, 4]);
   });
 
   it("filters on one operation, including its repeat line", () => {

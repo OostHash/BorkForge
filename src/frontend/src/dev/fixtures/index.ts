@@ -21,7 +21,7 @@ import { bulkPrices, changeLog, INVENTORY_ITEMS, INVENTORY_QUANTITIES, itemListS
 import { appFixtures } from "./app";
 import { overlayFixtures } from "./overlays";
 import { debugFixtures } from "./debug";
-import { loadSettings, saveSettings } from "./settings";
+import { loadSettings, saveSettings, setOcrModels } from "./settings";
 import { worldstate } from "./worldstate";
 
 type Fixtures = { [C in CommandName]: Fixture<CommandResult<C>, CommandArgs<C>> };
@@ -31,6 +31,7 @@ export const fixtures: Fixtures = {
   fetch_worldstate: worldstate,
   load_settings: loadSettings,
   save_settings: saveSettings,
+  set_ocr_models: setOcrModels,
   get_current_quantities: {
     default: () => ({
       "/Mods/PrimedContinuity": 1,

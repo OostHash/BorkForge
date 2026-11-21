@@ -40,3 +40,11 @@ export const saveSettings: Fixture<null, { json: string }> = {
     return null;
   },
 };
+
+export const setOcrModels: Fixture<null, { enabled: boolean }> = {
+  alwaysDefault: true,
+  default: ({ enabled }) => {
+    sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ ...read(), ocrModels: enabled }));
+    return null;
+  },
+};

@@ -47,3 +47,6 @@ export function useSaveSettings() {
     },
   });
 }
+
+/** Allows the ocrs models (downloading them first) or stops using them. */
+export const setOcrModels = (enabled: boolean) => invoke("set_ocr_models", { enabled });

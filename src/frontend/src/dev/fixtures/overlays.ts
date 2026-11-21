@@ -1,5 +1,5 @@
 import type { CatalogItem } from "../../domain/relics";
-import type { OcrRiven } from "../../domain/rivenOverlay";
+import type { BackendCard } from "../../domain/relicReward";
 import { noResult } from "./market";
 import type { Fixture } from "./scenario";
 
@@ -58,6 +58,7 @@ export const overlayFixtures = {
   show_overlay_window: noResult<{ x: number; y: number; w: number; h: number }>(),
   move_overlay_offscreen: noResult(),
   get_pending_relic_rewards: { alwaysDefault: true, default: () => null } satisfies Fixture<{ items: string[]; positions: number[] } | null>,
+  get_reward_cards: { default: () => [], empty: () => [] } satisfies Fixture<BackendCard[], { paths: string[] }>,
   get_items_by_paths: { default: () => OVERLAY_CATALOG, empty: () => [] } satisfies Fixture<CatalogItem[], { paths: string[] }>,
   get_item_price: { default: ({ itemName }) => OVERLAY_PRICES[itemName] ?? null, empty: () => null } satisfies Fixture<
     number | null,
@@ -68,22 +69,20 @@ export const overlayFixtures = {
   >,
   set_overlays_enabled: noResult<{ enabled: boolean }>(),
   set_relic_pick_enabled: noResult<{ enabled: boolean }>(),
-  ocr_riven_screen: {
-    default: () => ({
-      weapon: "soma",
-      positives: ["Critical Chance", "Critical Damage"],
-      negatives: ["Zoom"],
-      rolled_stats: [
-        { name: "Critical Chance", value: "+120%", positive: true },
-        { name: "Critical Damage", value: "+95%", positive: true },
-        { name: "Zoom", value: "-30%", positive: false },
-      ],
-      is_comparison: false,
-      original_rolled_stats: [],
-      raw: "SOMA\n+120% Critical Chance",
-    }),
-  } satisfies Fixture<OcrRiven>,
-  ocr_riven_log_error: noResult<{ error: string }>(),
+  set_relic_reward_enabled: noResult<{ enabled: boolean }>(),
+  set_riven_enabled: noResult<{ enabled: boolean }>(),
+  set_overlay_manual: noResult<{ enabled: boolean }>(),
+  set_overlay_key: noResult<{ vk: number }>(),
+  set_overlay_key_capture: noResult<{ enabled: boolean }>(),
+  set_overlay_screenshot: noResult<{ enabled: boolean }>(),
+  set_overlay_areas: noResult<{ enabled: boolean }>(),
+  get_capture: { default: () => new ArrayBuffer(0) } satisfies Fixture<ArrayBuffer, { name: string }>,
+  check_riven: noResult(),
+  show_riven_window: noResult(),
   log_relic_fe: noResult<{ msg: string }>(),
   show_relic_pick_window: noResult(),
+  park_relic_pick_window: noResult(),
+  show_overlay_status_window: noResult(),
+  overlay_closed: noResult(),
+  overlay_rendered: noResult<{ overlay: "relic_pick" | "relic_reward" | "riven"; view: number; summary: string }>(),
 };

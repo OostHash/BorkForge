@@ -11,3 +11,14 @@ export function clampMinutes(raw: string): number {
 
 export const autoInvisibleMinutes = (v: unknown): number =>
   typeof v === "number" && Number.isFinite(v) ? clampMinutes(String(v)) : AUTO_INVISIBLE_RANGE.fallback;
+
+/**
+ * Whether the ocrs models are allowed, as the backend reads it: an older settings file that chose ocrs as an
+ * engine (`ocrEngine`, `ocrEngines`) has them on disk already.
+ */
+export function ocrModelsFrom(settings: Readonly<Record<string, unknown>>): boolean {
+  if (typeof settings.ocrModels === "boolean") return settings.ocrModels;
+  const engines = settings.ocrEngines;
+  const chosen = engines !== null && typeof engines === "object" ? Object.values(engines as Record<string, unknown>) : [];
+  return settings.ocrEngine === "ocrs" || chosen.includes("ocrs");
+}

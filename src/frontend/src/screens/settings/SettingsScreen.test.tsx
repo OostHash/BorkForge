@@ -30,6 +30,9 @@ function setup(initial: { settings?: Record<string, unknown>; session?: [string,
       case "save_settings":
         settings = { ...settings, ...(JSON.parse((args as { json: string }).json) as Record<string, unknown>) };
         return null;
+      case "set_ocr_models":
+        settings = { ...settings, ocrModels: (args as { enabled: boolean }).enabled };
+        return null;
       case "wfm_get_session":
         return initial.session ?? null;
       case "get_item_list_status":
@@ -100,6 +103,26 @@ it("turns the memory scanner on in the settings file", async () => {
   await toggle.click();
   await expect.element(toggle).toBeChecked();
   expect(saved().memoryScannerEnabled).toBe(true);
+});
+
+it("downloads the OCR models when the player allows them", async () => {
+  const { client, saved, calls } = setup();
+  await mount(client);
+  const toggle = page.getByRole("switch", { name: "Read small text more accurately" });
+  await expect.element(toggle).not.toBeChecked();
+  await toggle.click();
+  await vi.waitFor(() => {
+    expect(saved().ocrModels).toBe(true);
+  });
+  expect(calls.find((call) => call.cmd === "set_ocr_models")?.args).toEqual({ enabled: true });
+  await expect.element(page.getByText("The OCR models are downloaded and in use.")).toBeVisible();
+  await expect.element(toggle).toBeChecked();
+});
+
+it("keeps the OCR models of an older settings file that chose ocrs", async () => {
+  const { client } = setup({ settings: { ocrEngines: { title: "windows", relicList: "ocrs" } } });
+  await mount(client);
+  await expect.element(page.getByRole("switch", { name: "Read small text more accurately" })).toBeChecked();
 });
 
 it("no longer has a Foundry page size; it moved to the Foundry toolbar", async () => {

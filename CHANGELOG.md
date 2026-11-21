@@ -10,9 +10,11 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 ### Added
 
 - An activity console in Settings → Console shows what HexDesk does in the
-  background as it happens. Filter by level and by source, open an entry to
-  see its details and the reason it failed, follow one inventory scan or
-  overlay from start to end, and copy lines for a bug report.
+  background as it happens. Filter by level and by one or more sources, with
+  each overlay (overlay key, Relic Pick, Relic Reward, riven check) as its
+  own source. Open an entry to see its details and the reason it failed,
+  follow one inventory scan or overlay from start to end, and copy lines for
+  a bug report.
 - A diagnostics export in the activity console saves a single zip to your
   Downloads folder, ready to attach to a bug report. Choose what goes in:
   system information, your settings, the activity entries and the log files.
@@ -23,6 +25,39 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   between the screens and Report a bug to collapse or expand it; HexDesk
   remembers your choice. When collapsed, hover or focus an icon to see its
   name. HexDesk starts collapsed, and narrow windows always show icons only.
+- Press Home to hide the overlays on screen. With none on screen, Home opens
+  the overlay for the screen you are on, without waiting for the game's log:
+  Relic Pick on the relic selection and refinement screens, Relic Reward on
+  the fissure reward screen and the riven check on the mods screen. Choose
+  another key, or none, in Settings → Overlays. The game still receives the
+  key as well. The activity console says what each press did, and with "Save
+  what OCR reads on screen" on it also shows the part of the screen that was
+  read.
+- The activity console follows each visit to a relic selection screen from
+  start to end: what opened it, the era read from the screen, what the
+  overlay showed and what closed it.
+- Manual mode in Settings → Overlays: overlays open only when you press the
+  overlay key, and the screen is read only then. The game's log still
+  closes them.
+- "Save the areas each screen read uses" in the activity console saves the
+  game window with the parts HexDesk reads outlined: the screen title, the
+  relic list, the reward cards and the riven card.
+- An overlay key press that opens an overlay is one entry group in the
+  activity console, together with everything that overlay did until it
+  closed. The Relic Reward read lists the relics it narrowed the rewards to
+  by name, and where they came from.
+- "Save a screenshot when an overlay is shown" in the activity console saves
+  the whole screen, game and overlay together, each time an overlay is drawn,
+  and shows it with what the overlay says it drew.
+- A short, click-through status line at the top centre of the game shows what
+  the overlays are doing, such as reading the screen, retrying or showing an
+  overlay. Turn it off, change how long it stays visible or move it in
+  Settings → Overlays → Status.
+- "Read small text more accurately" in Settings → General downloads about
+  12 MB of OCR models once. They read what Windows OCR misses, such as relic
+  counts and refinement tags. Without them HexDesk reads with Windows OCR
+  alone. The activity console shows which engine read each screen and how
+  long it took.
 
 ### Changed
 
@@ -55,6 +90,31 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   Repeated identical lines are collapsed into one line with a count.
 - Error messages for warframe.market actions now name what failed and how
   warframe.market answered.
+- The Relic Reward overlay appears as soon as two reads of the reward screen
+  agree on every card, instead of reading the screen several more times. A
+  card whose name was only partly read, or read differently between reads,
+  is marked "Uncertain". The activity console lists every card of each
+  read: the text read, the reward it matched, how well it matched and the
+  next best rewards.
+- Relic Reward keeps four closely spaced reward cards separate, and Relic Pick
+  no longer recommends an inventory relic that its complete on-screen list
+  did not confirm when OCR misses a tile. While Relic Reward is visible, title
+  OCR now also closes or replaces it when the game leaves the reward screen,
+  as a fallback for delayed EE.log lines.
+- Relic Pick opens sooner: it stops reading the relic list as soon as two
+  reads agree on the relics, refinements, ownership and counts, instead of
+  reading again while unrecognized text on screen keeps changing. Faded
+  tiles, relics you do not have, are no longer read a second time. Relic
+  names and refinement tags are recognized despite small OCR errors.
+- Relic Pick reads the count badges ("x3") and refinement tags of your relics
+  on their own when the list read skipped them, and a name OCR dropped is
+  read again. With "Read small text more accurately" on, the extra OCR
+  models read what Windows OCR still could not.
+- The riven check runs in the background instead of in the main window,
+  like the relic overlays. It opens on the riven screen, closes when you
+  leave it, and the activity console follows each visit to the riven screen:
+  what opened it, what each check read and whether the overlay was drawn.
+  "Check Riven" and "New roll" only run while the riven overlay is turned on.
 - Your Windows user name and player names no longer appear in log files.
 - Settings → Debugging is gone from release builds; the diagnostics export
   is in the activity console. What the old debugging tools wrote to separate
@@ -82,6 +142,34 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - Clicking an active filter preset again turns it off, in Inventory, Foundry
   and Market. With "Restore previous filters" on, it brings back the filters
   you had before.
+- The Relic Pick overlay closes by itself again when you pick a relic, back
+  out to the star chart, the mission starts or, in an endless fissure, every
+  player has voted. It no longer opens after the selection screen has already
+  closed, and it hides after two minutes if the game never reports that the
+  screen closed. It also opens when the relic list was still drawing at the
+  moment the game reported it.
+- The overlay key recognises the fissure reward screen when one letter of its
+  title is misread.
+- The Relic Pick overlay reads the relic list on screen and follows it: it no
+  longer recommends a relic you used up during a mission, shows the count on
+  the relic's tile when the game shows one, and marks a relic it could not
+  find on the list as "not on screen".
+- The Relic Reward and Relic Pick overlays agree on what you own: both count
+  a part, its blueprint, Foundry jobs, a built item and rewards received
+  since the last inventory scan the same way, and the activity console says
+  for each reward card where every count comes from.
+- The Relic Reward overlay counts the warframe part blueprints you own
+  (chassis, neuroptics, systems) again, so a set no longer shows those
+  parts as missing.
+- With the Relic Reward overlay turned off in Settings → Overlays, HexDesk
+  no longer reads the reward screen in the background.
+- Turning the Relic Reward or riven overlay on or off takes effect at once,
+  instead of after a restart.
+- The Riven overlay no longer has a second border around it.
+- The mouse cursor shows over the Relic Pick overlay, as it does over the
+  Riven overlay, and its close button can be clicked.
+- The Relic Pick overlay shows the rewards of each relic again after a
+  restart, instead of only the relic names.
 
 ## [1.0.1] - 2026-11-17
 

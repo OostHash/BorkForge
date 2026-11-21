@@ -722,7 +722,13 @@ pub(crate) async fn fetch_item_list(
     // active until the user manually forces a refresh.
     let has_fallback_only = state.wfcd_items.lock().map_err(|e| e.to_string())?.len() <= 15;
     let has_no_recipes = state.recipes.lock().map_err(|e| e.to_string())?.is_empty();
-    let force = force.unwrap_or(false) || has_fallback_only || has_no_recipes;
+    let has_no_relic_rewards = state
+        .relic_rewards
+        .lock()
+        .map_err(|e| e.to_string())?
+        .is_empty();
+    let force =
+        force.unwrap_or(false) || has_fallback_only || has_no_recipes || has_no_relic_rewards;
     let fetched = tauri::async_runtime::spawn_blocking(move || wfcd::fetch_items(None, force))
         .await
         .map_err(|e| e.to_string())??;
@@ -1299,8 +1305,10 @@ fn dedup_known_aliases(mut items: Vec<WfcdItem>) -> Vec<WfcdItem> {
 /// back for one full interval instead of running it at the launch tick.
 pub fn refresh_catalogue(app: &tauri::AppHandle, force: bool) -> Result<(), String> {
     let state = app.state::<AppState>();
-    // A valid ETag is not enough when version invalidation removed the local cache.
-    let cache_missing = !state.items_cache_path.exists();
+    // A valid ETag is not enough when a local cache built from the download is
+    // gone: an unchanged answer would leave it empty until the sources change.
+    let cache_missing =
+        !state.items_cache_path.exists() || !state.relic_rewards_cache_path.exists();
     let fetched = wfcd::fetch_items(None, force || cache_missing)?;
     let result = match fetched {
         cache::Fetched::New(r, _) => r,

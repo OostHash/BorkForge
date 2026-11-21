@@ -544,6 +544,7 @@ fn process_blob(
     if let Ok(mut q) = shared_quantities.lock() {
         *q = known.clone();
     }
+    crate::player::scan_applied();
     if let Ok(mut sm) = shared_mods.lock() {
         *sm = known_mods.clone();
     }

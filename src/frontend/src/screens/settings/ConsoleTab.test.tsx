@@ -40,11 +40,13 @@ const RECENT: LogEntry[] = [
   entry(4, { source: "market", message: "Top-items ranking refreshed" }),
 ];
 
-function mount() {
+function mount(entries: LogEntry[] = RECENT, calls: Array<{ cmd: string; args: unknown }> = []) {
   mockWindows("main");
   mockIPC(
-    (cmd) => {
-      if (cmd === "get_recent_logs") return RECENT;
+    (cmd, args) => {
+      calls.push({ cmd, args });
+      if (cmd === "get_recent_logs") return entries;
+      if (cmd === "get_capture") return new Uint8Array([0x42, 0x4d]).buffer;
       return null;
     },
     { shouldMockEvents: true },
@@ -79,13 +81,18 @@ it("shows the reason behind a failure when an entry is opened", async () => {
   await expect.element(list().getByRole("button", { name: "Copy line" })).toBeVisible();
 });
 
-it("filters on source and on one operation", async () => {
+it("filters on one or more sources and on one operation", async () => {
   await mount();
-  await page.getByRole("combobox", { name: "Source" }).selectOptions("market");
+  await page.getByRole("button", { name: "market", exact: true }).click();
   await expect.element(list().getByText("Warframe process found")).not.toBeInTheDocument();
   await expect.element(list().getByText("Top-items ranking refreshed")).toBeVisible();
 
-  await page.getByRole("combobox", { name: "Source" }).selectOptions("");
+  await page.getByRole("button", { name: "scanner", exact: true }).click();
+  await expect.element(list().getByText("Warframe process found")).toBeVisible();
+  await expect.element(list().getByText("Top-items ranking refreshed")).toBeVisible();
+
+  await page.getByRole("button", { name: "All sources" }).click();
+  await expect.element(page.getByRole("button", { name: "market", exact: true })).toHaveAttribute("aria-pressed", "false");
   await list().getByRole("button", { name: "Show only operation #12" }).first().click();
   // An operation shows all its steps, debug included.
   await expect.element(list().getByText("Candidate found")).toBeVisible();
@@ -100,4 +107,18 @@ it("adds new entries live", async () => {
   await emit("diag-entry", entry(5, { level: "error", source: "updater", message: "Update check failed", code: "updater.network" }));
   await expect.element(list().getByRole("listitem").first().getByText("Update check failed")).toBeVisible();
   await expect.element(page.getByText("4 of 5 entries")).toBeVisible();
+});
+
+it("saves the capture choice and shows a saved capture in the entry details", async () => {
+  const calls: Array<{ cmd: string; args: unknown }> = [];
+  await mount([entry(1, { source: "overlay", message: "Overlay key capture saved", fields: { capture: "overlay-key-1.bmp" } })], calls);
+  await page.getByRole("checkbox", { name: "Save what OCR reads on screen" }).click();
+  await expect
+    .poll(() => calls.some((c) => c.cmd === "save_settings" && (c.args as { json: string }).json.includes('"overlayKeyCapture":true')))
+    .toBe(true);
+  await list()
+    .getByRole("button", { name: /Overlay key capture saved/ })
+    .click();
+  await expect.element(page.getByRole("img", { name: "Screen capture given to OCR" })).toBeInTheDocument();
+  expect(calls.find((c) => c.cmd === "get_capture")?.args).toEqual({ name: "overlay-key-1.bmp" });
 });

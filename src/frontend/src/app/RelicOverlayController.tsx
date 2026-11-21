@@ -26,13 +26,45 @@ export function RelicOverlayController() {
     current.current = prefs;
   });
 
-  const { overlaysEnabled, relicPickEnabled } = prefs;
+  const {
+    overlaysEnabled,
+    rewardEnabled,
+    relicPickEnabled,
+    rivenEnabled,
+    overlayManual,
+    overlayKey,
+    overlayKeyCapture,
+    overlayScreenshot,
+    overlayAreas,
+  } = prefs;
   useEffect(() => {
     if (!isSuccess || !isTauri()) return;
-    syncOverlaySwitches({ ...current.current, overlaysEnabled, relicPickEnabled }).catch((error: unknown) => {
+    syncOverlaySwitches({
+      ...current.current,
+      overlaysEnabled,
+      rewardEnabled,
+      relicPickEnabled,
+      rivenEnabled,
+      overlayManual,
+      overlayKey,
+      overlayKeyCapture,
+      overlayScreenshot,
+      overlayAreas,
+    }).catch((error: unknown) => {
       console.error("overlays: syncing switches failed", error);
     });
-  }, [isSuccess, overlaysEnabled, relicPickEnabled]);
+  }, [
+    isSuccess,
+    overlaysEnabled,
+    rewardEnabled,
+    relicPickEnabled,
+    rivenEnabled,
+    overlayManual,
+    overlayKey,
+    overlayKeyCapture,
+    overlayScreenshot,
+    overlayAreas,
+  ]);
 
   useEffect(() => {
     if (!isTauri()) return;

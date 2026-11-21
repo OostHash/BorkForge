@@ -21,6 +21,7 @@ use wfm::Wfm;
 mod app_state;
 mod blob_capture;
 mod cache;
+mod captures;
 mod catalogue;
 mod credentials;
 mod db;
@@ -34,9 +35,11 @@ mod mem_regions;
 mod memory_scanner;
 mod monitor;
 mod ocr;
-mod ocr_fallback;
+mod overlay_key;
+mod overlays;
 mod paths;
 mod platform;
+mod player;
 mod pricing;
 mod refresh;
 mod relic_pick;
@@ -56,17 +59,6 @@ mod wfm_top;
 mod worldstate;
 
 // ─── Structs ──────────────────────────────────────────────────────────────────
-
-pub struct OcrParams<'a> {
-    pixels: &'a [u8],
-    pix_w: u32,
-    pix_h: u32,
-    game_h: u32,
-    catalog: &'a [(String, String)],
-    capture_info: &'a str,
-    hint_squad_size: Option<usize>,
-    player_names: &'a [String],
-}
 
 pub struct BlobBuildParams<'a> {
     blob: &'a memory_scanner::BlobInventory,
@@ -135,6 +127,29 @@ struct InitialCachePaths<'a> {
     corrections_path: &'a std::path::PathBuf,
 }
 
+/// Whether a stored relic rewards map can be used: keyed by relic display
+/// name ("Axi A21 Intact"), the key the Relic Pick overlay looks up.
+fn relic_rewards_usable(map: &HashMap<String, Vec<wfcd::RelicReward>>) -> bool {
+    !map.is_empty() && !map.keys().any(|k| k.starts_with('/'))
+}
+
+/// The relic rewards stored by the last catalogue build. A file that cannot
+/// be used is removed, so the next catalogue refresh rebuilds it.
+fn load_relic_rewards_cache(path: &std::path::Path) -> HashMap<String, Vec<wfcd::RelicReward>> {
+    let loaded: Option<HashMap<String, Vec<wfcd::RelicReward>>> = std::fs::read_to_string(path)
+        .ok()
+        .and_then(|s| serde_json::from_str(&s).ok());
+    match loaded {
+        Some(map) if relic_rewards_usable(&map) => map,
+        Some(_) => {
+            info!("relic rewards cache not usable, removed so the catalogue rebuilds it");
+            let _ = std::fs::remove_file(path);
+            HashMap::new()
+        }
+        None => HashMap::new(),
+    }
+}
+
 fn load_initial_state(paths: InitialCachePaths<'_>) -> InitialState {
     let InitialCachePaths {
         items_cache_path,
@@ -158,35 +173,7 @@ fn load_initial_state(paths: InitialCachePaths<'_>) -> InitialState {
         .and_then(|s| serde_json::from_str(&s).ok())
         .unwrap_or_default();
 
-    // Relic rewards: invalidate on old format or age > 24 h.
-    let relic_rewards: HashMap<String, Vec<wfcd::RelicReward>> = {
-        let cache_age_ok = std::fs::metadata(relic_rewards_cache_path)
-            .and_then(|m| m.modified())
-            .map(|t| {
-                t.elapsed().unwrap_or(std::time::Duration::MAX)
-                    < std::time::Duration::from_secs(86_400)
-            })
-            .unwrap_or(false);
-        let loaded: Option<HashMap<String, Vec<wfcd::RelicReward>>> = if cache_age_ok {
-            std::fs::read_to_string(relic_rewards_cache_path)
-                .ok()
-                .and_then(|s| serde_json::from_str(&s).ok())
-        } else {
-            None
-        };
-        match loaded {
-            Some(map) if map.keys().any(|k| k.starts_with("/Lotus/")) => map,
-            Some(_) => {
-                info!("relic_rewards cache is old format (no path keys) — discarding, will regenerate");
-                let _ = std::fs::remove_file(relic_rewards_cache_path);
-                HashMap::new()
-            }
-            None => {
-                let _ = std::fs::remove_file(relic_rewards_cache_path);
-                HashMap::new()
-            }
-        }
-    };
+    let relic_rewards = load_relic_rewards_cache(relic_rewards_cache_path);
 
     // Inventory state → split into quantities, uniques, mods.
     let inv_state = load_inventory_state_cache(inventory_state_cache_path);
@@ -325,16 +312,27 @@ fn setup_app(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     // NEVER hide relic-overlay — breaks DirectComposition on transparent WebView2.
     if let Some(win) = app.get_webview_window("relic-overlay") {
         let _ = win.show();
-        let _ = win.set_position(tauri::Position::Physical(tauri::PhysicalPosition {
-            x: 0,
-            y: -3000,
-        }));
+        overlays::window::park_reward(app.handle());
+    }
+
+    // Relic Pick uses the same lifetime-safe pattern: keep its WebView2 alive
+    // and move it on/off screen instead of suspending it with native hide().
+    if let Some(win) = app.get_webview_window(overlays::window::RELIC_PICK) {
+        let _ = win.show();
+        let _ = overlays::window::park_relic_pick(app.handle());
+    }
+
+    // Its empty page is transparent; keeping it on screen lets it receive the
+    // first status event without covering or taking input from the game.
+    if let Some(win) = app.get_webview_window(overlays::window::STATUS) {
+        let _ = win.set_ignore_cursor_events(true);
+        let _ = overlays::window::show_overlay_status_window(app.handle().clone());
     }
 
     // Single EE.log tailer — started once, unconditionally, and runs for the app's
-    // lifetime. Handles riven-screen, relic-pick, trade-completion and WFM-whisper
-    // detection regardless of the memory scanner toggle (plain file I/O, not memory
-    // reading); the relic-reward OCR trigger inside it self-gates on `monitor_active`.
+    // lifetime. Feeds the overlay runtime and handles trade-completion and
+    // WFM-whisper detection regardless of the memory scanner toggle (plain file
+    // I/O, not memory reading); the reward card read gates on `monitor_active`.
     {
         let state = app.state::<AppState>();
         let relic_rewards_map = state
@@ -342,6 +340,7 @@ fn setup_app(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
             .lock()
             .unwrap_or_else(|e| e.into_inner())
             .clone();
+        overlays::start(app.handle().clone());
         reward_watcher::spawn_reward_watcher_thread(reward_watcher::RewardWatcherDeps {
             app: app.handle().clone(),
             flag: state.monitor_active.clone(),
@@ -456,7 +455,7 @@ pub fn run() {
     let data_dir = paths::data_dir();
     let cache_dir = paths::cache_dir();
 
-    ocr_fallback::set_data_dir(cache_dir.clone());
+    hexdesk_capture::set_model_dir(cache_dir.join("ocr_models"));
 
     // ── Path definitions ───────────────────────────────────────────────────
     let db_path = data_dir.join("data.db");
@@ -467,6 +466,8 @@ pub fn run() {
     let quantities_cache_path = cache_dir.join("quantities_cache.json");
     let inventory_state_cache_path = cache_dir.join("inventory_state_cache.json");
     let settings_path = config_dir.join("settings.json");
+
+    ocr::load_models_setting(&read_settings_map(&settings_path).unwrap_or_default());
 
     let wfm_top_cache_path = cache_dir.join("wfm_top_cache.json");
     let syndicate_catalog_path = cache_dir.join("syndicate_catalog.json");
@@ -583,6 +584,9 @@ pub fn run() {
             corrections: initial.corrections,
             force_pid_check: Arc::new(AtomicBool::new(false)),
             relic_pick_overlay_enabled: Arc::new(AtomicBool::new(false)),
+            riven_overlay_enabled: Arc::new(AtomicBool::new(false)),
+            overlay_manual: Arc::new(AtomicBool::new(false)),
+            relic_reward_overlay_enabled: Arc::new(AtomicBool::new(false)),
             overlays_enabled: Arc::new(AtomicBool::new(false)),
         })
         .setup(setup_app)
@@ -603,6 +607,7 @@ pub fn run() {
             monitor::clear_cache,
             settings::load_settings,
             settings::save_settings,
+            ocr::set_ocr_models,
             settings::force_quit,
             catalogue::get_weapon_catalog,
             catalogue::get_craftable_items,
@@ -621,7 +626,6 @@ pub fn run() {
             updater::install_update,
             settings::factory_reset,
             wfm_commands::wfm_set_status,
-            rivens::ocr_riven_log_error,
             rivens::save_riven_roll,
             rivens::get_saved_riven_rolls,
             rivens::delete_saved_riven_roll,
@@ -629,7 +633,6 @@ pub fn run() {
             rivens::get_riven_weapons,
             rivens::reload_riven_database,
             rivens::analyze_riven,
-            rivens::ocr_riven_screen,
             wfm_commands::wfm_get_item_orders,
             wfm_commands::wfm_get_item_statistics,
             wfm_commands::wfm_refresh_token,
@@ -659,11 +662,11 @@ pub fn run() {
             syndicates::get_syndicate_stores,
             syndicates::get_research_lab_stores,
             worldstate::fetch_worldstate,
-            relic_pick::get_warframe_window_rect,
-            relic_pick::get_pending_relic_rewards,
+            overlays::window::get_warframe_window_rect,
+            overlays::reward::get_pending_relic_rewards,
             diagnostics::log_relic_fe,
-            relic_pick::show_overlay_window,
-            relic_pick::move_overlay_offscreen,
+            overlays::window::show_overlay_window,
+            overlays::window::move_overlay_offscreen,
             image_cache::get_img_cache_dir,
             image_cache::prewarm_image_cache,
             diagnostics::export_diagnostics,
@@ -673,11 +676,26 @@ pub fn run() {
             monitor::stop_monitor,
             monitor::poke_scan,
             monitor::set_relic_pick_enabled,
+            monitor::set_riven_enabled,
+            monitor::set_overlay_manual,
+            captures::set_overlay_areas,
+            monitor::set_relic_reward_enabled,
             monitor::set_overlays_enabled,
             monitor::get_monitor_status,
             platform::get_system_locale,
             catalogue::get_current_crafting,
-            relic_pick::show_relic_pick_window,
+            overlays::window::show_relic_pick_window,
+            overlays::window::park_relic_pick_window,
+            overlays::window::show_overlay_status_window,
+            overlay_key::set_overlay_key,
+            overlay_key::set_overlay_key_capture,
+            overlays::overlay_rendered,
+            overlays::overlay_closed,
+            overlays::check_riven,
+            overlays::show_riven_window,
+            player::get_reward_cards,
+            captures::get_capture,
+            captures::set_overlay_screenshot,
             wfcd::get_drop_data,
             pricing::get_cache_statuses,
             pricing::refresh_all_caches,
@@ -712,4 +730,42 @@ pub fn run() {
         })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+#[cfg(test)]
+mod relic_rewards_cache_tests {
+    use super::*;
+
+    fn rewards(keys: &[&str]) -> HashMap<String, Vec<wfcd::RelicReward>> {
+        keys.iter().map(|k| (k.to_string(), Vec::new())).collect()
+    }
+
+    #[test]
+    fn rewards_keyed_by_relic_name_are_usable() {
+        assert!(relic_rewards_usable(&rewards(&[
+            "Axi A21 Intact",
+            "Lith G1 Radiant"
+        ])));
+    }
+
+    #[test]
+    fn rewards_keyed_by_path_or_empty_are_not() {
+        assert!(!relic_rewards_usable(&rewards(&[
+            "/Lotus/Types/Game/Projections/T4VoidProjectionA21Bronze"
+        ])));
+        assert!(!relic_rewards_usable(&rewards(&[])));
+    }
+
+    #[test]
+    fn a_stored_rewards_file_survives_a_restart() {
+        let dir =
+            std::env::temp_dir().join(format!("hexdesk-relic-rewards-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("relic_rewards_cache.json");
+        std::fs::write(&path, r#"{"Axi A21 Intact":[{"unique_name":"/Lotus/X","name":"X","rarity":"Gold","image_name":null}]}"#).unwrap();
+        let loaded = load_relic_rewards_cache(&path);
+        assert_eq!(loaded.get("Axi A21 Intact").map(Vec::len), Some(1));
+        assert!(path.exists());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 }

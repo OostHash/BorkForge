@@ -64,11 +64,33 @@ pub(crate) fn set_relic_pick_enabled(state: State<AppState>, enabled: bool) {
     state
         .relic_pick_overlay_enabled
         .store(enabled, Ordering::SeqCst);
+    crate::overlays::sync_switches(&state);
+}
+
+#[tauri::command]
+pub(crate) fn set_relic_reward_enabled(state: State<AppState>, enabled: bool) {
+    state
+        .relic_reward_overlay_enabled
+        .store(enabled, Ordering::SeqCst);
+    crate::overlays::sync_switches(&state);
+}
+
+#[tauri::command]
+pub(crate) fn set_overlay_manual(state: State<AppState>, enabled: bool) {
+    state.overlay_manual.store(enabled, Ordering::SeqCst);
+    crate::overlays::sync_switches(&state);
+}
+
+#[tauri::command]
+pub(crate) fn set_riven_enabled(state: State<AppState>, enabled: bool) {
+    state.riven_overlay_enabled.store(enabled, Ordering::SeqCst);
+    crate::overlays::sync_switches(&state);
 }
 
 #[tauri::command]
 pub(crate) fn set_overlays_enabled(state: State<AppState>, enabled: bool) {
     state.overlays_enabled.store(enabled, Ordering::SeqCst);
+    crate::overlays::sync_switches(&state);
 }
 
 #[tauri::command]

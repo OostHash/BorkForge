@@ -132,6 +132,13 @@ pub struct AppState {
     pub force_pid_check: Arc<AtomicBool>,
     /// When false, the Relic Pick Overlay is suppressed even when EE.log triggers it.
     pub relic_pick_overlay_enabled: Arc<AtomicBool>,
+    /// When false, the reward cards are not read on the fissure reward screen.
+    pub relic_reward_overlay_enabled: Arc<AtomicBool>,
+    /// Manual mode: only the overlay key opens an overlay; EE.log lines
+    /// still close one.
+    pub overlay_manual: Arc<AtomicBool>,
+    /// When false, the riven check does not run on a riven screen.
+    pub riven_overlay_enabled: Arc<AtomicBool>,
     /// When false, all automatically-triggered overlays are suppressed.
     pub overlays_enabled: Arc<AtomicBool>,
 }

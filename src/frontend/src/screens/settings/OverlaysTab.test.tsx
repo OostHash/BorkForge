@@ -80,6 +80,17 @@ it("saves the switches and choices of each overlay", async () => {
     .toBeDisabled();
 });
 
+it("shows and hides the overlays with Home unless another key is chosen", async () => {
+  const { client, saved } = setup();
+  await mount(client);
+  const key = group("All overlays").getByRole("combobox", { name: "Overlay key" });
+  await expect.element(key).toHaveValue("Home");
+  await key.selectOptions("F8");
+  await vi.waitFor(() => {
+    expect(saved()).toMatchObject({ overlayKey: "F8" });
+  });
+});
+
 it("disables an overlay's choices while it is off, and hides the reward strip", async () => {
   const { client, saved } = setup({ relicPickEnabled: false });
   const seen = await heard("relic-screen");
@@ -111,6 +122,35 @@ it("saves offsets per overlay, typed or reset", async () => {
     expect(saved().overlayOffsets).toMatchObject({ relicPickX: -40, rivenX: 0, rivenY: 0 });
   });
   await expect.element(riven.getByRole("button", { name: "Reset" })).toBeDisabled();
+});
+
+it("keeps the status overlay settings in their own block", async () => {
+  const { client, saved } = setup({
+    overlayStatus: { enabled: true, durationSeconds: 6 },
+    overlayOffsets: { statusX: 10, statusY: -20 },
+  });
+  const seen = await heard("status-line");
+  await mount(client);
+  const status = group("Status");
+  const enabled = status.getByRole("switch", { name: "Show status overlay" });
+  await expect.element(enabled).toBeChecked();
+  await expect.element(status.getByRole("slider", { name: "Display time" })).toHaveAttribute("aria-valuetext", "6 s");
+  await expect.element(status.getByRole("spinbutton", { name: "X offset" })).toHaveValue(10);
+  await expect.element(status.getByRole("spinbutton", { name: "Y offset" })).toHaveValue(-20);
+
+  await enabled.click();
+  await expect.element(status.getByRole("slider", { name: "Display time" })).toBeDisabled();
+  await enabled.click();
+  await status.getByRole("spinbutton", { name: "X offset" }).fill("30");
+  await vi.waitFor(() => {
+    expect(saved().overlayStatus).toMatchObject({ enabled: true, durationSeconds: 6 });
+    expect(saved().overlayOffsets).toMatchObject({ statusX: 30, statusY: -20 });
+  });
+
+  await status.getByRole("button", { name: "Show preview" }).click();
+  await vi.waitFor(() => {
+    expect(seen).toEqual(["status-line"]);
+  });
 });
 
 it("shows and hides one preview, and moves it after an offset change", async () => {
@@ -172,5 +212,5 @@ it("shows the backend status line", async () => {
   const { client } = setup();
   client.setQueryData(["overlay", "status"], "Reading rewards…");
   await mount(client);
-  await expect.element(group("Relic reward overlay").getByRole("status")).toHaveTextContent("Reading rewards…");
+  await expect.element(group("Status").getByText("Reading rewards…", { exact: true })).toBeVisible();
 });
