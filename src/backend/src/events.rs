@@ -3,11 +3,10 @@
 //! The frontend lists the same names in `src/frontend/src/api/events.ts`; keep both in sync
 //! when adding, renaming, or retiring an event.
 //!
-//! Some constants here (the RIVEN_* window-lifecycle events, RELIC_SCREEN) have
-//! no Rust-side `.emit()` call — they're broadcast window-to-window entirely on
-//! the frontend (main window ↔ riven-overlay / relic-pick-overlay). They're kept
-//! here anyway so this file stays the single manifest of every event name in the
-//! app, next to the frontend's `EventMap`.
+//! Some constants here (RIVEN_ROLL_SAVED, RELIC_SCREEN) have no Rust-side
+//! `.emit()` call — they're broadcast window-to-window entirely on the
+//! frontend. They're kept here anyway so this file stays the single manifest
+//! of every event name in the app, next to the frontend's `EventMap`.
 #![allow(dead_code)]
 
 pub const SETTINGS_UPDATED: &str = "settings-updated";
@@ -18,14 +17,9 @@ pub const RELIC_SCREEN: &str = "relic-screen";
 pub const RELIC_PICK_OPEN: &str = "relic-pick-open";
 pub const RELIC_PICK_CLOSE: &str = "relic-pick-close";
 
-pub const RIVEN_MANUAL_CHECK: &str = "riven-manual-check";
-pub const RIVEN_WINDOW_READY: &str = "riven-window-ready";
-pub const RIVEN_ANALYSIS_UPDATE: &str = "riven-analysis-update";
+/// What the riven overlay shows, with its view number; null when it hides.
+pub const RIVEN_VIEW: &str = "riven-view";
 pub const RIVEN_ROLL_SAVED: &str = "riven-roll-saved";
-pub const RIVEN_OVERLAY_HIDE: &str = "riven-overlay-hide";
-pub const RIVEN_SCANNING_START: &str = "riven-scanning-start";
-pub const RIVEN_SCREEN_OPEN: &str = "riven-screen-open";
-pub const RIVEN_SCREEN_CLOSE: &str = "riven-screen-close";
 pub const RIVEN_UNVEILED: &str = "riven-unveiled";
 
 pub const INVENTORY_UPDATE: &str = "inventory-update";

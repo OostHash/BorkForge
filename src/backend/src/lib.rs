@@ -35,10 +35,11 @@ mod mem_regions;
 mod memory_scanner;
 mod monitor;
 mod ocr;
-mod ocr_fallback;
 mod overlay_key;
+mod overlays;
 mod paths;
 mod platform;
+mod player;
 mod pricing;
 mod refresh;
 mod relic_pick;
@@ -58,17 +59,6 @@ mod wfm_top;
 mod worldstate;
 
 // ─── Structs ──────────────────────────────────────────────────────────────────
-
-pub struct OcrParams<'a> {
-    pixels: &'a [u8],
-    pix_w: u32,
-    pix_h: u32,
-    game_h: u32,
-    catalog: &'a [(String, String)],
-    capture_info: &'a str,
-    hint_squad_size: Option<usize>,
-    player_names: &'a [String],
-}
 
 pub struct BlobBuildParams<'a> {
     blob: &'a memory_scanner::BlobInventory,
@@ -322,16 +312,27 @@ fn setup_app(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     // NEVER hide relic-overlay — breaks DirectComposition on transparent WebView2.
     if let Some(win) = app.get_webview_window("relic-overlay") {
         let _ = win.show();
-        let _ = win.set_position(tauri::Position::Physical(tauri::PhysicalPosition {
-            x: 0,
-            y: -3000,
-        }));
+        overlays::window::park_reward(app.handle());
+    }
+
+    // Relic Pick uses the same lifetime-safe pattern: keep its WebView2 alive
+    // and move it on/off screen instead of suspending it with native hide().
+    if let Some(win) = app.get_webview_window(overlays::window::RELIC_PICK) {
+        let _ = win.show();
+        let _ = overlays::window::park_relic_pick(app.handle());
+    }
+
+    // Its empty page is transparent; keeping it on screen lets it receive the
+    // first status event without covering or taking input from the game.
+    if let Some(win) = app.get_webview_window(overlays::window::STATUS) {
+        let _ = win.set_ignore_cursor_events(true);
+        let _ = overlays::window::show_overlay_status_window(app.handle().clone());
     }
 
     // Single EE.log tailer — started once, unconditionally, and runs for the app's
-    // lifetime. Handles riven-screen, relic-pick, trade-completion and WFM-whisper
-    // detection regardless of the memory scanner toggle (plain file I/O, not memory
-    // reading); the relic-reward OCR trigger inside it self-gates on `monitor_active`.
+    // lifetime. Feeds the overlay runtime and handles trade-completion and
+    // WFM-whisper detection regardless of the memory scanner toggle (plain file
+    // I/O, not memory reading); the reward card read gates on `monitor_active`.
     {
         let state = app.state::<AppState>();
         let relic_rewards_map = state
@@ -339,6 +340,7 @@ fn setup_app(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
             .lock()
             .unwrap_or_else(|e| e.into_inner())
             .clone();
+        overlays::start(app.handle().clone());
         reward_watcher::spawn_reward_watcher_thread(reward_watcher::RewardWatcherDeps {
             app: app.handle().clone(),
             flag: state.monitor_active.clone(),
@@ -453,7 +455,7 @@ pub fn run() {
     let data_dir = paths::data_dir();
     let cache_dir = paths::cache_dir();
 
-    ocr_fallback::set_data_dir(cache_dir.clone());
+    hexdesk_capture::set_model_dir(cache_dir.join("ocr_models"));
 
     // ── Path definitions ───────────────────────────────────────────────────
     let db_path = data_dir.join("data.db");
@@ -580,9 +582,9 @@ pub fn run() {
             corrections: initial.corrections,
             force_pid_check: Arc::new(AtomicBool::new(false)),
             relic_pick_overlay_enabled: Arc::new(AtomicBool::new(false)),
-            relic_pick_session: Arc::new(std::sync::atomic::AtomicU64::new(0)),
-            reward_overlay_active: Arc::new(AtomicBool::new(false)),
-            reward_key_request: Arc::new(std::sync::atomic::AtomicU8::new(0)),
+            riven_overlay_enabled: Arc::new(AtomicBool::new(false)),
+            overlay_manual: Arc::new(AtomicBool::new(false)),
+            relic_reward_overlay_enabled: Arc::new(AtomicBool::new(false)),
             overlays_enabled: Arc::new(AtomicBool::new(false)),
         })
         .setup(setup_app)
@@ -621,7 +623,6 @@ pub fn run() {
             updater::install_update,
             settings::factory_reset,
             wfm_commands::wfm_set_status,
-            rivens::ocr_riven_log_error,
             rivens::save_riven_roll,
             rivens::get_saved_riven_rolls,
             rivens::delete_saved_riven_roll,
@@ -629,7 +630,6 @@ pub fn run() {
             rivens::get_riven_weapons,
             rivens::reload_riven_database,
             rivens::analyze_riven,
-            rivens::ocr_riven_screen,
             wfm_commands::wfm_get_item_orders,
             wfm_commands::wfm_get_item_statistics,
             wfm_commands::wfm_refresh_token,
@@ -659,11 +659,11 @@ pub fn run() {
             syndicates::get_syndicate_stores,
             syndicates::get_research_lab_stores,
             worldstate::fetch_worldstate,
-            relic_pick::get_warframe_window_rect,
-            relic_pick::get_pending_relic_rewards,
+            overlays::window::get_warframe_window_rect,
+            overlays::reward::get_pending_relic_rewards,
             diagnostics::log_relic_fe,
-            relic_pick::show_overlay_window,
-            relic_pick::move_overlay_offscreen,
+            overlays::window::show_overlay_window,
+            overlays::window::move_overlay_offscreen,
             image_cache::get_img_cache_dir,
             image_cache::prewarm_image_cache,
             diagnostics::export_diagnostics,
@@ -673,17 +673,29 @@ pub fn run() {
             monitor::stop_monitor,
             monitor::poke_scan,
             monitor::set_relic_pick_enabled,
+            monitor::set_riven_enabled,
+            monitor::set_overlay_manual,
+            captures::set_overlay_areas,
+            monitor::set_relic_reward_enabled,
             monitor::set_overlays_enabled,
             monitor::get_monitor_status,
             platform::get_system_locale,
             catalogue::get_current_crafting,
-            relic_pick::show_relic_pick_window,
+            overlays::window::show_relic_pick_window,
+            overlays::window::show_overlay_status_window,
             overlay_key::set_overlay_key,
             overlay_key::set_overlay_key_capture,
+            overlays::overlay_rendered,
+            overlays::overlay_closed,
+            overlays::check_riven,
+            overlays::show_riven_window,
+            player::get_reward_cards,
             captures::get_capture,
+            captures::set_overlay_screenshot,
             wfcd::get_drop_data,
             pricing::get_cache_statuses,
             pricing::refresh_all_caches,
+            overlays::window::park_relic_pick_window,
         ])
         .on_window_event(|window, event| {
             let label = window.label().to_string();

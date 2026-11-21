@@ -33,8 +33,8 @@ export const LEVEL_LABELS: Record<ConsoleLevel, string> = { error: "Errors", war
 
 export type ConsoleFilter = {
   levels: ReadonlySet<ConsoleLevel>;
-  /** One source, or null for all. */
-  source: string | null;
+  /** The sources to show; empty shows every source. */
+  sources: ReadonlySet<string>;
   /** One operation, or null for all. */
   op: number | null;
   /** Case-insensitive text in the message, code or fields. */
@@ -42,7 +42,7 @@ export type ConsoleFilter = {
 };
 
 /** Readable by default: debug entries are there, but hidden until asked for. */
-export const DEFAULT_FILTER: ConsoleFilter = { levels: new Set(["error", "warn", "info"]), source: null, op: null, text: "" };
+export const DEFAULT_FILTER: ConsoleFilter = { levels: new Set(["error", "warn", "info"]), sources: new Set(), op: null, text: "" };
 
 /** How many entries the console keeps, the same as the backend ring buffer. */
 export const MAX_ENTRIES = 2000;
@@ -51,7 +51,7 @@ export const consoleLevel = (level: LogLevel): ConsoleLevel => (level === "trace
 
 export function matchesFilter(entry: LogEntry, filter: ConsoleFilter): boolean {
   if (!filter.levels.has(consoleLevel(entry.level))) return false;
-  if (filter.source !== null && entry.source !== filter.source) return false;
+  if (filter.sources.size > 0 && !filter.sources.has(entry.source)) return false;
   if (filter.op !== null && entry.op !== filter.op && entry.repeat?.last_op !== filter.op) return false;
   const text = filter.text.trim().toLowerCase();
   if (text === "") return true;

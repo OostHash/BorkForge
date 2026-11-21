@@ -16,7 +16,6 @@ import { MainNav, type NavScreen } from "./MainNav";
 import { ModularDock } from "./ModularDock";
 import { NAV_ICONS } from "./navIcons";
 import { RelicOverlayController } from "./RelicOverlayController";
-import { RivenOverlayController } from "./RivenOverlayController";
 import { ScreenBoundary } from "./ScreenBoundary";
 import { TradeWatcher } from "./TradeWatcher";
 import { WindowTitleBar } from "./WindowTitleBar";
@@ -54,7 +53,6 @@ export function AppShell() {
       <FissureAlerts />
       <TradeWatcher />
       <RelicOverlayController />
-      <RivenOverlayController />
       <WindowTitleBar />
       <div className="flex min-h-0 flex-1">
         <MainNav

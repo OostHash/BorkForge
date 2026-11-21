@@ -1131,7 +1131,7 @@ impl Wfm {
     /// 48-hour median sell price for a slug, or None if unlisted. Uses the 48h
     /// VWAP when there are ≥3 recent trades, else falls back to the 90-day window.
     /// Returns Err only for network/parse failures, not for "item not listed" (Ok(None)).
-    #[tracing::instrument(level = "debug", skip_all, fields(slug = %slug))]
+    #[tracing::instrument(target = "hexdesk::market", level = "debug", skip_all, fields(slug = %slug))]
     pub fn price_for_slug(&self, slug: &str) -> Result<Option<u32>, DiagError> {
         self.wait();
         let url = format!("{}/v1/items/{}/statistics", API_BASE, slug);

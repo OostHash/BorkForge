@@ -18,9 +18,9 @@ import {
   type LogEntry,
 } from "../../domain/console";
 import { Button } from "../../primitives/actions";
-import { Badge, Icon } from "../../primitives/display";
+import { Badge, Chip, Icon } from "../../primitives/display";
 import type { Tone } from "../../primitives/display/tone";
-import { Checkbox, SearchInput, Select } from "../../primitives/forms";
+import { Checkbox, SearchInput } from "../../primitives/forms";
 import { ExportDiagnosticsButtons, useDiagnosticsExport } from "./ExportDiagnostics";
 import { ResultText, SettingsGroup, useSettingsFile } from "./parts";
 
@@ -146,7 +146,7 @@ function EntryRow({ entry, onOp }: { entry: LogEntry; onOp: (op: number) => void
   );
 }
 
-/** Level checkboxes, source, operation and search. */
+/** Level checkboxes, source chips, operation and search. */
 function Filters({ filter, sources, onChange }: { filter: ConsoleFilter; sources: string[]; onChange: (f: ConsoleFilter) => void }) {
   return (
     <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
@@ -167,21 +167,31 @@ function Filters({ filter, sources, onChange }: { filter: ConsoleFilter; sources
           </Checkbox>
         ))}
       </fieldset>
-      <Select
-        size="sm"
-        aria-label="Source"
-        value={filter.source ?? ""}
-        onChange={(event) => {
-          onChange({ ...filter, source: event.target.value === "" ? null : event.target.value });
-        }}
-      >
-        <option value="">All sources</option>
+      <fieldset className="flex flex-wrap items-center gap-1.5">
+        <legend className="sr-only">Sources</legend>
+        <Chip
+          active={filter.sources.size === 0}
+          onActiveChange={() => {
+            onChange({ ...filter, sources: new Set() });
+          }}
+        >
+          All sources
+        </Chip>
         {sources.map((s) => (
-          <option key={s} value={s}>
+          <Chip
+            key={s}
+            active={filter.sources.has(s)}
+            onActiveChange={(on) => {
+              const next = new Set(filter.sources);
+              if (on) next.add(s);
+              else next.delete(s);
+              onChange({ ...filter, sources: next });
+            }}
+          >
             {s}
-          </option>
+          </Chip>
         ))}
-      </Select>
+      </fieldset>
       <SearchInput
         size="sm"
         label="Search the log"
@@ -228,7 +238,23 @@ export function ConsoleTab() {
               set({ overlayKeyCapture: on });
             }}
           >
-            Save a capture on each overlay key press
+            Save what OCR reads on screen
+          </Checkbox>
+          <Checkbox
+            checked={overlayPrefsFrom(settings).overlayScreenshot}
+            onCheckedChange={(on) => {
+              set({ overlayScreenshot: on });
+            }}
+          >
+            Save a screenshot when an overlay is shown
+          </Checkbox>
+          <Checkbox
+            checked={overlayPrefsFrom(settings).overlayAreas}
+            onCheckedChange={(on) => {
+              set({ overlayAreas: on });
+            }}
+          >
+            Save the areas each screen read uses, outlined on the game
           </Checkbox>
           <div className="flex flex-wrap items-center justify-between gap-2">
             <p className="text-xs text-muted" aria-live="polite">

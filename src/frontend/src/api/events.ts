@@ -38,8 +38,11 @@ export type InventoryUpdatePayload = {
   is_full_pass?: boolean;
 };
 
-/** Locked relic rewards: uniqueName per slot ("?:text" when OCR did not recognise it) and the slot's x (0–1). */
-export type RelicRewards = { items: string[]; positions: number[] };
+/**
+ * Locked relic rewards: uniqueName per slot ("?:text" when OCR did not recognise it), the slot's x (0–1),
+ * and per slot whether the match is uncertain (reads disagreed, or only part of the name was read).
+ */
+export type RelicRewards = { items: string[]; positions: number[]; uncertain?: boolean[] };
 
 export interface EventMap {
   "settings-updated": unknown;
@@ -77,7 +80,7 @@ export interface EventMap {
   "relic-screen": boolean;
   /** Overlays were switched off: every overlay window hides. */
   "overlays-disabled": unknown;
-  /** Short backend status line, shown for a few seconds. */
+  /** Short backend status line for the app header and the in-game status window. */
   "status-line": string;
   /** The relic selection screen opened: which relics to run. */
   "relic-pick-open": RelicPick;
@@ -85,17 +88,8 @@ export interface EventMap {
   /** Settings preview of the relic pick overlay. */
   "relic-pick-preview": unknown;
   "relic-pick-preview-close": unknown;
-  /** EE.log: a riven card screen opened / closed. */
-  "riven-screen-open": unknown;
-  "riven-screen-close": unknown;
-  /** Check the riven on screen now (overlay button, Rivens → Check Riven). */
-  "riven-manual-check": unknown;
-  /** The riven overlay wants to close (its close button, a cancelled preview). */
-  "riven-overlay-hide": { reason?: string };
-  /** The riven overlay window listens now and wants the current view. */
-  "riven-window-ready": unknown;
-  /** The riven overlay's state, from the main window. */
-  "riven-view": RivenView;
+  /** The riven overlay's state, from the backend; null when it hides. */
+  "riven-view": RivenView | null;
   /** Settings preview of the riven overlay. */
   "riven-preview": unknown;
   "riven-preview-close": unknown;
@@ -126,8 +120,6 @@ export function emitEvent(
     | "relic-reward-preview-close"
     | "relic-pick-preview"
     | "relic-pick-preview-close"
-    | "riven-manual-check"
-    | "riven-window-ready"
     | "riven-preview"
     | "riven-preview-close"
     | "riven-roll-saved",
@@ -136,9 +128,6 @@ export function emitEvent(
 }
 
 /** Window-to-window events that carry data. */
-export function emitWith<E extends "riven-view" | "riven-overlay-hide" | "relic-screen" | "changelog-open-inventory">(
-  event: E,
-  payload: EventMap[E],
-): Promise<void> {
+export function emitWith<E extends "relic-screen" | "changelog-open-inventory" | "status-line">(event: E, payload: EventMap[E]): Promise<void> {
   return emit(event, payload);
 }

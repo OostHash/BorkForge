@@ -298,12 +298,7 @@ pub fn is_elevated() -> Option<bool> {
     }
 }
 
-// ─── Screen Capture ───────────────────────────────────────────────────────────
-// Delegated to crate::ocr::windows — ocr is self-contained with its own
-// Windows capture code, no circular dependency needed.
-
-// ─── OCR Engine ───────────────────────────────────────────────────────────────
-// Delegated to crate::ocr::windows — same as above.
+// Screen capture and OCR live in src/backend/crates/capture.
 
 // ─── Locale ───────────────────────────────────────────────────────────────────
 

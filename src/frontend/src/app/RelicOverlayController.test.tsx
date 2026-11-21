@@ -36,11 +36,14 @@ const mount = (client: QueryClient) =>
   );
 
 it("tells the backend the overlay switches once settings are read", async () => {
-  const { client, find } = setup({ relicPickEnabled: false });
+  const { client, find } = setup({ relicPickEnabled: false, overlayEnabled: false });
   await mount(client);
   await vi.waitFor(() => {
     expect(find("set_overlays_enabled")[0]?.args).toEqual({ enabled: true });
     expect(find("set_relic_pick_enabled")[0]?.args).toEqual({ enabled: false });
+    expect(find("set_relic_reward_enabled")[0]?.args).toEqual({ enabled: false });
+    expect(find("set_riven_enabled")[0]?.args).toEqual({ enabled: true });
+    expect(find("set_overlay_manual")[0]?.args).toEqual({ enabled: false });
   });
 });
 

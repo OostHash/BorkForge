@@ -4,10 +4,10 @@ import type { FoundryItem, RecipeComponent } from "../domain/foundry";
 import type { CacheStatuses } from "../domain/cache";
 import type { LogEntry } from "../domain/console";
 import type { RelicRewards } from "./events";
-import type { OcrRiven } from "../domain/rivenOverlay";
 import type { ChangeEntry } from "../domain/inventory";
 import type { WfmItemInfo, WfmItemOrders, WfmStatPoint } from "../domain/market";
 import type { CatalogItem } from "../domain/relics";
+import type { BackendCard } from "../domain/relicReward";
 import type { SnapshotPoint, TopItem, TrackedItem, Trade } from "../domain/statistics";
 import type { OwnedRiven, RivenAnalysis, SavedRiven, WfmRivenAttribute } from "../domain/rivens";
 import type { WfmAuction, WfmManagedOrder } from "../domain/trading";
@@ -199,6 +199,8 @@ export interface CommandMap {
   get_pending_relic_rewards: { args: undefined; result: RelicRewards | null };
   /** Catalogue entries for these paths plus their prime-set siblings. */
   get_items_by_paths: { args: { paths: string[] }; result: CatalogItem[] };
+  /** Relic Reward cards with set parts and what the player owns of them. */
+  get_reward_cards: { args: { paths: string[] }; result: BackendCard[] };
   /** Cached warframe.market price by item name, or null. */
   get_item_price: { args: { itemName: string }; result: number | null };
   /** Foundry jobs the scanner saw. */
@@ -206,18 +208,31 @@ export interface CommandMap {
   /** Master switch for every overlay trigger in the backend. */
   set_overlays_enabled: { args: { enabled: boolean }; result: null };
   set_relic_pick_enabled: { args: { enabled: boolean }; result: null };
+  set_relic_reward_enabled: { args: { enabled: boolean }; result: null };
+  set_riven_enabled: { args: { enabled: boolean }; result: null };
+  /** Only the overlay key opens an overlay; EE.log lines still close one. */
+  set_overlay_manual: { args: { enabled: boolean }; result: null };
   /** The key that shows or hides the overlays, as a Windows virtual-key code (0 for none). */
   set_overlay_key: { args: { vk: number }; result: null };
   /** Save the screen title capture on each overlay key press, shown in the activity console. */
   set_overlay_key_capture: { args: { enabled: boolean }; result: null };
+  set_overlay_screenshot: { args: { enabled: boolean }; result: null };
+  /** Save the game frame with the areas each read uses outlined. */
+  set_overlay_areas: { args: { enabled: boolean }; result: null };
   /** A saved screen capture as .bmp bytes, by file name. */
   get_capture: { args: { name: string }; result: ArrayBuffer };
   /** Places and shows the relic pick window (no payload): previews and offset changes. */
   show_relic_pick_window: { args: undefined; result: null };
-  /** Reads the riven card on screen (OCR). */
-  ocr_riven_screen: { args: undefined; result: OcrRiven };
-  /** Appends a line to the riven session log. */
-  ocr_riven_log_error: { args: { error: string }; result: null };
+  /** Parks the relic pick window off-screen while keeping its transparent WebView2 alive. */
+  park_relic_pick_window: { args: undefined; result: null };
+  /** Places the status line at the top centre of the game window. */
+  show_overlay_status_window: { args: undefined; result: null };
+  overlay_closed: { args: undefined; result: null };
+  overlay_rendered: { args: { overlay: "relic_pick" | "relic_reward" | "riven"; view: number; summary: string }; result: null };
+  /** Runs a riven check: a new roll on the riven screen, or the riven screen opened as by the overlay key. */
+  check_riven: { args: undefined; result: null };
+  /** Places and shows the riven window (no view): the Settings preview. */
+  show_riven_window: { args: undefined; result: null };
   /** Appends "[FE] msg" to the overlay session log (Settings → Debugging → Overlay log). */
   log_relic_fe: { args: { msg: string }; result: null };
   // ── Diagnostics (Settings → Debugging, Settings → Console) ──

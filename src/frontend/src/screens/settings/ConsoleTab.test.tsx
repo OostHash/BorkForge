@@ -81,13 +81,18 @@ it("shows the reason behind a failure when an entry is opened", async () => {
   await expect.element(list().getByRole("button", { name: "Copy line" })).toBeVisible();
 });
 
-it("filters on source and on one operation", async () => {
+it("filters on one or more sources and on one operation", async () => {
   await mount();
-  await page.getByRole("combobox", { name: "Source" }).selectOptions("market");
+  await page.getByRole("button", { name: "market", exact: true }).click();
   await expect.element(list().getByText("Warframe process found")).not.toBeInTheDocument();
   await expect.element(list().getByText("Top-items ranking refreshed")).toBeVisible();
 
-  await page.getByRole("combobox", { name: "Source" }).selectOptions("");
+  await page.getByRole("button", { name: "scanner", exact: true }).click();
+  await expect.element(list().getByText("Warframe process found")).toBeVisible();
+  await expect.element(list().getByText("Top-items ranking refreshed")).toBeVisible();
+
+  await page.getByRole("button", { name: "All sources" }).click();
+  await expect.element(page.getByRole("button", { name: "market", exact: true })).toHaveAttribute("aria-pressed", "false");
   await list().getByRole("button", { name: "Show only operation #12" }).first().click();
   // An operation shows all its steps, debug included.
   await expect.element(list().getByText("Candidate found")).toBeVisible();
@@ -107,7 +112,7 @@ it("adds new entries live", async () => {
 it("saves the capture choice and shows a saved capture in the entry details", async () => {
   const calls: Array<{ cmd: string; args: unknown }> = [];
   await mount([entry(1, { source: "overlay", message: "Overlay key capture saved", fields: { capture: "overlay-key-1.bmp" } })], calls);
-  await page.getByRole("checkbox", { name: "Save a capture on each overlay key press" }).click();
+  await page.getByRole("checkbox", { name: "Save what OCR reads on screen" }).click();
   await expect
     .poll(() => calls.some((c) => c.cmd === "save_settings" && (c.args as { json: string }).json.includes('"overlayKeyCapture":true')))
     .toBe(true);

@@ -132,7 +132,8 @@
   /* Overlay windows stay transparent; only the main window paints --ff-bg. */
   html[data-window="overlay"],
   html[data-window="riven-overlay"],
-  html[data-window="relic-pick-overlay"] {
+  html[data-window="relic-pick-overlay"],
+  html[data-window="overlay-status"] {
     background: transparent;
   }
 
