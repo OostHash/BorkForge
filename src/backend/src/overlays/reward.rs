@@ -613,7 +613,8 @@ pub(crate) async fn capture_reward_items(
         let (frame, info) = crate::ocr::capture_warframe_reward_area()?;
         let capture_ms = started.elapsed().as_millis() as u64;
         let bmp = frame.to_bmp();
-        let read = hexdesk_capture::recognize_bmp(&bmp, frame.width, frame.height);
+        let read =
+            crate::ocr::recognize(crate::ocr::Reader::Rewards, &bmp, frame.width, frame.height);
         let ocr_ms = started.elapsed().as_millis() as u64 - capture_ms;
         let saved = match &read {
             Ok(read) if crate::captures::enabled() => {

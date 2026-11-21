@@ -53,6 +53,11 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   the overlays are doing, such as reading the screen, retrying or showing an
   overlay. Turn it off, change how long it stays visible or move it in
   Settings → Overlays → Status.
+- "Read small text more accurately" in Settings → General downloads about
+  12 MB of OCR models once. They read what Windows OCR misses, such as relic
+  counts and refinement tags. Without them HexDesk reads with Windows OCR
+  alone. The activity console shows which engine read each screen and how
+  long it took.
 
 ### Changed
 
@@ -96,6 +101,15 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   did not confirm when OCR misses a tile. While Relic Reward is visible, title
   OCR now also closes or replaces it when the game leaves the reward screen,
   as a fallback for delayed EE.log lines.
+- Relic Pick opens sooner: it stops reading the relic list as soon as two
+  reads agree on the relics, refinements, ownership and counts, instead of
+  reading again while unrecognized text on screen keeps changing. Faded
+  tiles, relics you do not have, are no longer read a second time. Relic
+  names and refinement tags are recognized despite small OCR errors.
+- Relic Pick reads the count badges ("x3") and refinement tags of your relics
+  on their own when the list read skipped them, and a name OCR dropped is
+  read again. With "Read small text more accurately" on, the extra OCR
+  models read what Windows OCR still could not.
 - The riven check runs in the background instead of in the main window,
   like the relic overlays. It opens on the riven screen, closes when you
   leave it, and the activity console follows each visit to the riven screen:

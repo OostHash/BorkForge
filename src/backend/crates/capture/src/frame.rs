@@ -98,15 +98,34 @@ impl Frame {
         Frame::new(pixels, self.width, self.height)
     }
 
-    /// The frame at twice the width and height, each pixel repeated.
+    /// The frame at twice the width and height, blended between pixels
+    /// (bilinear). Windows OCR reads nothing in short texts such as a count
+    /// badge when each pixel is only repeated: the letters come out blocky.
     pub fn upscale_2x(&self) -> Frame {
         let (w, h) = (self.width as usize, self.height as usize);
+        // An output pixel lies a quarter pixel from its nearest source pixel
+        // (weight 3) toward the next one (weight 1), clamped at the edges.
+        let near = |o: usize, n: usize| {
+            let i = o / 2;
+            let j = if o.is_multiple_of(2) {
+                i.saturating_sub(1)
+            } else {
+                (i + 1).min(n - 1)
+            };
+            (i, j)
+        };
+        let at = |x: usize, y: usize, c: usize| u32::from(self.pixels[(y * w + x) * 4 + c]);
         let mut out = vec![0u8; w * h * 16];
         for y in 0..h * 2 {
+            let (ya, yb) = near(y, h);
             for x in 0..w * 2 {
-                let src = ((y / 2) * w + x / 2) * 4;
+                let (xa, xb) = near(x, w);
                 let dst = (y * w * 2 + x) * 4;
-                out[dst..dst + 4].copy_from_slice(&self.pixels[src..src + 4]);
+                for c in 0..4 {
+                    let sum =
+                        9 * at(xa, ya, c) + 3 * at(xb, ya, c) + 3 * at(xa, yb, c) + at(xb, yb, c);
+                    out[dst + c] = ((sum + 8) / 16) as u8;
+                }
             }
         }
         Frame::new(out, self.width * 2, self.height * 2)
@@ -258,10 +277,14 @@ mod tests {
     }
 
     #[test]
-    fn upscale_repeats_each_pixel() {
-        let f = frame(&[[1; 4], [2; 4]], 2).upscale_2x();
+    fn upscale_blends_between_pixels() {
+        let f = frame(&[[0; 4], [160; 4]], 2).upscale_2x();
         assert_eq!((f.width, f.height), (4, 2));
-        assert_eq!(&f.pixels[..16], [[1; 4], [1; 4], [2; 4], [2; 4]].concat());
+        assert_eq!(
+            &f.pixels[..16],
+            [[0; 4], [40; 4], [120; 4], [160; 4]].concat()
+        );
+        assert_eq!(f.pixels[16..32], f.pixels[..16]);
     }
 
     #[test]

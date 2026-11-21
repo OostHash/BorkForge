@@ -1,7 +1,9 @@
 //! Capture and OCR of the game screen for the readers in this module, on top
 //! of `hexdesk-capture` (`src/backend/crates/capture`).
 
-use hexdesk_capture::{capture_game, Frame, Rect, TextRead};
+use std::time::Instant;
+
+use hexdesk_capture::{capture_game, Frame, Provider, Rect, TextRead};
 
 /// The text OCR read with its segments: (text, [(segment, centre x, centre y)]).
 pub type OcrResult = (String, Vec<(String, f32, f32)>);
@@ -38,9 +40,82 @@ const RELIC_LIST_TILES: Rect = Rect::new(0.0, 0.45, 0.2, 1.0);
 /// The screen title in the top-left corner.
 const SCREEN_TITLE: Rect = Rect::new(0.0, 0.6, 0.0, 0.15);
 
-/// Reads the text in a .bmp file.
-pub fn run_ocr(bmp: &[u8], width: u32, height: u32) -> Result<OcrResult, String> {
-    hexdesk_capture::recognize_bmp(bmp, width, height).map(|read| segmented(&read))
+/// A part of the game HexDesk reads; it names the log source of each read.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Reader {
+    /// The screen title in the top-left corner.
+    Title,
+    /// The relic tiles of a relic selection or refinement screen.
+    RelicList,
+    /// The reward cards of the fissure reward screen.
+    Rewards,
+    /// The riven card and the riven comparison screen.
+    Riven,
+}
+
+impl Reader {
+    fn id(self) -> &'static str {
+        match self {
+            Self::Title => "title",
+            Self::RelicList => "relicList",
+            Self::Rewards => "rewards",
+            Self::Riven => "riven",
+        }
+    }
+}
+
+/// Reads the text in a .bmp file, with Windows OCR where it is available,
+/// and logs which engine read it and how long that took.
+pub fn recognize(reader: Reader, bmp: &[u8], width: u32, height: u32) -> Result<TextRead, String> {
+    let read = recognize_quiet(bmp, width, height);
+    log_read(reader, &read.0, read.1);
+    read.0
+}
+
+/// Reads the text in a .bmp file with one given engine, logged like
+/// [`recognize`]: a second engine reading what the first could not.
+pub fn recognize_with(
+    reader: Reader,
+    provider: Provider,
+    bmp: &[u8],
+    width: u32,
+    height: u32,
+) -> Result<TextRead, String> {
+    let started = Instant::now();
+    let read = hexdesk_capture::recognize_bmp_with(provider, bmp, width, height);
+    log_read(reader, &read, started.elapsed().as_millis() as u64);
+    read
+}
+
+/// [`recognize`] without the log entry, for a reader that polls.
+fn recognize_quiet(bmp: &[u8], width: u32, height: u32) -> (Result<TextRead, String>, u64) {
+    let started = Instant::now();
+    let read = hexdesk_capture::recognize_bmp(bmp, width, height);
+    (read, started.elapsed().as_millis() as u64)
+}
+
+fn log_read(reader: Reader, read: &Result<TextRead, String>, ocr_ms: u64) {
+    let engine = read.as_ref().map_or("none", |read| read.engine.as_str());
+    let id = reader.id();
+    match reader {
+        Reader::RelicList => {
+            hexdesk_diag::debug!(relic_pick, reader = id, engine, ocr_ms, "OCR read")
+        }
+        Reader::Rewards => {
+            hexdesk_diag::debug!(relic_reward, reader = id, engine, ocr_ms, "OCR read")
+        }
+        Reader::Riven => {
+            hexdesk_diag::debug!(riven, reader = id, engine, ocr_ms, "OCR read")
+        }
+        Reader::Title => {
+            hexdesk_diag::debug!(overlay, reader = id, engine, ocr_ms, "OCR read")
+        }
+    }
+}
+
+/// Reads the text in a .bmp file and splits it into segments.
+fn run_ocr(reader: Reader, bmp: &[u8], width: u32, height: u32) -> Result<OcrResult, String> {
+    recognize(reader, bmp, width, height).map(|read| segmented(&read))
 }
 
 /// The game window as BGRA pixels with their width and height.
@@ -75,11 +150,11 @@ fn ocr_rect(pixels: &[u8], w: u32, h: u32, rect: Rect, gray: bool) -> Result<Str
     if gray {
         part = part.grayscale();
     }
-    run_ocr(&part.to_bmp(), part.width, part.height).map(|(text, _)| text)
+    run_ocr(Reader::Riven, &part.to_bmp(), part.width, part.height).map(|(text, _)| text)
 }
 
-/// The text in a part of a captured frame, in grey; coordinates are 0.0 to
-/// 1.0 fractions.
+/// The text in a part of a captured riven screen, in grey; coordinates are
+/// 0.0 to 1.0 fractions.
 pub fn ocr_pixels_rect(
     pixels: &[u8],
     w: u32,
@@ -98,8 +173,8 @@ pub fn ocr_pixels_rect(
     )
 }
 
-/// The text in a part of a captured frame, as captured: white text on a dark
-/// background reads well without the grey step.
+/// The text in a part of a captured riven screen, as captured: white text on
+/// a dark background reads well without the grey step.
 pub fn ocr_pixels_rect_raw(
     pixels: &[u8],
     w: u32,
@@ -128,10 +203,10 @@ pub struct ScreenRead {
     pub frame: Frame,
 }
 
-fn read_part(frame: &Frame, rect: Rect) -> Result<ScreenRead, String> {
+fn read_part(reader: Reader, frame: &Frame, rect: Rect) -> Result<ScreenRead, String> {
     let part = frame.crop(rect)?.grayscale();
     let image = part.to_bmp();
-    let read = hexdesk_capture::recognize_bmp(&image, part.width, part.height)?;
+    let read = recognize(reader, &image, part.width, part.height)?;
     Ok(ScreenRead {
         image,
         read,
@@ -144,7 +219,7 @@ fn read_part(frame: &Frame, rect: Rect) -> Result<ScreenRead, String> {
 pub fn read_relic_list() -> Result<ScreenRead, String> {
     let frame = capture_game()?.frame;
     crate::captures::save_areas("relic-list", &frame, &[RELIC_LIST_HEAD, RELIC_LIST_TILES]);
-    read_part(&frame, RELIC_LIST)
+    read_part(Reader::RelicList, &frame, RELIC_LIST)
 }
 
 /// What was read from the screen title in the top-left corner of the game.
@@ -165,21 +240,22 @@ pub struct ScreenTitle {
 /// screen and at another size on the next. Returns the accepted read, or the
 /// last one. Fails when the game window cannot be captured.
 pub fn read_screen_title(accept: impl Fn(&str) -> bool) -> Result<ScreenTitle, String> {
-    read_screen_title_with(accept, true)
+    read_screen_title_with(accept, false)
 }
 
-/// Reads the screen title without saving the outlined debug area. Used by a
-/// background watcher, where saving every poll would flood the captures list.
+/// Reads the screen title without saving the outlined debug area or logging
+/// each OCR read. Used by a background watcher, where doing so on every poll
+/// would flood the captures list and the log.
 pub fn read_screen_title_quiet(accept: impl Fn(&str) -> bool) -> Result<ScreenTitle, String> {
-    read_screen_title_with(accept, false)
+    read_screen_title_with(accept, true)
 }
 
 fn read_screen_title_with(
     accept: impl Fn(&str) -> bool,
-    save_debug_area: bool,
+    polled: bool,
 ) -> Result<ScreenTitle, String> {
     let frame = capture_game()?.frame;
-    if save_debug_area {
+    if !polled {
         crate::captures::save_areas("screen-title", &frame, &[SCREEN_TITLE]);
     }
     let gray = frame.crop(SCREEN_TITLE)?.grayscale();
@@ -192,9 +268,11 @@ fn read_screen_title_with(
     let mut last = None;
     for (scale, frame) in sizes {
         let bmp = frame.to_bmp();
-        let text = run_ocr(&bmp, frame.width, frame.height)
-            .ok()
-            .map(|(text, _)| text);
+        let (read, ocr_ms) = recognize_quiet(&bmp, frame.width, frame.height);
+        if !polled {
+            log_read(Reader::Title, &read, ocr_ms);
+        }
+        let text = read.ok().map(|read| segmented(&read).0);
         let accepted = text.as_deref().is_some_and(&accept);
         attempts.push((scale, text.clone().unwrap_or_default(), accepted));
         last = Some((text, bmp, scale));

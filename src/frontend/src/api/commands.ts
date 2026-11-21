@@ -26,6 +26,8 @@ export interface CommandMap {
   load_settings: { args: undefined; result: string };
   /** Merges the given top-level keys into the settings file; emits settings-updated. */
   save_settings: { args: { json: string }; result: null };
+  /** Allows the ocrs models, downloading them first, or stops using them. */
+  set_ocr_models: { args: { enabled: boolean }; result: null };
   /** Owned quantity per uniqueName. */
   get_current_quantities: { args: undefined; result: Record<string, number> };
   /** Cached companion-API inventory; only consumedSuits (Helminth) is used so far. */

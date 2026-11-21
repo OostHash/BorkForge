@@ -15,7 +15,10 @@ mod frame;
 mod screen;
 mod text;
 
-pub use engine::{languages, recognize_bmp, set_model_dir};
+pub use engine::{
+    languages, prepare_provider, provider_ready, recognize_bmp, recognize_bmp_with, set_model_dir,
+    Provider,
+};
 pub use frame::{bgra_to_bmp, Frame, Rect};
 pub use screen::{capture_game, capture_screen, Capture, Method};
 pub use text::{Line, TextRead, Word};

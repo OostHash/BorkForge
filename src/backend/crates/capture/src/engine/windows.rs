@@ -48,6 +48,12 @@ fn engine() -> Option<OcrEngine> {
     None
 }
 
+/// Whether Windows can create an OCR engine with an installed language.
+pub(crate) fn available() -> bool {
+    init_com();
+    engine().is_some()
+}
+
 /// Reads the text in a .bmp file of `width` by `height` pixels.
 pub(crate) fn recognize(bmp: &[u8], width: u32, height: u32) -> Result<TextRead, EngineError> {
     init_com();

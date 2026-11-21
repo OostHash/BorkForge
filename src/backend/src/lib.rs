@@ -467,6 +467,8 @@ pub fn run() {
     let inventory_state_cache_path = cache_dir.join("inventory_state_cache.json");
     let settings_path = config_dir.join("settings.json");
 
+    ocr::load_models_setting(&read_settings_map(&settings_path).unwrap_or_default());
+
     let wfm_top_cache_path = cache_dir.join("wfm_top_cache.json");
     let syndicate_catalog_path = cache_dir.join("syndicate_catalog.json");
     let img_cache_dir = cache_dir.join("img_cache");
@@ -605,6 +607,7 @@ pub fn run() {
             monitor::clear_cache,
             settings::load_settings,
             settings::save_settings,
+            ocr::set_ocr_models,
             settings::force_quit,
             catalogue::get_weapon_catalog,
             catalogue::get_craftable_items,
@@ -682,6 +685,7 @@ pub fn run() {
             platform::get_system_locale,
             catalogue::get_current_crafting,
             overlays::window::show_relic_pick_window,
+            overlays::window::park_relic_pick_window,
             overlays::window::show_overlay_status_window,
             overlay_key::set_overlay_key,
             overlay_key::set_overlay_key_capture,
@@ -695,7 +699,6 @@ pub fn run() {
             wfcd::get_drop_data,
             pricing::get_cache_statuses,
             pricing::refresh_all_caches,
-            overlays::window::park_relic_pick_window,
         ])
         .on_window_event(|window, event| {
             let label = window.label().to_string();

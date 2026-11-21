@@ -2,7 +2,7 @@
 //! (json) and the picture at a quarter of its size in grey (PGM), from
 //! `tests/fixtures/relic-list/`.
 
-use hexdesk_capture::{Frame, TextRead};
+use hexdesk_capture::{Frame, Line, TextRead, Word};
 use hexdesk_overlays::read::relic_list::{read_relic_list, Names, RelicList};
 
 fn fixture(name: &str) -> (TextRead, Frame) {
@@ -54,6 +54,50 @@ fn tile(list: &RelicList, relic: &str, refinement: &str) -> (Option<bool>, Optio
 }
 
 const MESO: &str = "A1 A2 A3 A4 A5 A6 A12 C1 C11 D8 D9 K8 K9 L5 V1 V13 V15 V17 X1 Y2";
+
+fn word(text: &str, left: f32, top: f32, width: f32) -> Word {
+    Word {
+        text: text.to_string(),
+        left,
+        top,
+        width,
+        height: 0.02,
+    }
+}
+
+#[test]
+fn ocrs_rellc_still_anchors_a_radiant_tile() {
+    let text = TextRead {
+        engine: "ocrs".to_string(),
+        width: 100,
+        height: 100,
+        lines: vec![
+            Line {
+                text: "Neo V1 3 Rellc".to_string(),
+                words: vec![
+                    word("Neo", 0.10, 0.30, 0.05),
+                    word("V1", 0.16, 0.30, 0.04),
+                    word("3", 0.20, 0.30, 0.02),
+                    word("Rellc", 0.23, 0.30, 0.06),
+                ],
+            },
+            Line {
+                text: "IRadiantl".to_string(),
+                words: vec![word("IRadiantl", 0.14, 0.325, 0.10)],
+            },
+        ],
+    };
+    let frame = Frame::new(vec![255; 100 * 100 * 4], 100, 100);
+    let owned = vec!["Neo V13".to_string()];
+    let names = Names {
+        owned: &owned,
+        all: &owned,
+    };
+
+    let list = read_relic_list(&text, &frame, &names, &|_| None);
+
+    assert_eq!(tile(&list, "Neo V13", "Radiant").0, Some(true));
+}
 
 #[test]
 fn the_meso_refinement_list() {
@@ -196,6 +240,25 @@ fn a_name_read_again_on_its_own_is_matched() {
         .tiles
         .iter()
         .all(|t| t.relic.as_deref() != Some("Meso V1")));
+}
+
+#[test]
+fn a_faded_tile_is_not_read_again() {
+    let (text, frame) = fixture("refinement-meso");
+    let all = era("Meso", MESO);
+    let names = Names {
+        owned: &[],
+        all: &all,
+    };
+    let rereads = std::cell::Cell::new(0);
+    let list = read_relic_list(&text, &frame, &names, &|_| {
+        rereads.set(rereads.get() + 1);
+        None
+    });
+    let faded = list.tiles.iter().filter(|t| t.owned == Some(false)).count();
+    assert!(faded > 0);
+    // With no owned names every tile the player has is read again once.
+    assert_eq!(rereads.get(), list.tiles.len() - faded);
 }
 
 #[test]

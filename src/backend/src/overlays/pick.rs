@@ -4,8 +4,12 @@
 
 use std::time::{Duration, Instant};
 
+use crate::ocr::Reader;
+use hexdesk_capture::Provider;
 use hexdesk_overlays::read::era_of_list;
-use hexdesk_overlays::read::relic_list::{read_relic_list, Names, RelicList};
+use hexdesk_overlays::read::relic_list::{
+    read_relic_list_with, Names, ReadLines, ReadText, RelicList,
+};
 use hexdesk_overlays::VisitId;
 use tracing::Span;
 
@@ -61,7 +65,7 @@ pub(super) fn read(app: tauri::AppHandle, visit: VisitId, wait_for_render: bool,
             let tiles = read_tiles(visit, era, &list, &app);
             let same = latest
                 .as_ref()
-                .is_some_and(|(e, t)| *e == era && t.summary() == tiles.summary());
+                .is_some_and(|(e, t)| *e == era && t.reads_the_same(&tiles));
             latest = Some((era, tiles));
             if same {
                 stable = true;
@@ -164,12 +168,34 @@ fn read_tiles(visit: VisitId, era: &str, list: &ScreenRead, app: &tauri::AppHand
         all: &all,
     };
     let reread = |part: &hexdesk_capture::Frame| {
-        hexdesk_capture::recognize(part)
+        crate::ocr::recognize(Reader::RelicList, &part.to_bmp(), part.width, part.height)
             .ok()
             .map(|read| read.text().split_whitespace().collect::<Vec<_>>().join(" "))
             .filter(|text| !text.trim().is_empty())
     };
-    let tiles = read_relic_list(&list.read, &list.frame, &names, &reread);
+    // Windows OCR skips small texts and drops some names in the whole list,
+    // so it reads the tags and badges of owned tiles on their own, and ocrs
+    // reads what it still could not, when the player allowed its models.
+    let windows = list.read.engine == "windows";
+    let fallback =
+        (windows && crate::ocr::ocrs_fallback()).then_some(|part: &hexdesk_capture::Frame| {
+            crate::ocr::recognize_with(
+                Reader::RelicList,
+                Provider::Ocrs,
+                &part.to_bmp(),
+                part.width,
+                part.height,
+            )
+            .ok()
+        });
+    let tiles = read_relic_list_with(
+        &list.read,
+        &list.frame,
+        &names,
+        &reread,
+        windows.then_some(&reread as ReadText<'_>),
+        fallback.as_ref().map(|f| f as ReadLines<'_>),
+    );
     let named = tiles.tiles.iter().filter(|t| t.relic.is_some()).count();
     let faded = tiles
         .tiles
@@ -187,6 +213,8 @@ fn read_tiles(visit: VisitId, era: &str, list: &ScreenRead, app: &tauri::AppHand
         faded,
         collected = %collected,
         complete = tiles.complete,
+        engine = %list.read.engine,
+        fallback = fallback.is_some(),
         "Relic tiles read: {}",
         tiles.summary()
     );
